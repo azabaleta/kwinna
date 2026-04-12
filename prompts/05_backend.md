@@ -5,7 +5,7 @@ Create backend in apps/api.
 
 REQUIREMENTS:
 
-- Node.js (Express or Nest)
+- Node.js + Express
 - Use contracts
 - Implement endpoints
 

@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "packageManager": "pnpm@9.0.0",
   "scripts": {
-    "dev": "pnpm -r dev",
+    "dev": "pnpm --parallel -r --filter '@kwinna/api' --filter '@kwinna/web' dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",

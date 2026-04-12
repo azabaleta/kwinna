@@ -3,7 +3,50 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── Design tokens → CSS variables (dark-first, siempre oscuro) ── */
+  :root {
+    --background:    222 47% 11%;   /* #0F172A */
+    --foreground:    220 14% 96%;   /* #E5E7EB */
+
+    --card:          223 44% 11%;   /* #111827 */
+    --card-foreground: 220 14% 96%;
+
+    --popover:       223 44% 11%;
+    --popover-foreground: 220 14% 96%;
+
+    --primary:       304 100% 22%;  /* #70005E */
+    --primary-foreground: 60 4% 97%; /* #F9F9F8 */
+
+    --secondary:     220 13% 96%;   /* #F5F5F4 */
+    --secondary-foreground: 222 47% 11%;
+
+    --muted:         220 20% 18%;
+    --muted-foreground: 220 14% 65%;
+
+    --accent:        30 15% 90%;    /* #E5DACE */
+    --accent-foreground: 222 47% 11%;
+
+    --destructive:   0 84% 60%;
+    --destructive-foreground: 220 14% 96%;
+
+    --border:        220 20% 20%;
+    --input:         220 20% 20%;
+    --ring:          304 100% 22%;
+
+    --radius: 1rem;
+
+    /* Custom semantic tokens */
+    --warning:       38 92% 50%;
+    --warning-foreground: 26 83% 14%;
+    --success:       142 71% 45%;
+    --success-foreground: 144 61% 14%;
+  }
+
   html {
-    @apply bg-background text-text;
+    @apply bg-background text-foreground;
+  }
+
+  * {
+    @apply border-border;
   }
 }

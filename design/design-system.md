@@ -1,8 +1,8 @@
 # DESIGN SYSTEM: KWINNA
 
 ## THEME OVERVIEW
-
-- Dark mode (default)
+- light mode (default)
+- Dark mode (option)
 - Minimal, moderno, limpio
 - Enfocado en legibilidad y contraste
 
@@ -52,7 +52,7 @@
 
 ## SHAPE SYSTEM
 
-- Border radius: 1 (ligeramente redondeado)
+- Border radius: 1rem (ligeramente redondeado)
 - Mantener consistencia en todos los componentes
 - Evitar bordes duros
 
