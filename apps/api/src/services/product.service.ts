@@ -1,10 +1,14 @@
-import type { Product } from "@kwinna/contracts";
-import { products } from "../db/seed";
+import type { Product, ProductCreateInput } from "@kwinna/contracts";
+import { findAllProducts, findProductById, insertProduct } from "../db/repositories";
 
-export function getAllProducts(): Product[] {
-  return products;
+export async function getAllProducts(): Promise<Product[]> {
+  return findAllProducts();
 }
 
-export function getProductById(id: string): Product | undefined {
-  return products.find((p) => p.id === id);
+export async function getProductById(id: string): Promise<Product | undefined> {
+  return findProductById(id);
+}
+
+export async function createProduct(input: ProductCreateInput): Promise<Product> {
+  return insertProduct(input);
 }

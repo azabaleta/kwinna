@@ -1,7 +1,6 @@
 import {
   StockListResponseSchema,
   StockMovementResponseSchema,
-  StockResponseSchema,
   type Stock,
   type StockListResponse,
   type StockMovement,
@@ -14,18 +13,26 @@ export async function fetchStock(): Promise<StockListResponse> {
   return StockListResponseSchema.parse(res.data);
 }
 
-export async function fetchProductStock(productId: Stock["productId"]): Promise<Stock> {
+/**
+ * GET /stock/:productId — retorna todas las variantes de talle del producto.
+ */
+export async function fetchProductStock(
+  productId: Stock["productId"]
+): Promise<Stock[]> {
   const res = await apiClient.get(`/stock/${productId}`);
-  return StockResponseSchema.parse(res.data).data;
+  return StockListResponseSchema.parse(res.data).data;
 }
 
 export interface StockInPayload {
   productId: StockMovement["productId"];
-  quantity: StockMovement["quantity"];
-  reason?: StockMovement["reason"];
+  quantity:  StockMovement["quantity"];
+  size?:     string;
+  reason?:   StockMovement["reason"];
 }
 
-export async function postStockIn(payload: StockInPayload): Promise<StockMovementResponse> {
+export async function postStockIn(
+  payload: StockInPayload
+): Promise<StockMovementResponse> {
   const res = await apiClient.post("/stock/in", payload);
   return StockMovementResponseSchema.parse(res.data);
 }

@@ -53,7 +53,7 @@ export default function LoginPage() {
       const { user, token } = await postLogin({ email, password });
       setSession(user, token);
       toast.success(`Bienvenido, ${user.name}`);
-      router.replace("/inventory");
+      router.replace("/admin/inventory");
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Error al iniciar sesión";

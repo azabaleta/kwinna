@@ -62,7 +62,7 @@ export function login(input: LoginInput): LoginResponse {
 export interface JwtPayload {
   sub: string;
   email: string;
-  role: "admin" | "operator";
+  role: "admin" | "operator" | "customer";
   iat: number;
   exp: number;
 }

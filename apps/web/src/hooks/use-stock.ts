@@ -30,9 +30,10 @@ export function useStock(): UseStockResult {
 }
 
 // ─── useProductStock ──────────────────────────────────────────────────────────
+// Retorna todas las variantes de talle para un producto (Stock[]).
 
 export interface UseProductStockResult {
-  stock: Stock | undefined;
+  stock: Stock[];
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
@@ -46,7 +47,7 @@ export function useProductStock(productId: Stock["productId"]): UseProductStockR
   });
 
   return {
-    stock: query.data,
+    stock: query.data ?? [],
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,
@@ -69,7 +70,6 @@ export function useStockIn(): UseStockInResult {
   const mutation = useMutation({
     mutationFn: postStockIn,
     onSuccess: () => {
-      // Invalida toda la rama de stock (lista + todos los detalles)
       queryClient.invalidateQueries({ queryKey: stockKeys.all });
     },
   });

@@ -1,119 +1,64 @@
 # PROJECT CONTEXT: KWINNA
 
 ## ROLE
-You are a senior fullstack engineer building a scalable production-ready system.
+You are a senior fullstack engineer and an autonomous "Claude Code" agent building a scalable, production-ready e-commerce platform and point-of-sale (POS) system.
 
 ---
 
-## GOAL
-Build a frontend + backend-ready architecture for a product inventory system used by:
-- Web app (Next.js) — cliente principal, fase actual
-- Desktop POS — cliente futuro (Electron/Tauri u otro); la API debe diseñarse para soportarlo desde ahora, pero no hay app de desktop en este monorepo por el momento
-
-The backend is the single source of truth.
+## BUSINESS GOAL
+Build a unified frontend + backend architecture for a product inventory and e-commerce system optimized for a women's clothing brand. 
+The platform operates as a backend API serving multiple clients:
+1. **Web App (Next.js)** — Online e-commerce storefront and admin dashboard.
+2. **Desktop POS** — Upcoming point-of-sale desktop application for physical store locations.
 
 ---
 
 ## STACK
 
-Frontend:
+**Frontend:**
 - Next.js (App Router)
 - TypeScript (strict)
-- Tailwind + shadcn/ui (instalar al comenzar la capa de UI)
+- Tailwind + shadcn/ui
+- Zustand (Client State)
 - TanStack Query
 - Axios
 - Zod
 
-Backend:
+**Backend:**
 - Node.js + Express
+- PostgreSQL
+- Drizzle ORM
 
-Shared:
+**Shared:**
 - Zod contracts
 
 ---
 
-## ARCHITECTURE (MANDATORY)
+## ARCHITECTURE COMMANDMENTS
 
-Monorepo:
-
+Monorepo workspace:
 apps/
-  web/
-  api/
-
+  web/       (Next.js Frontend)
+  api/       (Express Backend)
 packages/
-  contracts/
+  contracts/ (Shared definitions)
 
----
+### LAYER RULES
 
-## LAYER RULES
+- `components/` → Strict UI presentation only
+- `hooks/` → React Query / Data fetching
+- `services/` → Axios API calls
+- `store/` → Zustand state management
+- `schemas/` → Zod validation
+- `src/db/` (o similar) → Aislación estricta de la lógica de Base de Datos y el Drizzle ORM (Backend).
 
-- components → UI only
-- hooks → React Query
-- services → API calls
-- schemas → Zod validation
+### API & AUTH LOGIC
+- Totalmente RESTful.
+- **Misma API para web y desktop.**
+- Autenticación JWT mediante header `Authorization: Bearer <token>`.
+- El backend de ninguna manera dependerá de la lógica de cookies específica del frontend (Next.js).
 
----
+### DESIGN Y UX
+- Estilo premium para indumentaria femenina. Elegancia, tipografía cuidada, paleta coherente, transiciones sutiles y excelente UX mobile.
 
-## CONTRACT RULES
-
-- All schemas live in packages/contracts
-- No duplicated types
-- Use z.infer for TS types
-
----
-
-## API RULES
-
-- REST API
-- Single source of truth for stock
-- Same API for web + desktop
-
-## AUTHENTICATION
-
-- En scope para esta fase, pero simplificado
-- Usar JWT (sin refresh tokens por ahora)
-- El token se envía en el header Authorization: Bearer <token>
-- El API debe tener middleware de auth que proteja todas las rutas excepto /health y /auth/login
-- El cliente Axios debe adjuntar el token desde el store de sesión
-
-## PERSISTENCE
-
-- La fase actual usa in-memory storage en el backend (arrays en memoria)
-- Es un paso intermedio: la capa de datos debe estar aislada en un módulo propio (ej. src/db/ o src/repositories/) para facilitar la migración a una base de datos real (PostgreSQL previsto)
-- No mezclar lógica de negocio con el almacenamiento directamente en los handlers
-
----
-
-## VALIDATION
-
-- ALL API responses must be validated with Zod
-
----
-
-## CODE RULES
-
-- NO `any`
-- strict typing
-- use "@/"" imports
-
----
-
-## DESIGN
-
-- Follow design/design-system.md
-- Use tokens.json for Tailwind
-
----
-
-## TESTING
-
-- Vitest
-- MSW
-
----
-
-## IMPORTANT
-
-- Do NOT simplify architecture
-- Do NOT duplicate contracts
-- Prefer scalability over speed
+> NOTA DE FLUJO: Este archivo se mantiene inmutable a los pasos específicos. Para las tareas concretas, debes correr en secuencia los archivos en `prompts/`.

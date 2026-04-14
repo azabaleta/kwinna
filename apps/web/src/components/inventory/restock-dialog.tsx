@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, PackagePlus } from "lucide-react";
-import type { Product } from "@kwinna/contracts";
+import type { Product, Stock } from "@kwinna/contracts";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,21 +28,22 @@ import { useStockIn } from "@/hooks/use-stock";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface RestockDialogProps {
-  products: Product[];
-  /** stock actual indexado por productId, para calcular el nuevo total en el toast */
-  currentStock: Record<string, number>;
+  products:   Product[];
+  stockByProduct: Record<string, Stock[]>;
 }
 
 interface FormState {
   productId: string;
-  quantity: string;
-  reason: string;
+  size:      string;
+  quantity:  string;
+  reason:    string;
 }
 
 const INITIAL_FORM: FormState = {
   productId: "",
-  quantity: "",
-  reason: "",
+  size:      "",
+  quantity:  "",
+  reason:    "",
 };
 
 const REASON_OPTIONS = [
@@ -55,29 +56,38 @@ const REASON_OPTIONS = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function RestockDialog({ products, currentStock }: RestockDialogProps) {
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<FormState>(INITIAL_FORM);
+export function RestockDialog({ products, stockByProduct }: RestockDialogProps) {
+  const [open, setOpen]   = useState(false);
+  const [form, setForm]   = useState<FormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 
   const { mutateAsync, isPending } = useStockIn();
 
-  // Resetea el formulario cada vez que se abre el modal
+  // Talles conocidos para el producto seleccionado
+  const knownSizes: string[] = (stockByProduct[form.productId] ?? [])
+    .map((s) => s.size)
+    .filter((s): s is string => s !== undefined && s !== "");
+
+  const hasSizes = knownSizes.length > 0;
+
   useEffect(() => {
-    if (open) {
-      setForm(INITIAL_FORM);
-      setErrors({});
-    }
+    if (open) { setForm(INITIAL_FORM); setErrors({}); }
   }, [open]);
+
+  // Resetear size al cambiar de producto
+  function handleProductChange(val: string) {
+    setForm((f) => ({ ...f, productId: val, size: "" }));
+    setErrors((e) => ({ ...e, productId: undefined, size: undefined }));
+  }
 
   // ── Validation ──────────────────────────────────────────────────────────────
 
   function validate(): boolean {
-    const next: typeof errors = {};
+    const next: Partial<Record<keyof FormState, string>> = {};
 
-    if (!form.productId) {
-      next.productId = "Seleccioná un producto.";
-    }
+    if (!form.productId) next.productId = "Seleccioná un producto.";
+
+    if (hasSizes && !form.size) next.size = "Seleccioná el talle.";
 
     const qty = Number(form.quantity);
     if (!form.quantity || isNaN(qty) || qty <= 0 || !Number.isInteger(qty)) {
@@ -94,22 +104,24 @@ export function RestockDialog({ products, currentStock }: RestockDialogProps) {
     e.preventDefault();
     if (!validate()) return;
 
-    const qty = Number(form.quantity);
+    const qty     = Number(form.quantity);
     const product = products.find((p) => p.id === form.productId);
-    const prevQty = currentStock[form.productId] ?? 0;
-    const newQty = prevQty + qty;
+    const entries = stockByProduct[form.productId] ?? [];
+    const entry   = entries.find((s) => (s.size ?? "") === (form.size ?? ""));
+    const prevQty = entry?.quantity ?? 0;
 
     try {
       await mutateAsync({
         productId: form.productId,
-        quantity: qty,
-        reason: form.reason || undefined,
+        quantity:  qty,
+        size:      form.size || undefined,
+        reason:    form.reason || undefined,
       });
 
+      const sizeLabel = form.size ? ` · talle ${form.size}` : "";
       toast.success("Stock repuesto", {
-        description: `${product?.name ?? form.productId}: ${prevQty} → ${newQty} unidades`,
+        description: `${product?.name ?? ""}${sizeLabel}: ${prevQty} → ${prevQty + qty} uds.`,
       });
-
       setOpen(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error al reponer el stock";
@@ -122,7 +134,7 @@ export function RestockDialog({ products, currentStock }: RestockDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
+        <Button variant="outline" className="gap-2">
           <PackagePlus className="h-4 w-4" />
           Reponer Stock
         </Button>
@@ -132,7 +144,7 @@ export function RestockDialog({ products, currentStock }: RestockDialogProps) {
         <DialogHeader>
           <DialogTitle>Reponer Stock</DialogTitle>
           <DialogDescription>
-            Registrá un ingreso de mercadería. El stock se actualizará al instante.
+            Registrá un ingreso de mercadería por talle. El stock se actualiza al instante.
           </DialogDescription>
         </DialogHeader>
 
@@ -141,25 +153,14 @@ export function RestockDialog({ products, currentStock }: RestockDialogProps) {
 
             {/* ── Producto ── */}
             <div className="space-y-1.5">
-              <Label htmlFor="restock-product">Producto</Label>
-              <Select
-                value={form.productId}
-                onValueChange={(val) => {
-                  setForm((f) => ({ ...f, productId: val }));
-                  setErrors((e) => ({ ...e, productId: undefined }));
-                }}
-              >
-                <SelectTrigger id="restock-product" aria-invalid={!!errors.productId}>
+              <Label htmlFor="rs-product">Producto</Label>
+              <Select value={form.productId} onValueChange={handleProductChange}>
+                <SelectTrigger id="rs-product" aria-invalid={!!errors.productId}>
                   <SelectValue placeholder="Seleccioná un producto…" />
                 </SelectTrigger>
                 <SelectContent>
                   {products.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      <span>{p.name}</span>
-                      <span className="ml-2 text-xs text-muted-foreground">
-                        ({currentStock[p.id] ?? 0} en stock)
-                      </span>
-                    </SelectItem>
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -168,11 +169,66 @@ export function RestockDialog({ products, currentStock }: RestockDialogProps) {
               )}
             </div>
 
+            {/* ── Talle ── */}
+            {form.productId && (
+              <div className="space-y-1.5">
+                <Label htmlFor="rs-size">
+                  Talle
+                  {!hasSizes && (
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      (sin talle — accesorio)
+                    </span>
+                  )}
+                </Label>
+                {hasSizes ? (
+                  <>
+                    <Select
+                      value={form.size}
+                      onValueChange={(val) => {
+                        setForm((f) => ({ ...f, size: val }));
+                        setErrors((e) => ({ ...e, size: undefined }));
+                      }}
+                    >
+                      <SelectTrigger id="rs-size" aria-invalid={!!errors.size}>
+                        <SelectValue placeholder="Seleccioná el talle…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {knownSizes.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                        <SelectItem value="__new__">Nuevo talle…</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {form.size === "__new__" && (
+                      <Input
+                        placeholder="Ej: XS, XXL, 42…"
+                        value={""}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, size: e.target.value }))
+                        }
+                        autoFocus
+                      />
+                    )}
+                  </>
+                ) : (
+                  <Input
+                    id="rs-size"
+                    placeholder="Ej: S, M, L  (dejá vacío si no aplica)"
+                    value={form.size}
+                    onChange={(e) => setForm((f) => ({ ...f, size: e.target.value }))}
+                  />
+                )}
+                {errors.size && (
+                  <p className="text-xs text-destructive">{errors.size}</p>
+                )}
+              </div>
+            )}
+
             {/* ── Cantidad ── */}
             <div className="space-y-1.5">
-              <Label htmlFor="restock-qty">Cantidad</Label>
+              <Label htmlFor="rs-qty">Cantidad</Label>
               <Input
-                id="restock-qty"
+                id="rs-qty"
                 type="number"
                 min={1}
                 step={1}
@@ -191,22 +247,20 @@ export function RestockDialog({ products, currentStock }: RestockDialogProps) {
 
             {/* ── Motivo ── */}
             <div className="space-y-1.5">
-              <Label htmlFor="restock-reason">
-                Motivo{" "}
-                <span className="text-muted-foreground font-normal">(opcional)</span>
+              <Label htmlFor="rs-reason">
+                Motivo
+                <span className="ml-1 text-xs font-normal text-muted-foreground">(opcional)</span>
               </Label>
               <Select
                 value={form.reason}
                 onValueChange={(val) => setForm((f) => ({ ...f, reason: val }))}
               >
-                <SelectTrigger id="restock-reason">
+                <SelectTrigger id="rs-reason">
                   <SelectValue placeholder="Seleccioná un motivo…" />
                 </SelectTrigger>
                 <SelectContent>
                   {REASON_OPTIONS.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
-                    </SelectItem>
+                    <SelectItem key={r} value={r}>{r}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -215,26 +269,14 @@ export function RestockDialog({ products, currentStock }: RestockDialogProps) {
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={isPending}
-            >
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
               Cancelar
             </Button>
             <Button type="submit" disabled={isPending} className="gap-2">
-              {isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Guardando…
-                </>
-              ) : (
-                <>
-                  <PackagePlus className="h-4 w-4" />
-                  Reponer
-                </>
-              )}
+              {isPending
+                ? <><Loader2 className="h-4 w-4 animate-spin" />Guardando…</>
+                : <><PackagePlus className="h-4 w-4" />Reponer</>
+              }
             </Button>
           </DialogFooter>
         </form>

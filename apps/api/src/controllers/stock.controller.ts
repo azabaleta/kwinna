@@ -1,26 +1,51 @@
 import type { NextFunction, Request, Response } from "express";
-import type { StockInInput } from "../services/stock.service";
-import { addStock, getAllStock, getStockByProductId } from "../services/stock.service";
+import { addStock, getAllStock, getStockByProductId, type StockInInput } from "../services/stock.service";
 
-export function listStock(_req: Request, res: Response): void {
-  res.json({ data: getAllStock() });
-}
-
-export function getStock(req: Request, res: Response): void {
-  const entry = getStockByProductId(req.params["productId"] ?? "");
-
-  if (!entry) {
-    res.status(404).json({ error: "Stock entry not found", code: 404 });
-    return;
+export async function listStock(
+  _req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const stock = await getAllStock();
+    res.json({ data: stock });
+  } catch (err) {
+    next(err);
   }
-
-  res.json({ data: entry });
 }
 
-export function stockIn(req: Request, res: Response, next: NextFunction): void {
+/**
+ * GET /stock/:productId
+ * Retorna TODAS las filas de stock para el producto (una por variante de talle).
+ * Responde con { data: Stock[] } — mismo wrapper que /stock.
+ */
+export async function getStock(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const entries = await getStockByProductId(req.params["productId"] ?? "");
+
+    if (entries.length === 0) {
+      res.status(404).json({ error: "Stock entry not found", code: 404 });
+      return;
+    }
+
+    res.json({ data: entries });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function stockIn(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
   try {
     const input = req.body as StockInInput;
-    const movement = addStock(input);
+    const movement = await addStock(input);
     res.status(201).json({ data: movement });
   } catch (err) {
     next(err);

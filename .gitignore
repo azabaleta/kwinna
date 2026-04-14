@@ -42,3 +42,8 @@ coverage/
 
 # Misc
 *.local
+
+# Prompts
+prompts/
+context.md
+rules.md

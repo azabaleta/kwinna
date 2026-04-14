@@ -19,5 +19,7 @@ export const stockKeys = {
 };
 
 export const saleKeys = {
-  all: ["sales"] as const,
+  all:   ["sales"] as const,
+  lists: () => [...saleKeys.all, "list"] as const,
+  detail: (id: string) => [...saleKeys.all, "detail", id] as const,
 };

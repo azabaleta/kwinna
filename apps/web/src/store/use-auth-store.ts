@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { User } from "@kwinna/contracts";
+import { setAuthCookie, clearAuthCookie } from "@/lib/cookies";
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
@@ -25,19 +26,14 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       isAuthenticated: false,
 
       setSession: (user, token) => {
-        // Sincroniza con la cookie para que middleware.ts pueda leerla (server-side)
-        if (typeof window !== "undefined") {
-          const { setAuthCookie } = require("@/lib/cookies") as typeof import("@/lib/cookies");
-          setAuthCookie(token);
-        }
+        // Sincroniza con la cookie para que middleware.ts pueda leerla (server-side).
+        // Guard SSR: cookies.ts usa `document.cookie`, solo disponible en el browser.
+        if (typeof window !== "undefined") setAuthCookie(token);
         set({ user, token, isAuthenticated: true });
       },
 
       clearSession: () => {
-        if (typeof window !== "undefined") {
-          const { clearAuthCookie } = require("@/lib/cookies") as typeof import("@/lib/cookies");
-          clearAuthCookie();
-        }
+        if (typeof window !== "undefined") clearAuthCookie();
         set({ user: null, token: null, isAuthenticated: false });
       },
     }),

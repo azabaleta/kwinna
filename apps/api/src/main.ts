@@ -1,3 +1,4 @@
+import "dotenv/config";
 import cors from "cors";
 import express from "express";
 import morgan from "morgan";
@@ -27,7 +28,8 @@ app.use("/auth", authRoutes);
 
 app.use("/products", authGuard, productRoutes);
 app.use("/stock", authGuard, stockRoutes);
-app.use("/sales", authGuard, saleRoutes);
+// /sales: auth se gestiona a nivel de ruta — POST es público, GET requiere admin/operator
+app.use("/sales", saleRoutes);
 
 // ─── Global Error Handler ─────────────────────────────────────────────────────
 
@@ -36,5 +38,5 @@ app.use(errorHandler);
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
-  console.log(`\x1b[32m[API]\x1b[0m Running on http://localhost:${PORT}`);
+  process.stdout.write(`\x1b[32m[API]\x1b[0m Running on http://localhost:${PORT}\n`);
 });

@@ -1,12 +1,13 @@
 import { z } from "zod";
 
 // ─── User ─────────────────────────────────────────────────────────────────────
+// "customer" permite que usuarios web registrados tengan un perfil real.
 
 export const UserSchema = z.object({
   id: z.string().uuid(),
   email: z.string().email(),
   name: z.string().min(1),
-  role: z.enum(["admin", "operator"]),
+  role: z.enum(["admin", "operator", "customer"]),
 });
 
 export type User = z.infer<typeof UserSchema>;

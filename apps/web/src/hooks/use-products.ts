@@ -1,8 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import type { Product, ProductListResponse } from "@kwinna/contracts";
-import { fetchProduct, fetchProducts } from "@/services/product";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Product, ProductCreateInput, ProductListResponse } from "@kwinna/contracts";
+import { fetchProduct, fetchProducts, postProduct } from "@/services/product";
 import { productKeys } from "./query-keys";
 
 // ─── useProducts ──────────────────────────────────────────────────────────────
@@ -50,5 +50,35 @@ export function useProduct(id: Product["id"]): UseProductResult {
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,
+  };
+}
+
+// ─── useCreateProduct ─────────────────────────────────────────────────────────
+
+export interface UseCreateProductResult {
+  mutateAsync: (input: ProductCreateInput) => Promise<Product>;
+  isPending:   boolean;
+  isError:     boolean;
+  error:       Error | null;
+}
+
+export function useCreateProduct(): UseCreateProductResult {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (input: ProductCreateInput) => {
+      const res = await postProduct(input);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+    },
+  });
+
+  return {
+    mutateAsync: mutation.mutateAsync,
+    isPending:   mutation.isPending,
+    isError:     mutation.isError,
+    error:       mutation.error,
   };
 }
