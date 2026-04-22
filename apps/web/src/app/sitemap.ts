@@ -2,7 +2,13 @@ import type { MetadataRoute } from "next";
 import { ProductListResponseSchema } from "@kwinna/contracts";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://kwinna.com.ar";
-const API_URL = process.env.NEXT_PUBLIC_API_URL  ?? "http://localhost:3001";
+// API_URL is the server-side (private) internal URL — cheaper on PaaS networks
+// and safe to point to an internal hostname.  Falls back to the public browser
+// var so a single NEXT_PUBLIC_API_URL still works in simpler setups.
+const API_URL =
+  process.env.API_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://localhost:3001";
 
 // Static routes with their change frequency and priority
 const STATIC_ROUTES: MetadataRoute.Sitemap = [

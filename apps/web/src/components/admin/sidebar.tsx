@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { LayoutDashboard, LogOut, Package2, ShoppingBag } from "lucide-react";
+import { BarChart3, CalendarCheck, LayoutDashboard, LogOut, Package2, RotateCcw, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { selectUser, useAuthStore } from "@/store/use-auth-store";
@@ -11,9 +11,12 @@ import { selectUser, useAuthStore } from "@/store/use-auth-store";
 // ─── Nav items ────────────────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
-  { href: "/admin/dashboard", label: "Dashboard",  icon: LayoutDashboard },
-  { href: "/admin/inventory", label: "Inventario", icon: Package2        },
-  { href: "/admin/orders",    label: "Pedidos",    icon: ShoppingBag     },
+  { href: "/admin/dashboard", label: "Dashboard",       icon: LayoutDashboard },
+  { href: "/admin/today",     label: "Pedidos del día", icon: CalendarCheck   },
+  { href: "/admin/inventory", label: "Inventario",      icon: Package2        },
+  { href: "/admin/orders",    label: "Pedidos",         icon: ShoppingBag     },
+  { href: "/admin/returns",   label: "Devoluciones",    icon: RotateCcw       },
+  { href: "/admin/reports",   label: "Reportes",        icon: BarChart3       },
 ] as const;
 
 // ─── Isotipo inline (no SVGR configured in next.config) ───────────────────────
@@ -51,13 +54,22 @@ export function Sidebar() {
   return (
     <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-border bg-card">
 
-      {/* ── Brand ── */}
-      <div className="flex h-14 items-center gap-2.5 border-b border-border px-4">
+      {/* ── Brand → link a la tienda ── */}
+      <Link
+        href="/shop"
+        className="group flex h-14 items-center gap-2.5 border-b border-border px-4 transition-opacity hover:opacity-70"
+        title="Ver tienda"
+      >
         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10">
           <IsotipoIcon className="h-4 w-4 text-primary" />
         </div>
-        <span className="font-semibold text-foreground">Kwinna</span>
-      </div>
+        <div className="flex flex-col leading-none">
+          <span className="font-semibold text-foreground">Kwinna</span>
+          <span className="text-[10px] text-muted-foreground transition-colors group-hover:text-foreground">
+            Ver tienda →
+          </span>
+        </div>
+      </Link>
 
       {/* ── Nav ── */}
       <nav className="flex-1 space-y-0.5 p-3">

@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { addStock, getAllStock, getStockByProductId, type StockInInput } from "../services/stock.service";
+import { findStockMovementsInRange } from "../db/repositories";
 
 export async function listStock(
   _req: Request,
@@ -33,6 +34,26 @@ export async function getStock(
     }
 
     res.json({ data: entries });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── GET /stock/movements?from=ISO&to=ISO ─────────────────────────────────────
+// Devuelve todos los ingresos ("in") de mercadería en el rango indicado.
+// Usado por el dashboard para calcular el Sell-Through Rate por variante.
+
+export async function getMovements(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { from, to } = req.query as { from?: string; to?: string };
+    const fromDate = from ? new Date(from) : new Date(0);
+    const toDate   = to   ? new Date(to)   : new Date();
+    const data = await findStockMovementsInRange(fromDate, toDate);
+    res.json({ data });
   } catch (err) {
     next(err);
   }

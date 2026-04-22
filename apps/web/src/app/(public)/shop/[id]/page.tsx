@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import { ProductResponseSchema } from "@kwinna/contracts";
 import { ProductDetailClient } from "./product-detail-client";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+// Prefer the private server-side URL (same-network on PaaS) and fall back to
+// the public browser var so a single env is enough in simpler deployments.
+const API_URL =
+  process.env.API_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://localhost:3001";
 
 async function fetchProductMeta(id: string) {
   try {

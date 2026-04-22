@@ -52,12 +52,23 @@ export default function LoginPage() {
     try {
       const { user, token } = await postLogin({ email, password });
       setSession(user, token);
-      toast.success(`Bienvenido, ${user.name}`);
-      router.replace("/admin/inventory");
+      toast.success(`Bienvenida, ${user.name}`);
+      router.replace(user.role === "customer" ? "/shop" : "/admin/inventory");
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Error al iniciar sesión";
-      toast.error("Acceso denegado", { description: message });
+
+      if (message.includes("no verificado") || message.includes("verificar")) {
+        toast.error("Email no verificado", {
+          description: "Revisá tu casilla y confirmá tu cuenta antes de ingresar.",
+          action: {
+            label:   "Reenviar email",
+            onClick: () => router.push(`/verify-email/pending?email=${encodeURIComponent(email)}`),
+          },
+        });
+      } else {
+        toast.error("Acceso denegado", { description: message });
+      }
     } finally {
       setIsPending(false);
     }
@@ -95,7 +106,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@kwinna.com"
+                  placeholder="tumail@email.com"
                   autoComplete="email"
                   value={email}
                   aria-invalid={!!errors.email}
@@ -139,15 +150,25 @@ export default function LoginPage() {
                 )}
               </Button>
 
+              <div className="text-center">
+                <a
+                  href="/forgot-password"
+                  className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                >
+                  ¿Olvidaste tu contraseña?
+                </a>
+              </div>
+
             </form>
           </CardContent>
         </Card>
 
-        {/* ── Dev hint ── */}
+        {/* ── Link registro clientes ── */}
         <p className="text-center text-xs text-muted-foreground">
-          Demo: <code className="rounded bg-muted px-1">admin@kwinna.com</code>{" "}
-          /{" "}
-          <code className="rounded bg-muted px-1">admin123</code>
+          ¿Primera vez?{" "}
+          <a href="/register" className="font-medium text-primary hover:underline">
+            Crear cuenta
+          </a>
         </p>
 
       </div>

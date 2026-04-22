@@ -22,6 +22,8 @@ export type Stock = z.infer<typeof StockSchema>;
 export const StockMovementSchema = z.object({
   id:        z.string().uuid(),
   productId: z.string().uuid(),
+  // size es undefined para productos sin variante de talle (igual que StockSchema)
+  size:      z.string().optional(),
   type:      z.enum(["in", "out", "adjustment"]),
   quantity:  z.number().int().positive(),
   reason:    z.string().optional(),

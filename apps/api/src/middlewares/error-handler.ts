@@ -14,7 +14,7 @@ export function errorHandler(
 ): void {
   logError(err, req);
 
-  const status = res.statusCode >= 400 ? res.statusCode : 500;
+  const status = (err as { statusCode?: number }).statusCode ?? (res.statusCode >= 400 ? res.statusCode : 500);
 
   res.status(status).json({
     error: err.message ?? "Internal server error",

@@ -1,5 +1,6 @@
 import {
   StockListResponseSchema,
+  StockMovementListResponseSchema,
   StockMovementResponseSchema,
   type Stock,
   type StockListResponse,
@@ -35,4 +36,16 @@ export async function postStockIn(
 ): Promise<StockMovementResponse> {
   const res = await apiClient.post("/stock/in", payload);
   return StockMovementResponseSchema.parse(res.data);
+}
+
+/**
+ * GET /stock/movements?from=ISO&to=ISO
+ * Devuelve todos los ingresos ("in") de mercadería en el rango.
+ * Solo accesible por admin/operator.
+ */
+export async function fetchStockMovements(from: Date, to: Date): Promise<StockMovement[]> {
+  const res = await apiClient.get("/stock/movements", {
+    params: { from: from.toISOString(), to: to.toISOString() },
+  });
+  return StockMovementListResponseSchema.parse(res.data).data;
 }

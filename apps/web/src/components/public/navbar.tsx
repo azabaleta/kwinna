@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CartButton } from "@/components/public/cart-button";
 import { AuthButton } from "@/components/public/auth-button";
+import { AdminShortcut } from "@/components/public/admin-shortcut";
 
 // ─── Isotipo inline (no SVGR configured in next.config) ───────────────────────
 
@@ -47,6 +48,7 @@ export function PublicNavbar() {
 
         {/* ── Right actions ── */}
         <div className="flex items-center gap-0.5">
+          <AdminShortcut />
           <CartButton />
           <AuthButton />
         </div>

@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { getStock, listStock, stockIn } from "../controllers/stock.controller";
+import { getMovements, getStock, listStock, stockIn } from "../controllers/stock.controller";
+import { authGuard } from "../middlewares/auth-guard";
 import { requireRole } from "../middlewares/require-role";
 import { validate } from "../middlewares/validate";
 import { StockMovementSchema } from "@kwinna/contracts";
@@ -16,9 +17,19 @@ const StockInBodySchema = StockMovementSchema.pick({
 router.get("/",            listStock);
 router.get("/:productId",  getStock);
 
-// POST /stock/in — solo admin/operator (authGuard ya aplicado en main.ts)
+// GET /stock/movements — ingresos de mercadería por rango de fecha (admin/operator)
+// IMPORTANTE: debe ir antes de /:productId para que "/movements" no sea tratado como UUID
+router.get(
+  "/movements",
+  authGuard,
+  requireRole(["admin", "operator"]),
+  getMovements,
+);
+
+// POST /stock/in — solo admin/operator
 router.post(
   "/in",
+  authGuard,
   requireRole(["admin", "operator"]),
   validate(StockInBodySchema),
   stockIn,

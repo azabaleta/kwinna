@@ -28,10 +28,7 @@ async function deductStockItem(
 
     if (!stockRow || stockRow.quantity < item.quantity) {
       throw Object.assign(
-        new Error(
-          `Stock insuficiente para producto ${item.productId} talle ${item.size}: ` +
-          `solicitado ${item.quantity}, disponible ${stockRow?.quantity ?? 0}`
-        ),
+        new Error("Stock insuficiente para uno o más productos del pedido"),
         { statusCode: 409 }
       );
     }
@@ -52,10 +49,7 @@ async function deductStockItem(
 
     if (rows.length === 0 || totalAvailable < item.quantity) {
       throw Object.assign(
-        new Error(
-          `Stock insuficiente para producto ${item.productId}: ` +
-          `solicitado ${item.quantity}, disponible ${totalAvailable}`
-        ),
+        new Error("Stock insuficiente para uno o más productos del pedido"),
         { statusCode: 409 }
       );
     }
@@ -150,11 +144,15 @@ export async function createSale(input: SaleOrderInput): Promise<Sale> {
         customerName:     input.customerName,
         customerEmail:    input.customerEmail,
         customerPhone:    input.customerPhone,
+        customerDni:      input.customerDni,
         shippingAddress:  input.shippingAddress,
         shippingCity:     input.shippingCity,
         shippingProvince: input.shippingProvince,
         shippingCost:     shippingCost.toString(),
         userId:           input.userId,
+        channel:          input.channel ?? "pos",
+        paymentMethod:    input.paymentMethod,
+        saleNotes:        input.saleNotes,
         createdAt:        new Date(),
         updatedAt:        new Date(),
       })
@@ -232,11 +230,15 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
         customerName:     input.customerName,
         customerEmail:    input.customerEmail,
         customerPhone:    input.customerPhone,
+        customerDni:      input.customerDni,
         shippingAddress:  input.shippingAddress,
         shippingCity:     input.shippingCity,
         shippingProvince: input.shippingProvince,
         shippingCost:     shippingCost.toString(),
         userId:           input.userId,
+        channel:          input.channel ?? "web",
+        paymentMethod:    input.paymentMethod,
+        saleNotes:        input.saleNotes,
         createdAt:        new Date(),
         updatedAt:        new Date(),
       })

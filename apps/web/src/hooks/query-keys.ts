@@ -6,16 +6,16 @@ import type { Product, Stock } from "@kwinna/contracts";
 //     invalida tanto la lista como los detalles por productId.
 
 export const productKeys = {
-  all: ["products"] as const,
-  lists: () => [...productKeys.all, "list"] as const,
+  all:    ["products"] as const,
+  lists:  (q?: string) => [...productKeys.all, "list", q ?? ""] as const,
   detail: (id: Product["id"]) => [...productKeys.all, "detail", id] as const,
 };
 
 export const stockKeys = {
-  all: ["stock"] as const,
-  lists: () => [...stockKeys.all, "list"] as const,
-  detail: (productId: Stock["productId"]) =>
-    [...stockKeys.all, "detail", productId] as const,
+  all:       ["stock"] as const,
+  lists:     () => [...stockKeys.all, "list"] as const,
+  detail:    (productId: Stock["productId"]) => [...stockKeys.all, "detail", productId] as const,
+  movements: (from: string, to: string) => [...stockKeys.all, "movements", from, to] as const,
 };
 
 export const saleKeys = {

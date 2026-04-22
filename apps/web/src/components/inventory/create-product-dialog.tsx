@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2, Plus, PlusCircle, Trash2, X } from "lucide-react";
+import { Loader2, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,15 +32,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+import { ImageUploader } from "@/components/inventory/image-uploader";
 import { useCreateProduct } from "@/hooks/use-products";
-import { ProductFormSchema, type ProductFormValues, CATEGORIES } from "@/schemas/product";
+import { cn } from "@/lib/utils";
+import { ProductFormSchema, type ProductFormValues, CATEGORIES, PRODUCT_TAGS, ACCESSORY_TAG } from "@/schemas/product";
+import { SEASON_LABELS, type ProductSeason } from "@kwinna/contracts";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function CreateProductDialog() {
-  const [open, setOpen]       = useState(false);
-  const [tagInput, setTagInput] = useState("");
+  const [open, setOpen]           = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const { mutateAsync, isPending } = useCreateProduct();
 
@@ -54,43 +56,22 @@ export function CreateProductDialog() {
       categoryId:  "",
       images:      [],
       tags:        [],
+      season:      undefined,
     },
   });
 
-  // ── Image helpers ───────────────────────────────────────────────────────────
-
-  function addImageRow() {
-    const current = form.getValues("images");
-    form.setValue("images", [...current, ""], { shouldValidate: false });
-  }
-
-  function removeImageRow(idx: number) {
-    const current = form.getValues("images");
-    form.setValue("images", current.filter((_, i) => i !== idx), { shouldValidate: true });
-  }
-
-  function updateImageRow(idx: number, val: string) {
-    const current = form.getValues("images");
-    const next = [...current];
-    next[idx] = val;
-    form.setValue("images", next, { shouldValidate: true });
-  }
-
   // ── Tag helpers ─────────────────────────────────────────────────────────────
 
-  function addTag() {
-    const tag = tagInput.trim();
-    if (!tag) return;
+  function toggleTag(tag: string) {
     const current = form.getValues("tags");
-    if (!current.includes(tag)) {
-      form.setValue("tags", [...current, tag], { shouldValidate: true });
+    const next = current.includes(tag)
+      ? current.filter((t) => t !== tag)
+      : [...current, tag];
+    form.setValue("tags", next, { shouldValidate: true });
+    // Al marcar Accesorios, limpiar temporada (no aplica)
+    if (tag === ACCESSORY_TAG && !current.includes(tag)) {
+      form.setValue("season", undefined, { shouldValidate: true });
     }
-    setTagInput("");
-  }
-
-  function removeTag(tag: string) {
-    const current = form.getValues("tags");
-    form.setValue("tags", current.filter((t) => t !== tag), { shouldValidate: true });
   }
 
   // ── Reset on close ──────────────────────────────────────────────────────────
@@ -99,21 +80,15 @@ export function CreateProductDialog() {
     setOpen(next);
     if (!next) {
       form.reset();
-      setTagInput("");
+      setIsUploading(false);
     }
   }
 
   // ── Submit ──────────────────────────────────────────────────────────────────
 
   async function onSubmit(values: ProductFormValues) {
-    // Strip empty image URLs before sending
-    const payload: ProductFormValues = {
-      ...values,
-      images: values.images.filter((url) => url.trim() !== ""),
-    };
-
     try {
-      const product = await mutateAsync(payload);
+      const product = await mutateAsync(values);
       toast.success("Producto creado", {
         description: `${product.name} — SKU ${product.sku}`,
       });
@@ -124,8 +99,11 @@ export function CreateProductDialog() {
     }
   }
 
-  const watchedImages = form.watch("images");
-  const watchedTags   = form.watch("tags");
+  const watchedImages    = form.watch("images");
+  const watchedTags      = form.watch("tags");
+  const isAccessory      = watchedTags.includes(ACCESSORY_TAG);
+
+  const blocked = isPending || isUploading;
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -138,7 +116,7 @@ export function CreateProductDialog() {
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-[540px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Crear Producto</DialogTitle>
           <DialogDescription>
@@ -253,91 +231,127 @@ export function CreateProductDialog() {
                 )}
               />
 
-              {/* ── Imágenes ── */}
+              {/* ── Temporada (admin-only) ── */}
+              <FormField
+                control={form.control}
+                name="season"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Temporada
+                      {isAccessory ? (
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                          (no aplica para accesorios)
+                        </span>
+                      ) : (
+                        <span className="ml-1 text-xs font-normal text-destructive">*</span>
+                      )}
+                    </FormLabel>
+                    <div className="flex gap-2 flex-wrap">
+                      {(Object.entries(SEASON_LABELS) as [ProductSeason, string][]).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          disabled={isAccessory}
+                          onClick={() => field.onChange(field.value === value ? undefined : value)}
+                          className={cn(
+                            "rounded-none border px-3 py-1.5 text-xs font-medium tracking-wide transition-colors",
+                            isAccessory
+                              ? "cursor-not-allowed border-border/40 text-muted-foreground/40"
+                              : field.value === value
+                              ? "border-foreground bg-foreground text-background"
+                              : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground",
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* ── Imágenes — Cloudinary uploader ── */}
               <div className="space-y-2">
                 <FormLabel>
-                  Imágenes
-                  <span className="ml-1 text-xs font-normal text-muted-foreground">(URLs, opcional)</span>
+                  Fotos del producto
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    (hasta 8 imágenes)
+                  </span>
                 </FormLabel>
-                <div className="space-y-2">
-                  {watchedImages.map((url, idx) => (
-                    <div key={idx} className="flex gap-2">
-                      <Input
-                        placeholder="https://…"
-                        value={url}
-                        onChange={(e) => updateImageRow(idx, e.target.value)}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="shrink-0 text-muted-foreground hover:text-destructive"
-                        onClick={() => removeImageRow(idx)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                {form.formState.errors.images && (
+                <ImageUploader
+                  value={watchedImages}
+                  onChange={(urls) =>
+                    form.setValue("images", urls, { shouldValidate: true })
+                  }
+                  onUploadingChange={setIsUploading}
+                />
+                {isUploading && (
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Subiendo imágenes… esperá antes de guardar
+                  </p>
+                )}
+                {form.formState.errors.images && !isUploading && (
                   <p className="text-xs font-medium text-destructive">
                     {typeof form.formState.errors.images.message === "string"
                       ? form.formState.errors.images.message
-                      : "Revisá las URLs de las imágenes"}
+                      : "Revisá las imágenes"}
                   </p>
                 )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={addImageRow}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Agregar imagen
-                </Button>
               </div>
 
               {/* ── Tags ── */}
               <div className="space-y-2">
                 <FormLabel>
-                  Tags
-                  <span className="ml-1 text-xs font-normal text-muted-foreground">(opcional)</span>
+                  Categorías
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    (seleccioná una o más)
+                  </span>
                 </FormLabel>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Ej: verano, casual…"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") { e.preventDefault(); addTag(); }
-                    }}
-                  />
-                  <Button
+                <div className="flex flex-wrap gap-1.5">
+                  {PRODUCT_TAGS.filter((t) => t !== ACCESSORY_TAG).map((tag) => {
+                    const active = watchedTags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        className={cn(
+                          "rounded-none border px-2.5 py-1 text-[11px] font-medium tracking-wide transition-colors",
+                          active
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-border bg-transparent text-muted-foreground hover:border-foreground/50 hover:text-foreground",
+                        )}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Accesorios — separado porque tiene comportamiento especial */}
+                <div className="flex items-center gap-2 border-t border-border/40 pt-2">
+                  <button
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0"
-                    onClick={addTag}
+                    onClick={() => toggleTag(ACCESSORY_TAG)}
+                    className={cn(
+                      "rounded-none border px-2.5 py-1 text-[11px] font-medium tracking-wide transition-colors",
+                      watchedTags.includes(ACCESSORY_TAG)
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border bg-transparent text-muted-foreground hover:border-foreground/50 hover:text-foreground",
+                    )}
                   >
-                    Agregar
-                  </Button>
+                    {ACCESSORY_TAG}
+                  </button>
+                  <span className="text-[10px] text-muted-foreground">
+                    Exime de asignar temporada
+                  </span>
                 </div>
                 {watchedTags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {watchedTags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="gap-1 pr-1">
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => removeTag(tag)}
-                          className="ml-0.5 rounded-full hover:text-destructive"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Seleccionadas: {watchedTags.join(", ")}
+                  </p>
                 )}
               </div>
 
@@ -348,15 +362,18 @@ export function CreateProductDialog() {
                 type="button"
                 variant="outline"
                 onClick={() => handleOpenChange(false)}
-                disabled={isPending}
+                disabled={blocked}
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isPending} className="gap-2">
-                {isPending
-                  ? <><Loader2 className="h-4 w-4 animate-spin" />Guardando…</>
-                  : <><PlusCircle className="h-4 w-4" />Crear Producto</>
-                }
+              <Button type="submit" disabled={blocked} className="gap-2">
+                {isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />Guardando…</>
+                ) : isUploading ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />Subiendo fotos…</>
+                ) : (
+                  <><PlusCircle className="h-4 w-4" />Crear Producto</>
+                )}
               </Button>
             </DialogFooter>
           </form>

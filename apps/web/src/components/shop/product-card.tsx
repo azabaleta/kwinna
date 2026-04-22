@@ -1,8 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { ShoppingBag } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ShoppingBag, Heart, Share2 } from "lucide-react";
+import { toast } from "sonner";
 import type { Product } from "@kwinna/contracts";
+import { useAuthStore } from "@/store/use-auth-store";
+import { useWishlistStore } from "@/store/use-wishlist-store";
 import { cn } from "@/lib/utils";
 
 // ─── Gradient system — deterministic from product ID ──────────────────────────
@@ -49,100 +54,163 @@ interface ProductCardProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ProductCard({ product, stockQty, cartQty, onAdd }: ProductCardProps) {
-  const outOfStock = stockQty === 0;
-  const maxReached = !outOfStock && cartQty >= stockQty;
-  const disabled   = outOfStock || maxReached;
-  const remaining  = stockQty - cartQty;
-  const lowStock   = !outOfStock && remaining <= 5 && remaining > 0;
+  const router          = useRouter();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const toggleItem      = useWishlistStore((s) => s.toggleItem);
+  const inWishlist      = useWishlistStore((s) =>
+    s.items.some((i) => i.product.id === product.id)
+  );
+  const outOfStock  = stockQty === 0;
+  const remaining   = stockQty - cartQty;
+  const lowStock    = !outOfStock && remaining <= 5 && remaining > 0;
+
+  async function handleShare(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const url = `${window.location.origin}/shop/${product.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: product.name, text: `$${product.price.toLocaleString("es-AR")} — Kwinna`, url });
+      } catch (err) {
+        // AbortError = usuario canceló el sheet → no hacer nada
+        if (err instanceof Error && err.name !== "AbortError") {
+          await navigator.clipboard.writeText(url);
+          toast.success("Enlace copiado");
+        }
+      }
+    } else {
+      await navigator.clipboard.writeText(url);
+      toast.success("Enlace copiado", { description: product.name });
+    }
+  }
+
+  function handleWishlist(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      toast.info("Iniciá sesión para guardar favoritos");
+      router.push("/login");
+      return;
+    }
+    toggleItem(product);
+    toast(inWishlist ? "Eliminado de favoritos" : "Guardado en favoritos", {
+      description: product.name,
+    });
+  }
 
   return (
     <article
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-[var(--radius)] bg-card transition-all duration-300",
-        "hover:-translate-y-0.5 hover:shadow-soft",
+        "group relative flex flex-col overflow-hidden bg-background transition-all duration-300",
+        "border border-border/40 hover:border-border",
         outOfStock && "opacity-70",
       )}
     >
       {/* ── Image / placeholder — clickable area → PDP ───────────────── */}
-      <Link href={`/shop/${product.id}`} tabIndex={-1} aria-hidden="true" className="contents">
-      <div
-        className={cn(
-          "relative aspect-[3/4] overflow-hidden bg-gradient-to-b",
-          getGradient(product.id),
-        )}
-      >
-        {/* Watermark */}
-        <div className="absolute inset-0 flex items-center justify-center text-primary/10 transition-transform duration-500 group-hover:scale-110">
-          <IsotipoWatermark />
+      <div className="relative">
+        <Link href={`/shop/${product.id}`} prefetch={true} tabIndex={-1} aria-hidden="true">
+        <div
+          className={cn(
+            "relative aspect-[3/4] overflow-hidden",
+            product.images?.[0]
+              ? "bg-muted"
+              : cn("bg-gradient-to-b", getGradient(product.id)),
+          )}
+        >
+          {/* Product photo — shown when the product has at least one image */}
+          {product.images?.[0] && (
+            <Image
+              src={product.images[0]}
+              alt={product.name}
+              fill
+              sizes="(max-width: 640px) 50vw, 33vw"
+              className={cn(
+                "object-cover transition-all duration-700",
+                product.images?.[1] ? "group-hover:opacity-0" : "group-hover:scale-105"
+              )}
+            />
+          )}
+
+          {/* Secondary photo for hover cross-fade */}
+          {product.images?.[1] && (
+            <Image
+              src={product.images[1]}
+              alt={`${product.name} detail`}
+              fill
+              sizes="(max-width: 640px) 50vw, 33vw"
+              className="absolute inset-0 object-cover opacity-0 transition-opacity duration-700 group-hover:opacity-100"
+            />
+          )}
+
+          {/* Watermark placeholder — shown only when there are no images */}
+          {!product.images?.[0] && (
+            <div className="absolute inset-0 flex items-center justify-center text-primary/10 transition-transform duration-500 group-hover:scale-110">
+              <IsotipoWatermark />
+            </div>
+          )}
+
+          {/* Cart badge */}
+          {cartQty > 0 && !lowStock && (
+            <div className="absolute left-2.5 top-2.5 z-10 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold tracking-wide text-primary-foreground shadow-soft">
+              <ShoppingBag className="h-2.5 w-2.5" />
+              {cartQty}
+            </div>
+          )}
+
+          {/* Low stock chip */}
+          {lowStock && (
+            <div className="absolute left-2.5 top-2.5 z-10 rounded-none bg-amber-500/90 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-white">
+              Últimas {remaining}
+            </div>
+          )}
+
+          {/* Out-of-stock overlay */}
+          {outOfStock && (
+            <div className="absolute inset-0 z-10 flex items-end justify-center bg-background/50 backdrop-blur-[2px] pb-6">
+              <span className="rounded-none bg-card/90 px-3 py-1 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+                Agotado
+              </span>
+            </div>
+          )}
         </div>
+        </Link>
 
-        {/* Cart badge */}
-        {cartQty > 0 && (
-          <div className="absolute left-2.5 top-2.5 z-10 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold tracking-wide text-primary-foreground shadow-soft">
-            <ShoppingBag className="h-2.5 w-2.5" />
-            {cartQty}
-          </div>
-        )}
+        {/* Wishlist Heart */}
+        <button
+          className={cn(
+            "absolute right-2.5 top-2.5 z-20 flex h-7 w-7 items-center justify-center rounded-none bg-background/50 backdrop-blur-sm transition-all hover:bg-background/80",
+            inWishlist ? "text-rose-500" : "text-foreground/60 hover:text-foreground",
+          )}
+          aria-label={inWishlist ? "Quitar de favoritos" : "Guardar en favoritos"}
+          onClick={handleWishlist}
+        >
+          <Heart className={cn("h-3.5 w-3.5 transition-all", inWishlist && "fill-current")} />
+        </button>
 
-        {/* Low stock chip */}
-        {lowStock && (
-          <div className="absolute right-2.5 top-2.5 z-10 rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white shadow-soft">
-            Últimas {remaining}
-          </div>
-        )}
-
-        {/* Out-of-stock overlay */}
-        {outOfStock && (
-          <div className="absolute inset-0 z-10 flex items-end justify-center bg-background/50 backdrop-blur-[2px] pb-6">
-            <span className="rounded-full bg-card/90 px-3 py-1 text-xs font-medium tracking-widest text-muted-foreground uppercase">
-              Agotado
-            </span>
-          </div>
-        )}
-
-        {/* Hover add-to-cart overlay */}
-        {!disabled && (
-          <button
-            onClick={() => onAdd(product)}
-            className="absolute inset-x-0 bottom-0 z-10 translate-y-full py-3 bg-primary text-primary-foreground text-xs font-semibold tracking-widest uppercase transition-transform duration-300 group-hover:translate-y-0 focus-visible:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            aria-label={`Añadir ${product.name} al carrito`}
-          >
-            Añadir al carrito
-          </button>
-        )}
+        {/* Share — aparece al hacer hover sobre la tarjeta */}
+        <button
+          className="absolute right-2.5 top-11 z-20 flex h-7 w-7 items-center justify-center rounded-none bg-background/50 backdrop-blur-sm text-foreground/60 opacity-0 transition-all hover:bg-background/80 hover:text-foreground group-hover:opacity-100"
+          aria-label="Compartir producto"
+          onClick={handleShare}
+        >
+          <Share2 className="h-3.5 w-3.5" />
+        </button>
       </div>
-      </Link>
 
       {/* ── Info — also links to PDP ──────────────────────────────────── */}
-      <Link href={`/shop/${product.id}`} className="flex flex-col gap-1 px-3 py-3 hover:no-underline">
-        <h3 className="line-clamp-1 text-[13px] font-semibold leading-snug tracking-wide text-foreground">
+      <Link href={`/shop/${product.id}`} prefetch={true} className="flex flex-col gap-1 px-3 py-3 hover:no-underline text-center">
+        <h3 className="line-clamp-1 text-[11px] font-normal uppercase tracking-[0.05em] leading-snug text-foreground">
           {product.name}
         </h3>
         {product.description && (
-          <p className="line-clamp-1 text-[11px] leading-relaxed text-muted-foreground">
+          <p className="line-clamp-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">
             {product.description}
           </p>
         )}
-        <p className="mt-0.5 text-sm font-bold tabular-nums text-foreground">
+        <p className="mt-0.5 text-xs font-normal tracking-wide tabular-nums text-foreground">
           ${product.price.toLocaleString("es-AR")}
         </p>
       </Link>
-
-      {/* ── Always-visible CTA (mobile — no hover) ───────────────────── */}
-      <div className="px-3 pb-3 sm:hidden">
-        <button
-          onClick={() => !disabled && onAdd(product)}
-          disabled={disabled}
-          className={cn(
-            "w-full rounded-full py-2 text-[11px] font-semibold tracking-widest uppercase transition-colors",
-            disabled
-              ? "bg-muted text-muted-foreground cursor-not-allowed"
-              : "bg-primary text-primary-foreground active:opacity-80",
-          )}
-        >
-          {outOfStock ? "Agotado" : maxReached ? "Máx. alcanzado" : "Añadir"}
-        </button>
-      </div>
     </article>
   );
 }

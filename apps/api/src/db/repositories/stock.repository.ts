@@ -1,11 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, lt } from "drizzle-orm";
 import type { Stock, StockMovement } from "@kwinna/contracts";
 import { db } from "../index";
 import { stockMovementsTable, stockTable } from "../schema";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-// La BD almacena '' como centinela para "sin talle".
-// El contrato Zod usa undefined. Estos helpers convierten en ambas direcciones.
 
 function sizeToDb(size: string | undefined): string {
   return size ?? "";
@@ -31,6 +29,7 @@ function mapMovementRow(row: typeof stockMovementsTable.$inferSelect): StockMove
   return {
     id:        row.id,
     productId: row.productId,
+    size:      sizeFromDb(row.size),
     type:      row.type,
     quantity:  row.quantity,
     reason:    row.reason ?? undefined,
@@ -45,15 +44,31 @@ export async function findAllStock(): Promise<Stock[]> {
   return rows.map(mapStockRow);
 }
 
-/**
- * Retorna todas las filas de stock para un producto (una por cada variante de talle).
- */
 export async function findStockByProductId(productId: string): Promise<Stock[]> {
   const rows = await db
     .select()
     .from(stockTable)
     .where(eq(stockTable.productId, productId));
   return rows.map(mapStockRow);
+}
+
+/**
+ * Movimientos de stock tipo "in" (ingresos de mercadería) en un rango de fechas.
+ * Usado para calcular el Sell-Through Rate por variante en el dashboard.
+ */
+export async function findStockMovementsInRange(from: Date, to: Date): Promise<StockMovement[]> {
+  const rows = await db
+    .select()
+    .from(stockMovementsTable)
+    .where(
+      and(
+        eq(stockMovementsTable.type, "in"),
+        gte(stockMovementsTable.createdAt, from),
+        lt(stockMovementsTable.createdAt, to),
+      ),
+    )
+    .orderBy(stockMovementsTable.createdAt);
+  return rows.map(mapMovementRow);
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
@@ -66,8 +81,7 @@ export interface AddStockInput {
 }
 
 /**
- * Hace upsert de stock para (productId, size) y registra el movimiento.
- * Si la fila ya existe, suma la cantidad. Si no, la crea.
+ * Hace upsert de stock para (productId, size) y registra el movimiento con talle.
  */
 export async function addStock(input: AddStockInput): Promise<StockMovement> {
   const dbSize = sizeToDb(input.size);
@@ -78,22 +92,19 @@ export async function addStock(input: AddStockInput): Promise<StockMovement> {
     .where(
       and(
         eq(stockTable.productId, input.productId),
-        eq(stockTable.size, dbSize)
-      )
+        eq(stockTable.size, dbSize),
+      ),
     );
 
   if (existing[0]) {
     await db
       .update(stockTable)
-      .set({
-        quantity:  existing[0].quantity + input.quantity,
-        updatedAt: new Date(),
-      })
+      .set({ quantity: existing[0].quantity + input.quantity, updatedAt: new Date() })
       .where(
         and(
           eq(stockTable.productId, input.productId),
-          eq(stockTable.size, dbSize)
-        )
+          eq(stockTable.size, dbSize),
+        ),
       );
   } else {
     await db.insert(stockTable).values({
@@ -108,6 +119,7 @@ export async function addStock(input: AddStockInput): Promise<StockMovement> {
     .insert(stockMovementsTable)
     .values({
       productId: input.productId,
+      size:      dbSize,          // ← talle guardado en el movimiento
       type:      "in",
       quantity:  input.quantity,
       reason:    input.reason,

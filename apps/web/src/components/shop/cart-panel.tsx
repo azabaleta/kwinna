@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShoppingBag, Trash2, X } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   selectCartItems,
   selectCartTotal,
+  selectHasHydrated,
   selectItemCount,
   useCartStore,
 } from "@/store/use-cart-store";
@@ -20,11 +22,12 @@ export function CartPanel() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
-  const items      = useCartStore(selectCartItems);
-  const total      = useCartStore(selectCartTotal);
-  const count      = useCartStore(selectItemCount);
-  const removeItem = useCartStore((s) => s.removeItem);
-  const clearCart  = useCartStore((s) => s.clearCart);
+  const items        = useCartStore(selectCartItems);
+  const total        = useCartStore(selectCartTotal);
+  const count        = useCartStore(selectItemCount);
+  const hasHydrated  = useCartStore(selectHasHydrated);
+  const removeItem   = useCartStore((s) => s.removeItem);
+  const clearCart    = useCartStore((s) => s.clearCart);
 
   function handleGoToCheckout() {
     setOpen(false);
@@ -34,7 +37,9 @@ export function CartPanel() {
   return (
     <>
       {/* ── Floating FAB ─────────────────────────────────────────────── */}
-      {count > 0 && (
+      {/* hasHydrated garantiza que el primer render del cliente sea idéntico
+          al del servidor (ambos sin FAB), evitando hydration mismatch. */}
+      {hasHydrated && count > 0 && (
         <button
           onClick={() => setOpen(true)}
           className="fixed bottom-6 right-6 z-40 flex items-center gap-3 rounded-full bg-primary px-5 py-3.5 text-primary-foreground shadow-soft transition-all duration-200 hover:scale-105 hover:shadow-[0_8px_32px_rgba(112,0,94,0.45)] active:scale-95"
@@ -108,8 +113,20 @@ export function CartPanel() {
                 className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/60 p-3 transition-colors hover:border-border"
               >
                 {/* Thumbnail */}
-                <div className="flex h-12 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <ShoppingBag className="h-3.5 w-3.5 text-primary/50" />
+                <div className="relative h-12 w-9 shrink-0 overflow-hidden rounded-lg bg-primary/10">
+                  {product.images?.[0] ? (
+                    <Image
+                      src={product.images[0]}
+                      alt={product.name}
+                      fill
+                      sizes="36px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <ShoppingBag className="h-3.5 w-3.5 text-primary/50" />
+                    </div>
+                  )}
                 </div>
 
                 {/* Info */}
@@ -132,13 +149,15 @@ export function CartPanel() {
                   <p className="text-xs font-bold tabular-nums text-foreground">
                     ${(product.price * quantity).toLocaleString("es-AR")}
                   </p>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => removeItem(product.id, size)}
-                    className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground/50 transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                     aria-label={`Quitar ${product.name}`}
                   >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             ))

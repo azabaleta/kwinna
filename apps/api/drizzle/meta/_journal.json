@@ -5,15 +5,64 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1776143155409,
-      "tag": "0000_amused_paper_doll",
+      "when": 1776342705326,
+      "tag": "0000_careless_wendell_rand",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1776144549987,
-      "tag": "0001_cuddly_gamma_corps",
+      "when": 1745117200000,
+      "tag": "0001_analytics_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1745203600000,
+      "tag": "0002_returns",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1745290000000,
+      "tag": "0003_stock_movements_size",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1745376400000,
+      "tag": "0004_product_season",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1745462800000,
+      "tag": "0005_sale_pos_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1745549200000,
+      "tag": "0006_metric_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1745635600000,
+      "tag": "0007_email_verification",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1745722000000,
+      "tag": "0008_password_reset_tokens",
       "breakpoints": true
     }
   ]

@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { User } from "@kwinna/contracts";
 import { setAuthCookie, clearAuthCookie } from "@/lib/cookies";
+import { useCartStore } from "@/store/use-cart-store";
+import { useWishlistStore } from "@/store/use-wishlist-store";
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
@@ -26,13 +28,18 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       isAuthenticated: false,
 
       setSession: (user, token) => {
-        // Sincroniza con la cookie para que middleware.ts pueda leerla (server-side).
-        // Guard SSR: cookies.ts usa `document.cookie`, solo disponible en el browser.
+        // Limpia carrito y favoritos antes de establecer la sesión — cada
+        // usuario siempre arranca limpio, sin ver datos de otra sesión.
+        useCartStore.getState().clearCart();
+        useWishlistStore.getState().clearWishlist();
         if (typeof window !== "undefined") setAuthCookie(token);
         set({ user, token, isAuthenticated: true });
       },
 
       clearSession: () => {
+        // Limpia carrito y favoritos al cerrar sesión.
+        useCartStore.getState().clearCart();
+        useWishlistStore.getState().clearWishlist();
         if (typeof window !== "undefined") clearAuthCookie();
         set({ user: null, token: null, isAuthenticated: false });
       },

@@ -1,7 +1,17 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { SaleOrderInputSchema } from "@kwinna/contracts";
-import { cancelSale, getSales, postCheckout, postSale, postWebhook } from "../controllers/sale.controller";
+import { cancelSale, getSales, getWebOrders, patchSaleStatus, postCheckout, postSale, postWebhook } from "../controllers/sale.controller";
 import { authGuard, optionalAuth, requireRole, validate } from "../middlewares";
+
+// 10 checkouts por IP por hora — previene reserva masiva de stock con ventas pending
+const checkoutLimiter = rateLimit({
+  windowMs:        60 * 60 * 1000,
+  max:             10,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message:         { error: "Demasiados intentos de compra. Intentá de nuevo en una hora.", code: 429 },
+});
 
 const router = Router();
 
@@ -17,6 +27,7 @@ router.post(
 // Crea la venta como pending + genera Preference MP → devuelve { sale, initPoint }
 router.post(
   "/checkout",
+  checkoutLimiter,
   optionalAuth,
   validate(SaleOrderInputSchema),
   postCheckout
@@ -33,6 +44,23 @@ router.get(
   authGuard,
   requireRole(["admin", "operator"]),
   getSales
+);
+
+// GET /sales/web-orders — pedidos web (completed|assembled) para el POS
+// IMPORTANTE: antes de /:id para que "web-orders" no matchee como UUID
+router.get(
+  "/web-orders",
+  authGuard,
+  requireRole(["admin", "operator"]),
+  getWebOrders
+);
+
+// PATCH /sales/:id/status — actualiza status (ej: assembled desde POS)
+router.patch(
+  "/:id/status",
+  authGuard,
+  requireRole(["admin", "operator"]),
+  patchSaleStatus
 );
 
 // PUT /sales/:id/cancel — cancela una venta pending y restaura stock

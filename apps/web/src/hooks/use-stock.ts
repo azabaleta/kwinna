@@ -1,8 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Stock, StockListResponse, StockMovementResponse } from "@kwinna/contracts";
-import { fetchProductStock, fetchStock, postStockIn, type StockInPayload } from "@/services/stock";
+import type { Stock, StockListResponse, StockMovement, StockMovementResponse } from "@kwinna/contracts";
+import { fetchProductStock, fetchStock, fetchStockMovements, postStockIn, type StockInPayload } from "@/services/stock";
 import { stockKeys } from "./query-keys";
 
 // ─── useStock ─────────────────────────────────────────────────────────────────
@@ -51,6 +51,27 @@ export function useProductStock(productId: Stock["productId"]): UseProductStockR
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,
+  };
+}
+
+// ─── useStockMovements ────────────────────────────────────────────────────────
+// Ingresos de mercadería ("in") en un rango — para el Sell-Through Rate por variante.
+
+export function useStockMovements(from: Date, to: Date): {
+  movements: StockMovement[];
+  isLoading: boolean;
+  isError:   boolean;
+} {
+  const query = useQuery({
+    queryKey:  stockKeys.movements(from.toISOString(), to.toISOString()),
+    queryFn:   () => fetchStockMovements(from, to),
+    staleTime: 60_000,
+    retry:     false,
+  });
+  return {
+    movements: query.data ?? [],
+    isLoading: query.isLoading,
+    isError:   query.isError,
   };
 }
 

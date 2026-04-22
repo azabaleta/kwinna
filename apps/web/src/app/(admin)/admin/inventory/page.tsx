@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Package2, Search, ShoppingCart, TrendingDown } from "lucide-react";
+import { ChevronDown, Package2, Search, ShoppingCart, SlidersHorizontal, TrendingDown, X } from "lucide-react";
 import type { Product, SaleOrderInput, Stock } from "@kwinna/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -27,6 +33,12 @@ import { useProducts } from "@/hooks/use-products";
 import { useStock } from "@/hooks/use-stock";
 import { RestockDialog } from "@/components/inventory/restock-dialog";
 import { CreateProductDialog } from "@/components/inventory/create-product-dialog";
+import { BulkImportDialog } from "@/components/inventory/bulk-import-dialog";
+import { DeleteProductDialog } from "@/components/inventory/delete-product-dialog";
+import { EditProductDialog } from "@/components/inventory/edit-product-dialog";
+import { PRODUCT_TAGS } from "@/schemas/product";
+import { SEASON_LABELS, type ProductSeason } from "@kwinna/contracts";
+import { cn } from "@/lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,14 +46,58 @@ function totalQty(entries: Stock[]): number {
   return entries.reduce((sum, s) => sum + s.quantity, 0);
 }
 
-function matchesQuery(product: Product, q: string): boolean {
-  if (!q) return true;
-  const lower = q.toLowerCase();
-  return (
-    product.name.toLowerCase().includes(lower) ||
-    product.sku.toLowerCase().includes(lower) ||
-    (product.tags ?? []).some((t) => t.toLowerCase().includes(lower))
+// ── Fuzzy matching ────────────────────────────────────────────────────────────
+// Normaliza acentos y mayúsculas, luego calcula edit distance (Levenshtein)
+// con una tolerancia de 1 error cada 4 caracteres.
+
+function normalize(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function editDistance(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    let prev = i;
+    for (let j = 1; j <= n; j++) {
+      const val = a[i - 1] === b[j - 1]
+        ? dp[j - 1]
+        : 1 + Math.min(dp[j - 1]!, dp[j]!, prev);
+      dp[j - 1] = prev;
+      prev = val;
+    }
+    dp[n] = prev;
+  }
+  return dp[n]!;
+}
+
+// Devuelve true si `query` matchea `text` con tolerancia a typos.
+// Para tokens cortos (≤2 chars) se exige match exacto.
+function fuzzyMatch(text: string, query: string): boolean {
+  if (!query) return true;
+  const t = normalize(text);
+  const q = normalize(query);
+  if (t.includes(q)) return true;
+  if (q.length <= 2) return false;
+
+  // Divide la query en tokens y exige que cada uno matchee alguna palabra del texto
+  const qTokens = q.split(/\s+/).filter(Boolean);
+  const tWords  = t.split(/[\s\-_/]+/).filter(Boolean);
+
+  return qTokens.every((token) => {
+    if (t.includes(token)) return true;
+    const maxDist = Math.max(1, Math.floor(token.length / 4));
+    return tWords.some((word) => editDistance(word, token) <= maxDist);
+  });
+}
+
+function matchesQuery(product: Product, q: string, tag: string, season: string): boolean {
+  const textMatch   = !q || fuzzyMatch(product.name, q) || fuzzyMatch(product.sku, q);
+  const tagMatch    = !tag || (product.tags ?? []).some(
+    (t) => t.toLowerCase() === tag.toLowerCase()
   );
+  const seasonMatch = !season || product.season === season;
+  return textMatch && tagMatch && seasonMatch;
 }
 
 // ─── Stock Chips ──────────────────────────────────────────────────────────────
@@ -160,7 +216,9 @@ function SellButton({ product, stockQty }: { product: Product; stockQty: number 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
-  const [query, setQuery] = useState("");
+  const [query,        setQuery]        = useState("");
+  const [activeTag,    setActiveTag]    = useState("");
+  const [activeSeason, setActiveSeason] = useState<ProductSeason | "">("");
 
   const { products, isLoading: loadingProducts, isError: errorProducts } = useProducts();
   const { stock, isLoading: loadingStock } = useStock();
@@ -174,7 +232,7 @@ export default function InventoryPage() {
     return acc;
   }, {});
 
-  const filtered = products.filter((p) => matchesQuery(p, query));
+  const filtered = products.filter((p) => matchesQuery(p, query, activeTag, activeSeason));
 
   const lowStockCount = products.filter((p) => {
     const qty = totalQty(stockByProduct[p.id] ?? []);
@@ -204,7 +262,8 @@ export default function InventoryPage() {
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <BulkImportDialog />
             <RestockDialog products={products} stockByProduct={stockByProduct} />
             <CreateProductDialog />
           </div>
@@ -237,16 +296,118 @@ export default function InventoryPage() {
                   Stock en tiempo real · se actualiza tras cada venta o reposición
                 </CardDescription>
               </div>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nombre, SKU o tag…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="pl-8"
-                />
+            </div>
+
+            {/* ── Filtro de temporada ── */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground font-medium">Temporada:</span>
+              {(Object.entries(SEASON_LABELS) as [ProductSeason, string][]).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setActiveSeason(activeSeason === value ? "" : value)}
+                  className={cn(
+                    "rounded-none border px-2.5 py-1 text-xs font-medium tracking-wide transition-colors",
+                    activeSeason === value
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+              {activeSeason && (
+                <button
+                  type="button"
+                  onClick={() => setActiveSeason("")}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3 w-3" /> Limpiar
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {/* Búsqueda fuzzy por nombre / SKU */}
+                <div className="relative w-full sm:w-56">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Nombre o SKU…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="pl-8 pr-7"
+                  />
+                  {query && (
+                    <button
+                      onClick={() => setQuery("")}
+                      className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Tag dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={cn(
+                        "flex shrink-0 items-center gap-1.5 rounded-md border px-3 h-9 text-xs font-medium transition-colors focus-visible:outline-none",
+                        activeTag
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-input text-muted-foreground hover:border-foreground/50 hover:text-foreground",
+                      )}
+                    >
+                      <SlidersHorizontal className="h-3 w-3 shrink-0" />
+                      <span className="max-w-[100px] truncate">
+                        {activeTag || "Categoría"}
+                      </span>
+                      {activeTag ? (
+                        <X
+                          className="h-3 w-3 shrink-0"
+                          onClick={(e) => { e.stopPropagation(); setActiveTag(""); }}
+                        />
+                      ) : (
+                        <ChevronDown className="h-3 w-3 shrink-0" />
+                      )}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="max-h-72 w-44 overflow-y-auto">
+                    {PRODUCT_TAGS.map((tag) => (
+                      <DropdownMenuItem
+                        key={tag}
+                        onSelect={() => setActiveTag(tag === activeTag ? "" : tag)}
+                        className={cn(
+                          "text-xs cursor-pointer",
+                          activeTag === tag && "font-semibold bg-accent",
+                        )}
+                      >
+                        {activeTag === tag && <span className="mr-1.5">✓</span>}
+                        {tag}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
+
+            {/* Resumen de filtros activos */}
+            {(query || activeTag || activeSeason) && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {filtered.length} resultado{filtered.length !== 1 ? "s" : ""}
+                {query && <> para <span className="font-medium text-foreground">"{query}"</span></>}
+                {activeTag && <> · categoría <span className="font-medium text-foreground">{activeTag}</span></>}
+                {activeSeason && <> · temporada <span className="font-medium text-foreground">{SEASON_LABELS[activeSeason]}</span></>}
+                {" · "}
+                <button
+                  className="underline underline-offset-2 hover:text-foreground"
+                  onClick={() => { setQuery(""); setActiveTag(""); setActiveSeason(""); }}
+                >
+                  Limpiar filtros
+                </button>
+              </p>
+            )}
           </CardHeader>
           <CardContent className="p-0">
             <Table>
@@ -266,8 +427,8 @@ export default function InventoryPage() {
                 ) : filtered.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                      {query
-                        ? `Sin resultados para "${query}"`
+                      {query || activeTag
+                        ? "Sin resultados para los filtros aplicados."
                         : "No hay productos cargados aún."}
                     </TableCell>
                   </TableRow>
@@ -297,7 +458,14 @@ export default function InventoryPage() {
 
                         {/* Name + description */}
                         <TableCell className="pl-2">
-                          <span className="font-medium text-foreground">{product.name}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium text-foreground">{product.name}</span>
+                            {product.season && (
+                              <span className="rounded-none border border-border px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                                {SEASON_LABELS[product.season]}
+                              </span>
+                            )}
+                          </div>
                           {product.description && (
                             <span className="block max-w-[220px] truncate text-xs text-muted-foreground">
                               {product.description}
@@ -334,9 +502,13 @@ export default function InventoryPage() {
                           <StockChips entries={entries} />
                         </TableCell>
 
-                        {/* Sell */}
+                        {/* Sell + Edit + Delete */}
                         <TableCell className="pr-6 text-right">
-                          <SellButton product={product} stockQty={qty} />
+                          <div className="flex items-center justify-end gap-1">
+                            <SellButton product={product} stockQty={qty} />
+                            <EditProductDialog product={product} />
+                            <DeleteProductDialog product={product} />
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

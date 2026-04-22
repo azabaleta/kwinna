@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, User, UserCircle } from "lucide-react";
+import { Heart, LogOut, User, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -98,6 +98,14 @@ export function AuthButton() {
           <Link href="/profile" className="cursor-pointer">
             <User className="h-3.5 w-3.5" />
             Mi Perfil
+          </Link>
+        </DropdownMenuItem>
+
+        {/* Mis Favoritos */}
+        <DropdownMenuItem asChild>
+          <Link href="/favorites" className="cursor-pointer">
+            <Heart className="h-3.5 w-3.5" />
+            Mis Favoritos
           </Link>
         </DropdownMenuItem>
 

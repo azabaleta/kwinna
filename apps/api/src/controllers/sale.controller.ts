@@ -1,8 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
-import type { SaleOrderInput } from "@kwinna/contracts";
+import type { SaleOrderInput, SaleStatus } from "@kwinna/contracts";
+import { SaleStatusSchema } from "@kwinna/contracts";
 import { cancelSaleAndRestoreStock, createSale, createPendingSale } from "../services/sale.service";
 import { createMPPreference, getMPPayment, verifyMPSignature } from "../services/mp.service";
-import { findAllSales, findSaleById, updateSaleStatus } from "../db/repositories/sale.repository";
+import { findAllSales, findSaleById, findWebOrdersToProcess, updateSaleStatus } from "../db/repositories/sale.repository";
+import { sendSaleConfirmationEmail } from "../services/email.service";
 
 // ─── POST /sales ──────────────────────────────────────────────────────────────
 // Venta directa POS — crea la venta como `completed` de inmediato.
@@ -17,6 +19,11 @@ export async function postSale(
     const input = req.body as SaleOrderInput;
     const sale = await createSale({ ...input, userId: input.userId ?? req.user?.sub });
     res.status(201).json({ data: sale });
+
+    // Fire-and-forget — no bloqueamos la respuesta ni tumbamos el servidor
+    sendSaleConfirmationEmail(sale).catch((err: Error) =>
+      console.error("[Email] Error enviando confirmación POS:", err.message)
+    );
   } catch (err) {
     const typed = err as Error & { statusCode?: number };
     if (typed.statusCode) res.status(typed.statusCode);
@@ -107,16 +114,16 @@ export async function postWebhook(
     const paymentId = Number(rawId);
     if (!Number.isFinite(paymentId)) return;
 
-    // ── Verificar firma (solo si el secret está configurado) ────────────────
+    // ── Verificar firma HMAC-SHA256 ────────────────────────────────────────
+    // Si MP_WEBHOOK_SECRET está configurado, la firma es OBLIGATORIA.
+    // Sin secret (dev/sandbox), se acepta sin verificar.
     const xSignature  = String(req.headers["x-signature"]  ?? "");
     const xRequestId  = String(req.headers["x-request-id"] ?? "");
+    const hasSecret   = !!process.env["MP_WEBHOOK_SECRET"];
 
-    if (xSignature && xRequestId) {
-      const valid = verifyMPSignature({
-        xSignature,
-        xRequestId,
-        dataId: rawId,
-      });
+    if (hasSecret) {
+      if (!xSignature || !xRequestId) return; // firma ausente → rechazar silenciosamente
+      const valid = verifyMPSignature({ xSignature, xRequestId, dataId: rawId });
       if (!valid) return;
     }
 
@@ -134,7 +141,14 @@ export async function postWebhook(
 
     if (existing.status === "completed") return; // idempotencia
 
-    await updateSaleStatus(saleId, "completed");
+    const completed = await updateSaleStatus(saleId, "completed");
+
+    // Fire-and-forget — ya respondimos 200, el error no puede afectar a MP
+    if (completed) {
+      sendSaleConfirmationEmail(completed).catch((err: Error) =>
+        console.error("[Email] Error enviando confirmación MP:", err.message)
+      );
+    }
 
   } catch (err) {
     // No re-lanzamos — ya enviamos 200. Solo loguear para debugging.
@@ -155,6 +169,54 @@ export async function getSales(
   try {
     const sales = await findAllSales();
     res.json({ data: sales });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── GET /sales/web-orders ────────────────────────────────────────────────────
+// Lista pedidos web en estado completed o assembled (para la vista POS).
+// Solo admin/operator.
+
+export async function getWebOrders(
+  _req: Request,
+  res:  Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const sales = await findWebOrdersToProcess();
+    res.json({ data: sales });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── PATCH /sales/:id/status ──────────────────────────────────────────────────
+// Actualiza el status de una venta (ej: completed → assembled desde el POS).
+// Solo admin/operator.
+
+export async function patchSaleStatus(
+  req:  Request,
+  res:  Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    const { status } = req.body as { status: SaleStatus };
+
+    const parsed = SaleStatusSchema.safeParse(status);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Estado inválido", detail: parsed.error.issues });
+      return;
+    }
+
+    const sale = await updateSaleStatus(id, parsed.data);
+    if (!sale) {
+      res.status(404).json({ error: "Venta no encontrada" });
+      return;
+    }
+
+    res.json({ data: sale });
   } catch (err) {
     next(err);
   }

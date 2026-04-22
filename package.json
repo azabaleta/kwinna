@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "pnpm --parallel -r --filter '@kwinna/api' --filter '@kwinna/web' dev",
     "build": "pnpm -r build",
+    "start:api": "pnpm --filter '@kwinna/api' start",
+    "start:web": "pnpm --filter '@kwinna/web' start",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "clean": "pnpm -r clean"

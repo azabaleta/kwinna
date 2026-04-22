@@ -46,9 +46,10 @@ const INITIAL_FORM: FormState = {
   reason:    "",
 };
 
+// "Devolución de cliente" se gestiona exclusivamente desde /admin/returns
+// para que el registro de motivo y la reposición de stock sean atómicos.
 const REASON_OPTIONS = [
   "Compra a proveedor",
-  "Devolución de cliente",
   "Ajuste de inventario",
   "Transferencia entre sucursales",
   "Otro",

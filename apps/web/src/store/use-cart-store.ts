@@ -22,20 +22,26 @@ function lineKey(productId: string, size?: string): string {
 // ─── State & Actions ──────────────────────────────────────────────────────────
 
 interface CartState {
-  items: CartItem[];
+  items:        CartItem[];
+  /** true una vez que persist termina de leer localStorage.
+   *  Empieza en false tanto en servidor como en el primer render del cliente,
+   *  garantizando que ambos sean idénticos y evitando hydration mismatch. */
+  hasHydrated:  boolean;
 }
 
 interface CartActions {
   /** Agrega el producto al carrito. Si ya existe la misma (product, size), incrementa la cantidad. */
-  addItem: (product: Product, quantity?: number, size?: string) => void;
+  addItem:          (product: Product, quantity?: number, size?: string) => void;
   /** Elimina toda la línea (product, size) del carrito. */
-  removeItem: (productId: string, size?: string) => void;
+  removeItem:       (productId: string, size?: string) => void;
   /** Vacía el carrito por completo. */
-  clearCart: () => void;
+  clearCart:        () => void;
   /** Precio total del carrito (suma de price × quantity por ítem). */
-  getTotal: () => number;
+  getTotal:         () => number;
   /** Cantidad total de unidades en el carrito (suma de todas las quantities). */
-  getItemCount: () => number;
+  getItemCount:     () => number;
+  /** Llamado internamente por onRehydrateStorage. No usar desde la UI. */
+  setHasHydrated:   (value: boolean) => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -43,7 +49,10 @@ interface CartActions {
 export const useCartStore = create<CartState & CartActions>()(
   persist(
     (set, get) => ({
-      items: [],
+      items:       [],
+      hasHydrated: false,
+
+      setHasHydrated: (value) => set({ hasHydrated: value }),
 
       addItem: (product, quantity = 1, size) => {
         set((state) => {
@@ -84,16 +93,23 @@ export const useCartStore = create<CartState & CartActions>()(
         get().items.reduce((sum, i) => sum + i.quantity, 0),
     }),
     {
-      name: "kwinna-cart",
+      name:    "kwinna-cart",
       storage: createJSONStorage(() => localStorage),
+      // Solo persistir items — hasHydrated es un flag de runtime, nunca se guarda.
       partialize: (state) => ({ items: state.items }),
+      // Se ejecuta cuando persist termina de leer localStorage.
+      // El callback recibe el estado ya rehidratado (incluye setHasHydrated).
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
-export const selectCartItems = (state: CartState & CartActions) => state.items;
+export const selectCartItems    = (state: CartState & CartActions) => state.items;
+export const selectHasHydrated  = (state: CartState & CartActions) => state.hasHydrated;
 
 export const selectItemCount = (state: CartState & CartActions) =>
   state.items.reduce((sum, i) => sum + i.quantity, 0);
