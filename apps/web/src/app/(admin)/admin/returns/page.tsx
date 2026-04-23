@@ -67,6 +67,10 @@ import { cn } from "@/lib/utils";
 
 const FormSchema = ReturnCreateInputSchema.extend({
   quantity: z.coerce.number().int().min(1, "Mínimo 1"),
+  // Sobreescribir restock sin .default() — react-hook-form infiere el tipo de
+  // entrada (boolean | undefined) y choca con el output type (boolean).
+  // El valor inicial lo maneja defaultValues en useForm.
+  restock: z.boolean(),
 });
 type FormValues = z.infer<typeof FormSchema>;
 

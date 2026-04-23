@@ -29,7 +29,9 @@ const DUMMY_HASH = "$2b$12$invalidhashfortimingprotection00000000000000000000000
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const JWT_SECRET = process.env["JWT_SECRET"];
+// Non-null assertion: el throw de la línea siguiente es la garantía runtime.
+// Sin `!`, TypeScript infiere `string | undefined` y rompe las llamadas a jwt.sign/verify.
+const JWT_SECRET = process.env.JWT_SECRET as string;
 if (!JWT_SECRET) throw new Error("JWT_SECRET env var is required");
 const JWT_EXPIRES           = "8h";
 const BCRYPT_ROUNDS         = 12;
@@ -227,5 +229,5 @@ export interface JwtPayload {
 }
 
 export function verifyToken(token: string): JwtPayload {
-  return jwt.verify(token, JWT_SECRET) as JwtPayload;
+  return jwt.verify(token, JWT_SECRET as string) as JwtPayload;
 }

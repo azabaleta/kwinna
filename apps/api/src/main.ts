@@ -10,6 +10,12 @@ import { registerReportsJob } from "./jobs/reports.job";
 const app = express();
 const PORT = process.env["PORT"] ?? 3001;
 
+// ─── Trust proxy ──────────────────────────────────────────────────────────────
+// Railway / Render / Fly.io despachan tráfico a través de un reverse proxy.
+// Sin esto, express-rate-limit ve la IP del proxy (igual para todos los clientes)
+// y el rate limiting deja de funcionar por IP real.
+app.set("trust proxy", 1);
+
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 // CORS_ORIGIN accepts a comma-separated list of allowed origins so Railway /
 // Render / Vercel deployments can inject the real frontend URL without a code
@@ -41,8 +47,11 @@ app.use(
 );
 
 // ─── Global Middlewares ───────────────────────────────────────────────────────
-app.use(express.json());
-app.use(morgan("combined"));
+// Limite de 100 KB previene payloads gigantes antes de que lleguen a los controllers.
+app.use(express.json({ limit: "100kb" }));
+// 'combined' en producción incluye IP, user-agent y referrer — útil para auditoría.
+// 'dev' en desarrollo da output coloreado y compacto.
+app.use(morgan(process.env["NODE_ENV"] === "production" ? "combined" : "dev"));
 app.use(requestLogger);
 
 // ─── Public Routes ────────────────────────────────────────────────────────────
@@ -71,7 +80,28 @@ app.use(errorHandler);
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   process.stdout.write(`\x1b[32m[API]\x1b[0m Running on http://localhost:${PORT}\n`);
   registerReportsJob();
 });
+
+// ─── Graceful shutdown ────────────────────────────────────────────────────────
+// Railway / Render envían SIGTERM antes de escalar o reiniciar el contenedor.
+// Esperamos que las requests activas terminen antes de cerrar el proceso.
+
+function shutdown(signal: string) {
+  process.stdout.write(`\n[API] ${signal} recibido — cerrando servidor...\n`);
+  server.close(() => {
+    process.stdout.write("[API] Servidor cerrado correctamente.\n");
+    process.exit(0);
+  });
+
+  // Si el servidor no cierra en 10 s, forzar salida.
+  setTimeout(() => {
+    process.stderr.write("[API] Timeout de cierre forzado.\n");
+    process.exit(1);
+  }, 10_000).unref();
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT",  () => shutdown("SIGINT"));
