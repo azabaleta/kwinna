@@ -20,8 +20,7 @@ const nextConfig: NextConfig = {
   // standalone empaqueta solo lo necesario para correr — ideal para Docker / Railway.
   output: "standalone",
 
-  // contracts ahora se compila a dist/index.js via tsup — transpilePackages ya no es necesario.
-  // transpilePackages: ["@kwinna/contracts"],
+  transpilePackages: ["@kwinna/contracts"],
 
   images: {
     remotePatterns: [
