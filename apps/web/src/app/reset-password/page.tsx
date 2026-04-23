@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -17,7 +17,7 @@ interface FieldErrors {
   confirm?:  string;
 }
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const token        = searchParams.get("token") ?? "";
@@ -186,5 +186,13 @@ function PageShell({ children }: { children: React.ReactNode }) {
         {children}
       </div>
     </main>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<PageShell><div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></PageShell>}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
