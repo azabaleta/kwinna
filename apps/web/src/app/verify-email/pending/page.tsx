@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, Loader2, CheckCircle2 } from "lucide-react";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { postResendVerification } from "@/services/auth";
 
-export default function VerifyEmailPendingPage() {
+function VerifyEmailPendingForm() {
   const searchParams = useSearchParams();
   const email        = searchParams.get("email") ?? "";
 
@@ -93,5 +93,13 @@ export default function VerifyEmailPendingPage() {
 
       </div>
     </main>
+  );
+}
+
+export default function VerifyEmailPendingPage() {
+  return (
+    <Suspense fallback={<main className="flex min-h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></main>}>
+      <VerifyEmailPendingForm />
+    </Suspense>
   );
 }

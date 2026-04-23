@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
@@ -11,7 +11,7 @@ import { useAuthStore } from "@/store/use-auth-store";
 
 type State = "loading" | "success" | "error";
 
-export default function VerifyEmailPage() {
+function VerifyEmailForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const setSession   = useAuthStore((s) => s.setSession);
@@ -108,5 +108,13 @@ function ErrorCard({ message }: { message: string }) {
         </Button>
       </CardContent>
     </Card>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<PageShell><Card><CardContent className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></CardContent></Card></PageShell>}>
+      <VerifyEmailForm />
+    </Suspense>
   );
 }
