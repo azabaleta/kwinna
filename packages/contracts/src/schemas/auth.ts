@@ -67,6 +67,28 @@ export const ResendVerificationInputSchema = z.object({
 
 export type ResendVerificationInput = z.infer<typeof ResendVerificationInputSchema>;
 
+// ─── Customer with purchase metrics ──────────────────────────────────────────
+// Solo expuesto a admin/operator — contiene PII.
+
+export const CustomerMetricsSchema = z.object({
+  id:            z.string().uuid(),
+  name:          z.string(),
+  email:         z.string().email(),
+  emailVerified: z.boolean(),
+  createdAt:     z.string().datetime(),
+  totalLifetime: z.number(),
+  totalMonth:    z.number(),
+  totalSemester: z.number(),
+});
+
+export type CustomerMetrics = z.infer<typeof CustomerMetricsSchema>;
+
+export const CustomerListResponseSchema = z.object({
+  data: z.array(CustomerMetricsSchema),
+});
+
+export type CustomerListResponse = z.infer<typeof CustomerListResponseSchema>;
+
 // ─── Password reset ───────────────────────────────────────────────────────────
 
 export const ForgotPasswordInputSchema = z.object({

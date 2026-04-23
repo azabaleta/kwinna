@@ -11,6 +11,12 @@ The platform operates as a backend API serving multiple clients:
 1. **Web App (Next.js)** — Online e-commerce storefront and admin dashboard.
 2. **Desktop POS** — Upcoming point-of-sale desktop application for physical store locations.
 
+**CURRENT STATE (APR 2026):** The application is fully deployed in **PRODUCTION**. 
+- Frontend is hosted on Vercel (Next.js App Router).
+- Backend API is hosted on Railway (Express).
+- Database is PostgreSQL on Railway.
+- Monorepo package manager is **PNPM** workspaces. Ensure `pnpm install` is respected and avoid introducing package manager conflicts. No changes should break the live deployment pipeline.
+
 ---
 
 ## STACK

@@ -31,13 +31,14 @@ export const SaleSchema = z.object({
   // ── Customer data (PII) ────────────────────────────────────────────────────
   customerName:  z.string().min(1),
   customerEmail: z.string().email(),
-  customerPhone: z.string().optional(),
-  customerDni:   z.string().optional(),
+  customerPhone: z.string().optional(),  // opcional en entidad — puede ser vacío en ventas históricas
+  customerDni:   z.string().optional(),  // opcional en entidad — puede ser vacío en ventas históricas
 
   // ── Shipping ───────────────────────────────────────────────────────────────
   shippingAddress:  z.string().min(1),
   shippingCity:     z.string().min(1),
   shippingProvince: z.string().min(1),
+  shippingZipCode:  z.string().default(""),  // default "" para ventas históricas sin CP
   shippingCost:     z.number().nonnegative(),
 
   // ── Canal y metadata POS ───────────────────────────────────────────────────
@@ -74,10 +75,11 @@ export const SaleOrderInputSchema = z.object({
   items:            z.array(SaleOrderItemSchema).min(1).max(30, "El carrito no puede superar 30 ítems distintos"),
   customerName:     z.string().min(1).max(100),
   customerEmail:    z.string().email().max(255),
-  customerPhone:    z.string().max(30).optional(),
+  customerPhone:    z.string().max(30).optional(),    // opcional: POS puede omitirlo
   shippingAddress:  z.string().min(1).max(200),
   shippingCity:     z.string().min(1).max(100),
   shippingProvince: z.string().min(1).max(100),
+  shippingZipCode:  z.string().max(20).optional(),    // opcional: POS puede omitirlo
   userId:           z.string().uuid().optional(),
   // total y shippingCost son calculados exclusivamente por el backend
 
@@ -85,7 +87,7 @@ export const SaleOrderInputSchema = z.object({
   channel:       SaleChannelSchema.optional(),
   paymentMethod: z.string().max(50).optional(),
   saleNotes:     z.string().max(500).optional(),
-  customerDni:   z.string().max(20).optional(),
+  customerDni:   z.string().max(20).optional(),       // opcional: POS puede omitirlo
 });
 
 export type SaleOrderInput = z.infer<typeof SaleOrderInputSchema>;

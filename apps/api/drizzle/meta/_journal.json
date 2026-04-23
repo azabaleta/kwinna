@@ -64,6 +64,13 @@
       "when": 1745722000000,
       "tag": "0008_password_reset_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1776986437675,
+      "tag": "0009_spicy_zeigeist",
+      "breakpoints": true
     }
   ]
 }

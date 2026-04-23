@@ -126,9 +126,11 @@ export default function CheckoutPage() {
       name:             user?.name  ?? "",
       email:            user?.email ?? "",
       phone:            "",
+      dni:              "",
       shippingAddress:  "",
       shippingCity:     "",
       shippingProvince: "",
+      shippingZipCode:  "",
     },
   });
 
@@ -176,10 +178,12 @@ export default function CheckoutPage() {
       })),
       customerName:     values.name,
       customerEmail:    values.email,
-      customerPhone:    values.phone || undefined,
+      customerPhone:    values.phone,
+      customerDni:      values.dni,
       shippingAddress:  values.shippingAddress,
       shippingCity:     values.shippingCity,
       shippingProvince: values.shippingProvince,
+      shippingZipCode:  values.shippingZipCode,
       userId:           user?.id,
     };
 
@@ -392,29 +396,51 @@ export default function CheckoutPage() {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs">
-                          Teléfono{" "}
-                          <span className="text-[11px] font-normal text-muted-foreground">
-                            (opcional)
-                          </span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type="tel"
-                            placeholder="+54 11 1234-5678"
-                            autoComplete="tel"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage className="text-[11px]" />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">
+                            Teléfono{" "}
+                            <span className="text-destructive" aria-hidden>*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="tel"
+                              placeholder="+54 299 4XX-XXXX"
+                              autoComplete="tel"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage className="text-[11px]" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="dni"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">
+                            DNI / CUIL{" "}
+                            <span className="text-destructive" aria-hidden>*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              placeholder="12.345.678"
+                              autoComplete="off"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage className="text-[11px]" />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </fieldset>
 
                 {/* ── Envío ────────────────────────────────────────── */}
@@ -530,6 +556,28 @@ export default function CheckoutPage() {
                       )}
                     />
                   </div>
+
+                  <FormField
+                    control={form.control}
+                    name="shippingZipCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">
+                          Código postal{" "}
+                          <span className="text-destructive" aria-hidden>*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="text"
+                            placeholder="8300"
+                            autoComplete="postal-code"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage className="text-[11px]" />
+                      </FormItem>
+                    )}
+                  />
                 </fieldset>
 
                 {/* ── Submit ───────────────────────────────────────── */}

@@ -197,6 +197,7 @@ export const salesTable = pgTable("sales", {
   shippingAddress:  text("shipping_address").notNull(),
   shippingCity:     varchar("shipping_city", { length: 100 }).notNull(),
   shippingProvince: varchar("shipping_province", { length: 100 }).notNull(),
+  shippingZipCode:  varchar("shipping_zip_code", { length: 20 }).notNull().default(""),
   shippingCost:     numeric("shipping_cost", { precision: 12, scale: 2 }).notNull().default("0"),
 
   // ── Opcional: cliente registrado ───────────────────────────────────────────

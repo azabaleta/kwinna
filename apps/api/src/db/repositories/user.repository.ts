@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
-import type { User } from "@kwinna/contracts";
+import { eq, sql } from "drizzle-orm";
+import type { CustomerMetrics, User } from "@kwinna/contracts";
 import { db } from "../index";
-import { usersTable } from "../schema";
+import { salesTable, usersTable } from "../schema";
 
 // ─── Internal type ────────────────────────────────────────────────────────────
 // Incluye el hash que nunca se expone fuera del módulo de auth.
@@ -68,6 +68,59 @@ export async function createUser(input: CreateUserInput): Promise<StoredUser> {
     })
     .returning();
   return mapRow(row!);
+}
+
+/**
+ * Lista todos los clientes registrados con métricas de compras calculadas en BD.
+ * Una sola query con LEFT JOIN y agregación condicional — sin N+1.
+ * Solo usuarios con role = "customer". Nunca expone passwordHash.
+ */
+export async function findAllCustomers(): Promise<CustomerMetrics[]> {
+  const now          = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+
+  const rows = await db
+    .select({
+      id:            usersTable.id,
+      name:          usersTable.name,
+      email:         usersTable.email,
+      emailVerified: usersTable.emailVerified,
+      createdAt:     usersTable.createdAt,
+      totalLifetime: sql<number>`
+        COALESCE(SUM(CASE WHEN ${salesTable.status} = 'completed'
+          THEN CAST(${salesTable.total} AS numeric) ELSE 0 END), 0)
+      `.mapWith(Number),
+      totalMonth: sql<number>`
+        COALESCE(SUM(CASE WHEN ${salesTable.status} = 'completed'
+          AND ${salesTable.createdAt} >= ${startOfMonth}
+          THEN CAST(${salesTable.total} AS numeric) ELSE 0 END), 0)
+      `.mapWith(Number),
+      totalSemester: sql<number>`
+        COALESCE(SUM(CASE WHEN ${salesTable.status} = 'completed'
+          AND ${salesTable.createdAt} >= ${sixMonthsAgo}
+          THEN CAST(${salesTable.total} AS numeric) ELSE 0 END), 0)
+      `.mapWith(Number),
+    })
+    .from(usersTable)
+    .leftJoin(salesTable, eq(salesTable.userId, usersTable.id))
+    .where(eq(usersTable.role, "customer"))
+    .groupBy(
+      usersTable.id,
+      usersTable.name,
+      usersTable.email,
+      usersTable.emailVerified,
+      usersTable.createdAt,
+    )
+    .orderBy(sql`${usersTable.createdAt} DESC`);
+
+  return rows.map((r) => ({
+    ...r,
+    createdAt:     r.createdAt.toISOString(),
+    totalLifetime: Number(r.totalLifetime),
+    totalMonth:    Number(r.totalMonth),
+    totalSemester: Number(r.totalSemester),
+  }));
 }
 
 export async function markEmailVerified(userId: string): Promise<void> {

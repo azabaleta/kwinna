@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { BarChart3, CalendarCheck, LayoutDashboard, LogOut, Package2, RotateCcw, ShoppingBag } from "lucide-react";
+import { BarChart3, CalendarCheck, LayoutDashboard, LogOut, Package2, RotateCcw, ShoppingBag, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { selectUser, useAuthStore } from "@/store/use-auth-store";
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: "/admin/today",     label: "Pedidos del día", icon: CalendarCheck   },
   { href: "/admin/inventory", label: "Inventario",      icon: Package2        },
   { href: "/admin/orders",    label: "Pedidos",         icon: ShoppingBag     },
+  { href: "/admin/customers", label: "Clientes",        icon: Users           },
   { href: "/admin/returns",   label: "Devoluciones",    icon: RotateCcw       },
   { href: "/admin/reports",   label: "Reportes",        icon: BarChart3       },
 ] as const;
