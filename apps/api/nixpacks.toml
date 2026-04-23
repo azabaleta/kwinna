@@ -1,0 +1,8 @@
+[phases.build]
+cmds = [
+  "pnpm --filter @kwinna/contracts build",
+  "pnpm --filter @kwinna/api build"
+]
+
+[start]
+cmd = "node dist/main.js"

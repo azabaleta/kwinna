@@ -166,8 +166,13 @@ export function ImageUploader({
       {hasAny && (
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
           {/* Committed URLs */}
-          {value.map((url) => (
-            <CommittedThumb key={url} url={url} onRemove={() => removeCommitted(url)} />
+          {value.map((url, idx) => (
+            <CommittedThumb
+              key={url}
+              url={url}
+              label={idx === 0 ? "Principal" : idx === 1 ? "Hover" : undefined}
+              onRemove={() => removeCommitted(url)}
+            />
           ))}
 
           {/* In-flight / errored uploads */}
@@ -234,11 +239,32 @@ export function ImageUploader({
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function CommittedThumb({ url, onRemove }: { url: string; onRemove: () => void }) {
+function CommittedThumb({
+  url,
+  label,
+  onRemove,
+}: {
+  url:      string;
+  label?:   string;
+  onRemove: () => void;
+}) {
   return (
     <div className="group relative aspect-square overflow-hidden rounded-xl border border-border/40 bg-muted">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={url} alt="" className="h-full w-full object-cover" loading="lazy" />
+
+      {/* Position badge */}
+      {label && (
+        <span className={cn(
+          "absolute bottom-1 left-1 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide leading-none",
+          label === "Principal"
+            ? "bg-primary text-primary-foreground"
+            : "bg-black/60 text-white",
+        )}>
+          {label}
+        </span>
+      )}
+
       <button
         type="button"
         onClick={onRemove}
