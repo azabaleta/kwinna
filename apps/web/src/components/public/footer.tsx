@@ -45,7 +45,7 @@ export function PublicFooter() {
           </h3>
           <address className="not-italic text-[11px] uppercase tracking-widest text-muted-foreground/80 leading-relaxed">
             Luis Beltran 830 <br />
-            Río Negro, Argentina <br />
+            Neuquén, Argentina <br />
             Atencion de Lunes a Sábado
           </address>
         </div>
