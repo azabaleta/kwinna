@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/main.ts",
+    "prebuild": "pnpm --filter @kwinna/contracts build",
     "build": "tsc",
     "start": "node dist/main.js",
     "lint": "eslint .",
