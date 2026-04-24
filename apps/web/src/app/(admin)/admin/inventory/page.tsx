@@ -448,50 +448,21 @@ export default function InventoryPage() {
 
                     return (
                       <Fragment key={product.id}>
-                        <TableRow
-                          className={cn(hasSizes && "cursor-pointer hover:bg-muted/30")}
-                          onClick={hasSizes ? () => toggleExpanded(product.id) : undefined}
-                          role={hasSizes ? "button" : undefined}
-                          aria-expanded={hasSizes ? isOpen : undefined}
-                          tabIndex={hasSizes ? 0 : undefined}
-                          onKeyDown={hasSizes ? (e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              toggleExpanded(product.id);
-                            }
-                          } : undefined}
-                        >
-                          {/* Thumbnail + chevron */}
+                        <TableRow>
+                          {/* Thumbnail */}
                           <TableCell className="pl-4">
-                            <div className="flex items-center gap-1">
-                              {hasSizes ? (
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); toggleExpanded(product.id); }}
-                                  aria-label={isOpen ? "Contraer talles" : "Ver talles"}
-                                  aria-expanded={isOpen}
-                                  className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
-                                >
-                                  {isOpen
-                                    ? <ChevronDown className="h-4 w-4" />
-                                    : <ChevronRight className="h-4 w-4" />}
-                                </button>
-                              ) : (
-                                <span className="w-6" aria-hidden />
-                              )}
-                              {thumb ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={thumb}
-                                  alt={product.name}
-                                  className="h-10 w-10 rounded-md object-cover"
-                                />
-                              ) : (
-                                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
-                                  <Package2 className="h-4 w-4 text-muted-foreground" />
-                                </div>
-                              )}
-                            </div>
+                            {thumb ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={thumb}
+                                alt={product.name}
+                                className="h-10 w-10 rounded-md object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+                                <Package2 className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            )}
                           </TableCell>
 
                           {/* Name + description */}
@@ -535,20 +506,29 @@ export default function InventoryPage() {
                             ${product.price.toLocaleString("es-AR")}
                           </TableCell>
 
-                          {/* Stock total con badge de estado */}
+                          {/* Stock total + botón "Ver talles" */}
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <StockBadge quantity={qty} />
                               {hasSizes && (
-                                <span className="text-[10px] text-muted-foreground">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpanded(product.id)}
+                                  aria-expanded={isOpen}
+                                  aria-controls={`stock-detail-${product.id}`}
+                                  className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:border-foreground/50 hover:text-foreground"
+                                >
                                   {sizedEntries.length} talle{sizedEntries.length !== 1 ? "s" : ""}
-                                </span>
+                                  {isOpen
+                                    ? <ChevronDown className="h-3 w-3" />
+                                    : <ChevronRight className="h-3 w-3" />}
+                                </button>
                               )}
                             </div>
                           </TableCell>
 
                           {/* Sell + Edit + Delete */}
-                          <TableCell className="pr-6 text-right" onClick={(e) => e.stopPropagation()}>
+                          <TableCell className="pr-6 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <SellButton product={product} stockQty={qty} />
                               <EditProductDialog product={product} />
@@ -559,9 +539,12 @@ export default function InventoryPage() {
 
                         {/* Fila expandida con detalle por talle */}
                         {hasSizes && isOpen && (
-                          <TableRow className="bg-muted/20 hover:bg-muted/20">
+                          <TableRow
+                            id={`stock-detail-${product.id}`}
+                            className="bg-muted/20 hover:bg-muted/20"
+                          >
                             <TableCell colSpan={6} className="pl-4 pr-6 py-3">
-                              <div className="flex items-center gap-3 pl-[70px]">
+                              <div className="flex flex-wrap items-center gap-3 pl-[56px]">
                                 <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                                   Detalle por talle
                                 </span>
