@@ -8,7 +8,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     <AuthGuard>
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar />
-        <div className="flex-1 overflow-y-auto">
+        {/* pt-14 en mobile deja espacio para la top bar con el hamburger. */}
+        <div className="flex-1 overflow-y-auto pt-14 lg:pt-0">
           {children}
         </div>
       </div>

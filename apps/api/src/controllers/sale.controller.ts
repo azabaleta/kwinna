@@ -90,9 +90,17 @@ export async function postWebhook(
   res.sendStatus(200);
 
   try {
+    // ── Log de entrada — visible en Railway Logs ────────────────────────────
+    console.log("[Webhook] Notificación recibida", JSON.stringify({
+      body:  req.body,
+      query: req.query,
+      headers: {
+        "x-signature":  req.headers["x-signature"]  ?? "(ausente)",
+        "x-request-id": req.headers["x-request-id"] ?? "(ausente)",
+      },
+    }));
+
     // ── Extraer payment ID ──────────────────────────────────────────────────
-    // Webhooks v2 body: { type: "payment", data: { id: "123" }, action: "..." }
-    // IPN legacy query: ?topic=payment&id=123
     const body = req.body as {
       type?:   string;
       action?: string;
@@ -103,45 +111,81 @@ export async function postWebhook(
       body.type === "payment" ||
       (req.query["topic"] === "payment" && typeof req.query["id"] === "string");
 
-    if (!isPaymentEvent) return;
+    if (!isPaymentEvent) {
+      console.warn("[Webhook] Ignorado: no es un evento de pago", { type: body.type, topic: req.query["topic"] });
+      return;
+    }
 
     const rawId =
       body.data?.id ??
       (typeof req.query["id"] === "string" ? req.query["id"] : undefined);
 
-    if (!rawId) return;
+    if (!rawId) {
+      console.warn("[Webhook] Ignorado: no se encontró payment ID en body ni en query");
+      return;
+    }
 
     const paymentId = Number(rawId);
-    if (!Number.isFinite(paymentId)) return;
+    if (!Number.isFinite(paymentId)) {
+      console.warn("[Webhook] Ignorado: payment ID no es un número válido", { rawId });
+      return;
+    }
+
+    console.log("[Webhook] Procesando payment ID:", paymentId);
 
     // ── Verificar firma HMAC-SHA256 ────────────────────────────────────────
-    // Si MP_WEBHOOK_SECRET está configurado, la firma es OBLIGATORIA.
-    // Sin secret (dev/sandbox), se acepta sin verificar.
     const xSignature  = String(req.headers["x-signature"]  ?? "");
     const xRequestId  = String(req.headers["x-request-id"] ?? "");
     const hasSecret   = !!process.env["MP_WEBHOOK_SECRET"];
 
     if (hasSecret) {
-      if (!xSignature || !xRequestId) return; // firma ausente → rechazar silenciosamente
+      if (!xSignature || !xRequestId) {
+        console.warn("[Webhook] Ignorado: MP_WEBHOOK_SECRET configurado pero faltan headers de firma (x-signature / x-request-id)");
+        return;
+      }
       const valid = verifyMPSignature({ xSignature, xRequestId, dataId: rawId });
-      if (!valid) return;
+      if (!valid) {
+        console.warn("[Webhook] Ignorado: firma HMAC-SHA256 inválida");
+        return;
+      }
+      console.log("[Webhook] Firma HMAC verificada correctamente");
+    } else {
+      console.log("[Webhook] Sin MP_WEBHOOK_SECRET — verificación de firma omitida (sandbox/dev)");
     }
 
     // ── Re-validar estado del pago en la API de MP ──────────────────────────
     const payment = await getMPPayment(paymentId);
+    console.log("[Webhook] Estado del pago consultado en MP:", {
+      id:                payment.id,
+      status:            payment.status,
+      externalReference: payment.externalReference,
+    });
 
-    if (payment.status !== "approved") return;
+    if (payment.status !== "approved") {
+      console.warn("[Webhook] Ignorado: estado del pago no es 'approved'", { status: payment.status });
+      return;
+    }
 
     const saleId = payment.externalReference;
-    if (!saleId) return;
+    if (!saleId) {
+      console.warn("[Webhook] Ignorado: pago aprobado sin external_reference — no se puede identificar la orden");
+      return;
+    }
 
     // ── Actualizar sale de pending → completed ──────────────────────────────
     const existing = await findSaleById(saleId);
-    if (!existing) return;
+    if (!existing) {
+      console.warn("[Webhook] Ignorado: no se encontró orden con ID", { saleId });
+      return;
+    }
 
-    if (existing.status === "completed") return; // idempotencia
+    if (existing.status === "completed") {
+      console.log("[Webhook] Idempotencia: la orden ya estaba en estado 'completed'", { saleId });
+      return;
+    }
 
     const completed = await updateSaleStatus(saleId, "completed");
+    console.log("[Webhook] ✅ Orden actualizada a 'completed'", { saleId });
 
     // Fire-and-forget — ya respondimos 200, el error no puede afectar a MP
     if (completed) {
@@ -151,8 +195,7 @@ export async function postWebhook(
     }
 
   } catch (err) {
-    // No re-lanzamos — ya enviamos 200. Solo loguear para debugging.
-    console.error("[Webhook] Error procesando notificación:", err);
+    console.error("[Webhook] Error inesperado procesando notificación:", err);
     next(err);
   }
 }

@@ -100,6 +100,9 @@ function ErrorCard({ message }: { message: string }) {
         <CardDescription className="text-center">{message}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
+        <Button asChild className="w-full">
+          <Link href="/verify-email/code">Ingresar código del email</Link>
+        </Button>
         <Button asChild variant="outline" className="w-full">
           <Link href="/verify-email/pending">Solicitar nuevo enlace</Link>
         </Button>

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, Package2, Search, ShoppingCart, SlidersHorizontal, TrendingDown, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Package2, Search, ShoppingCart, SlidersHorizontal, TrendingDown, X } from "lucide-react";
 import type { Product, SaleOrderInput, Stock } from "@kwinna/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -219,6 +219,11 @@ export default function InventoryPage() {
   const [query,        setQuery]        = useState("");
   const [activeTag,    setActiveTag]    = useState("");
   const [activeSeason, setActiveSeason] = useState<ProductSeason | "">("");
+  const [expanded,     setExpanded]     = useState<Record<string, boolean>>({});
+
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
 
   const { products, isLoading: loadingProducts, isError: errorProducts } = useProducts();
   const { stock, isLoading: loadingStock } = useStock();
@@ -417,7 +422,7 @@ export default function InventoryPage() {
                   <TableHead className="pl-2">Producto</TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead>Precio</TableHead>
-                  <TableHead>Stock por talle</TableHead>
+                  <TableHead>Stock total</TableHead>
                   <TableHead className="pr-6 text-right">Acción</TableHead>
                 </TableRow>
               </TableHeader>
@@ -434,83 +439,140 @@ export default function InventoryPage() {
                   </TableRow>
                 ) : (
                   filtered.map((product) => {
-                    const entries = stockByProduct[product.id] ?? [];
-                    const qty = totalQty(entries);
-                    const thumb = product.images?.[0];
+                    const entries     = stockByProduct[product.id] ?? [];
+                    const sizedEntries = entries.filter((s) => s.size);
+                    const qty         = totalQty(entries);
+                    const thumb       = product.images?.[0];
+                    const hasSizes    = sizedEntries.length > 0;
+                    const isOpen      = !!expanded[product.id];
 
                     return (
-                      <TableRow key={product.id}>
-                        {/* Thumbnail */}
-                        <TableCell className="pl-4">
-                          {thumb ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={thumb}
-                              alt={product.name}
-                              className="h-10 w-10 rounded-md object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
-                              <Package2 className="h-4 w-4 text-muted-foreground" />
+                      <Fragment key={product.id}>
+                        <TableRow
+                          className={cn(hasSizes && "cursor-pointer hover:bg-muted/30")}
+                          onClick={hasSizes ? () => toggleExpanded(product.id) : undefined}
+                          role={hasSizes ? "button" : undefined}
+                          aria-expanded={hasSizes ? isOpen : undefined}
+                          tabIndex={hasSizes ? 0 : undefined}
+                          onKeyDown={hasSizes ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              toggleExpanded(product.id);
+                            }
+                          } : undefined}
+                        >
+                          {/* Thumbnail + chevron */}
+                          <TableCell className="pl-4">
+                            <div className="flex items-center gap-1">
+                              {hasSizes ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); toggleExpanded(product.id); }}
+                                  aria-label={isOpen ? "Contraer talles" : "Ver talles"}
+                                  aria-expanded={isOpen}
+                                  className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                                >
+                                  {isOpen
+                                    ? <ChevronDown className="h-4 w-4" />
+                                    : <ChevronRight className="h-4 w-4" />}
+                                </button>
+                              ) : (
+                                <span className="w-6" aria-hidden />
+                              )}
+                              {thumb ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={thumb}
+                                  alt={product.name}
+                                  className="h-10 w-10 rounded-md object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+                                  <Package2 className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </TableCell>
+                          </TableCell>
 
-                        {/* Name + description */}
-                        <TableCell className="pl-2">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-medium text-foreground">{product.name}</span>
-                            {product.season && (
-                              <span className="rounded-none border border-border px-1.5 py-px text-[10px] font-medium text-muted-foreground">
-                                {SEASON_LABELS[product.season]}
+                          {/* Name + description */}
+                          <TableCell className="pl-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-medium text-foreground">{product.name}</span>
+                              {product.season && (
+                                <span className="rounded-none border border-border px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                                  {SEASON_LABELS[product.season]}
+                                </span>
+                              )}
+                            </div>
+                            {product.description && (
+                              <span className="block max-w-[220px] truncate text-xs text-muted-foreground">
+                                {product.description}
                               </span>
                             )}
-                          </div>
-                          {product.description && (
-                            <span className="block max-w-[220px] truncate text-xs text-muted-foreground">
-                              {product.description}
-                            </span>
-                          )}
-                          {(product.tags ?? []).length > 0 && (
-                            <div className="mt-0.5 flex flex-wrap gap-1">
-                              {(product.tags ?? []).slice(0, 3).map((t) => (
-                                <span
-                                  key={t}
-                                  className="rounded-full bg-muted px-1.5 py-px text-[10px] text-muted-foreground"
-                                >
-                                  {t}
+                            {(product.tags ?? []).length > 0 && (
+                              <div className="mt-0.5 flex flex-wrap gap-1">
+                                {(product.tags ?? []).slice(0, 3).map((t) => (
+                                  <span
+                                    key={t}
+                                    className="rounded-full bg-muted px-1.5 py-px text-[10px] text-muted-foreground"
+                                  >
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </TableCell>
+
+                          {/* SKU */}
+                          <TableCell>
+                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                              {product.sku}
+                            </code>
+                          </TableCell>
+
+                          {/* Price */}
+                          <TableCell className="font-medium tabular-nums">
+                            ${product.price.toLocaleString("es-AR")}
+                          </TableCell>
+
+                          {/* Stock total con badge de estado */}
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <StockBadge quantity={qty} />
+                              {hasSizes && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  {sizedEntries.length} talle{sizedEntries.length !== 1 ? "s" : ""}
                                 </span>
-                              ))}
+                              )}
                             </div>
-                          )}
-                        </TableCell>
+                          </TableCell>
 
-                        {/* SKU */}
-                        <TableCell>
-                          <code className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                            {product.sku}
-                          </code>
-                        </TableCell>
+                          {/* Sell + Edit + Delete */}
+                          <TableCell className="pr-6 text-right" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1">
+                              <SellButton product={product} stockQty={qty} />
+                              <EditProductDialog product={product} />
+                              <DeleteProductDialog product={product} />
+                            </div>
+                          </TableCell>
+                        </TableRow>
 
-                        {/* Price */}
-                        <TableCell className="font-medium tabular-nums">
-                          ${product.price.toLocaleString("es-AR")}
-                        </TableCell>
-
-                        {/* Per-size chips */}
-                        <TableCell>
-                          <StockChips entries={entries} />
-                        </TableCell>
-
-                        {/* Sell + Edit + Delete */}
-                        <TableCell className="pr-6 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <SellButton product={product} stockQty={qty} />
-                            <EditProductDialog product={product} />
-                            <DeleteProductDialog product={product} />
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                        {/* Fila expandida con detalle por talle */}
+                        {hasSizes && isOpen && (
+                          <TableRow className="bg-muted/20 hover:bg-muted/20">
+                            <TableCell colSpan={6} className="pl-4 pr-6 py-3">
+                              <div className="flex items-center gap-3 pl-[70px]">
+                                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                                  Detalle por talle
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  <StockChips entries={entries} />
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
                     );
                   })
                 )}

@@ -29,6 +29,11 @@ export async function postResendVerification(email: string): Promise<void> {
   await apiClient.post("/auth/resend-verification", { email });
 }
 
+export async function postVerifyEmailByCode(code: string): Promise<LoginResponse> {
+  const res = await apiClient.post("/auth/verify-email-code", { code });
+  return LoginResponseSchema.parse(res.data);
+}
+
 export async function postForgotPassword(input: ForgotPasswordInput): Promise<void> {
   await apiClient.post("/auth/forgot-password", input);
 }

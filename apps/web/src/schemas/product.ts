@@ -49,10 +49,12 @@ export type ProductUpdateFormValues = z.infer<typeof ProductUpdateFormSchema>;
 // Sincronizado con mocks/db.ts y el seed de la API.
 
 export const CATEGORIES = [
-  { id: "770e8400-e29b-41d4-a716-446655440001", label: "Vestidos" },
+  { id: "770e8400-e29b-41d4-a716-446655440001", label: "Calzas" },
   { id: "770e8400-e29b-41d4-a716-446655440002", label: "Tops" },
-  { id: "770e8400-e29b-41d4-a716-446655440003", label: "Pantalones" },
-  { id: "770e8400-e29b-41d4-a716-446655440004", label: "Accesorios" },
+  { id: "770e8400-e29b-41d4-a716-446655440003", label: "Musculosas" },
+  { id: "770e8400-e29b-41d4-a716-446655440004", label: "Remeras" },
+  { id: "770e8400-e29b-41d4-a716-446655440005", label: "Accesorios" },
+  { id: "770e8400-e29b-41d4-a716-446655440006", label: "Otros" },
 ] as const;
 
 // ─── Product tags ─────────────────────────────────────────────────────────────
@@ -80,6 +82,7 @@ export const PRODUCT_TAGS = [
   "Camperas",
   "Buzos",
   "Medias",
+  "Deportivo",
   "Accesorios",
 ] as const;
 

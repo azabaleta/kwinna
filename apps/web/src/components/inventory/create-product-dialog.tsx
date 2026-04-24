@@ -92,7 +92,7 @@ export function CreateProductDialog() {
       toast.success("Producto creado", {
         description: `${product.name} — SKU ${product.sku}`,
       });
-      setOpen(false);
+      handleOpenChange(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error al crear el producto";
       toast.error("No se pudo crear", { description: message });

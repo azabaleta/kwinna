@@ -197,8 +197,9 @@ function buildEmailHtml(sale: Sale, productNames: Map<string, string>): string {
  * rawToken es el token en crudo (no el hash) — viaja solo en la URL del email.
  */
 export async function sendVerificationEmail(
-  user:     Pick<User, "name" | "email">,
-  rawToken: string,
+  user:      Pick<User, "name" | "email">,
+  rawToken:  string,
+  shortCode?: string,
 ): Promise<void> {
   const resend  = getClient();
   const appUrl  = process.env["APP_URL"] ?? "http://localhost:3000";
@@ -225,6 +226,21 @@ export async function sendVerificationEmail(
             </td>
           </tr>
 
+          <!-- Banner anti-spam -->
+          <tr>
+            <td style="padding:16px 24px 0;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;">
+                <tr>
+                  <td style="padding:12px 16px;">
+                    <p style="margin:0;color:#92400e;font-size:12px;line-height:1.6;">
+                      <strong>⚠️ ¿Este mail llegó a Spam?</strong> Marcalo como &quot;No es spam&quot; o movelo a tu Bandeja de Entrada antes de hacer clic — algunos clientes de correo deshabilitan los botones en mensajes de Spam.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
           <tr>
             <td style="padding:40px 40px 32px;text-align:center;">
               <div style="width:56px;height:56px;background:#f0fdf4;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px;">
@@ -244,14 +260,32 @@ export async function sendVerificationEmail(
             </td>
           </tr>
 
+          ${shortCode ? `
+          <tr>
+            <td style="padding:0 40px 24px;text-align:center;">
+              <div style="border-top:1px solid #e5e7eb;margin-bottom:24px;"></div>
+              <p style="margin:0 0 6px;color:#6b7280;font-size:12px;">
+                ¿El botón no funciona? Ingresá este código en
+                <a href="${appUrl}/verify-email/code" style="color:#111827;font-weight:600;">${appUrl}/verify-email/code</a>
+              </p>
+              <div style="display:inline-block;margin-top:12px;background:#f3f4f6;border-radius:12px;padding:16px 32px;">
+                <span style="font-size:36px;font-weight:700;letter-spacing:10px;color:#111827;font-family:monospace;">${shortCode}</span>
+              </div>
+              <p style="margin:10px 0 0;color:#9ca3af;font-size:11px;">Código de un solo uso · expira en 24 horas</p>
+            </td>
+          </tr>
+          ` : `
           <tr>
             <td style="padding:0 40px 32px;text-align:center;">
-              <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
-                Si el botón no funciona, copiá este enlace en tu navegador:<br>
-                <span style="color:#374151;word-break:break-all;">${verifyUrl}</span>
+              <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.8;">
+                Si el botón no funciona, copiá y pegá este enlace en tu navegador:
+              </p>
+              <p style="margin:8px 0 0;font-size:12px;word-break:break-all;background:#f3f4f6;border-radius:6px;padding:10px 14px;text-align:left;">
+                <a href="${verifyUrl}" style="color:#111827;text-decoration:underline;">${verifyUrl}</a>
               </p>
             </td>
           </tr>
+          `}
 
           <tr>
             <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
@@ -309,6 +343,21 @@ export async function sendPasswordResetEmail(
             </td>
           </tr>
 
+          <!-- Banner anti-spam -->
+          <tr>
+            <td style="padding:16px 24px 0;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;">
+                <tr>
+                  <td style="padding:12px 16px;">
+                    <p style="margin:0;color:#92400e;font-size:12px;line-height:1.6;">
+                      <strong>⚠️ ¿Este mail llegó a Spam?</strong> Marcalo como &quot;No es spam&quot; o movelo a tu Bandeja de Entrada antes de hacer clic — algunos clientes de correo deshabilitan los botones en mensajes de Spam.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
           <tr>
             <td style="padding:40px 40px 32px;text-align:center;">
               <div style="width:56px;height:56px;background:#fef2f2;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px;">
@@ -333,9 +382,11 @@ export async function sendPasswordResetEmail(
 
           <tr>
             <td style="padding:0 40px 32px;text-align:center;">
-              <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
-                Si el botón no funciona, copiá este enlace en tu navegador:<br>
-                <span style="color:#374151;word-break:break-all;">${resetUrl}</span>
+              <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.8;">
+                Si el botón no funciona, copiá y pegá este enlace en tu navegador:
+              </p>
+              <p style="margin:8px 0 0;font-size:12px;word-break:break-all;background:#f3f4f6;border-radius:6px;padding:10px 14px;text-align:left;">
+                <a href="${resetUrl}" style="color:#111827;text-decoration:underline;">${resetUrl}</a>
               </p>
             </td>
           </tr>

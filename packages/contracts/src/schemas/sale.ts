@@ -22,6 +22,9 @@ export type SaleStatus = z.infer<typeof SaleStatusSchema>;
 export const SaleChannelSchema = z.enum(["web", "pos"]);
 export type SaleChannel = z.infer<typeof SaleChannelSchema>;
 
+export const ShippingMethodSchema = z.enum(["delivery", "pickup"]);
+export type ShippingMethod = z.infer<typeof ShippingMethodSchema>;
+
 export const SaleSchema = z.object({
   id:     z.string().uuid(),
   items:  z.array(SaleItemSchema),
@@ -40,6 +43,9 @@ export const SaleSchema = z.object({
   shippingProvince: z.string().min(1),
   shippingZipCode:  z.string().default(""),  // default "" para ventas históricas sin CP
   shippingCost:     z.number().nonnegative(),
+
+  // ── Método de envío ───────────────────────────────────────────────────────
+  shippingMethod: ShippingMethodSchema.default("delivery"),
 
   // ── Canal y metadata POS ───────────────────────────────────────────────────
   channel:       SaleChannelSchema.default("web"),
@@ -82,6 +88,9 @@ export const SaleOrderInputSchema = z.object({
   shippingZipCode:  z.string().max(20).optional(),    // opcional: POS puede omitirlo
   userId:           z.string().uuid().optional(),
   // total y shippingCost son calculados exclusivamente por el backend
+
+  // ── Método de envío ───────────────────────────────────────────────────────
+  shippingMethod: ShippingMethodSchema.optional(),     // opcional: POS siempre usa "delivery"
 
   // ── POS metadata (opcionales — solo el cliente de mostrador los envía) ───
   channel:       SaleChannelSchema.optional(),

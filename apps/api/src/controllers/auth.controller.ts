@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import type { RegisterInput, ResetPasswordInput } from "@kwinna/contracts";
 import type { LoginInput } from "../services/auth.service";
-import { login, register, verifyEmail, resendVerification, requestPasswordReset, resetPassword } from "../services/auth.service";
+import { login, register, verifyEmail, verifyEmailByCode, resendVerification, requestPasswordReset, resetPassword } from "../services/auth.service";
 
 export async function postLogin(
   req: Request,
@@ -64,6 +64,23 @@ export async function postResendVerification(
       await resendVerification(email);
     }
     res.json({ message: "Si el email existe y no está verificado, recibirás un nuevo enlace." });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── POST /auth/verify-email-code ────────────────────────────────────────────
+// Verifica el email usando el código corto de 6 dígitos (alternativa al link).
+
+export async function postVerifyEmailByCode(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { code } = req.body as { code: string };
+    const result = await verifyEmailByCode(code);
+    res.json(result);
   } catch (err) {
     next(err);
   }

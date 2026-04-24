@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ShoppingBag } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { selectItemCount, useCartStore } from "@/store/use-cart-store";
@@ -24,7 +24,7 @@ export function CartButton() {
   return (
     <div className="relative">
       <Button variant="ghost" size="sm" onClick={handleCheckout} className="gap-2">
-        <ShoppingBag className="h-4 w-4" />
+        <ShoppingCart className="h-4 w-4" />
         <span className="hidden text-[11px] font-semibold tracking-widest uppercase sm:inline">
           Carrito
         </span>

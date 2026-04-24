@@ -85,6 +85,13 @@ function VerifyEmailPendingForm() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground">
+          ¿Tu email anterior tenía un código de 6 dígitos?{" "}
+          <Link href="/verify-email/code" className="font-medium text-primary hover:underline">
+            Ingresarlo acá
+          </Link>
+        </p>
+
+        <p className="text-center text-xs text-muted-foreground">
           ¿Ya verificaste?{" "}
           <Link href="/login" className="font-medium text-primary hover:underline">
             Iniciar sesión

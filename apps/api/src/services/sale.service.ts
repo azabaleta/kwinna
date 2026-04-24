@@ -131,7 +131,9 @@ export async function createSale(input: SaleOrderInput): Promise<Sale> {
     }
 
     // 3 — Calcular totales en el servidor ─────────────────────────────────
-    const shippingCost = computeShippingCost(input.shippingCity);
+    // Pickup siempre tiene envío gratis, independientemente de la ciudad.
+    const isPickup    = input.shippingMethod === "pickup";
+    const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity);
     const total = saleItems.reduce((sum, i) => sum + i.subtotal, 0) + shippingCost;
 
     // 4 — Insertar venta ───────────────────────────────────────────────────
@@ -149,6 +151,7 @@ export async function createSale(input: SaleOrderInput): Promise<Sale> {
         shippingCity:     input.shippingCity,
         shippingProvince: input.shippingProvince,
         shippingZipCode:  input.shippingZipCode ?? "",
+        shippingMethod:   input.shippingMethod ?? "delivery",
         shippingCost:     shippingCost.toString(),
         userId:           input.userId,
         channel:          input.channel ?? "pos",
@@ -218,7 +221,9 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
     }
 
     // 3 — Calcular totales en el servidor ─────────────────────────────────
-    const shippingCost = computeShippingCost(input.shippingCity);
+    // Pickup siempre tiene envío gratis, independientemente de la ciudad.
+    const isPickup     = input.shippingMethod === "pickup";
+    const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity);
     const total = saleItems.reduce((sum, i) => sum + i.subtotal, 0) + shippingCost;
 
     // 4 — Insertar venta pending ───────────────────────────────────────────
@@ -236,6 +241,7 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
         shippingCity:     input.shippingCity,
         shippingProvince: input.shippingProvince,
         shippingZipCode:  input.shippingZipCode ?? "",
+        shippingMethod:   input.shippingMethod ?? "delivery",
         shippingCost:     shippingCost.toString(),
         userId:           input.userId,
         channel:          input.channel ?? "web",

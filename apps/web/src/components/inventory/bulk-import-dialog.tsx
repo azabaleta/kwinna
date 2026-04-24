@@ -121,7 +121,9 @@ function groupCsvRows(rows: Record<string, string>[]): ParsedProduct[] {
 /**
  * Matches photo files to products: a photo is linked to a product when its
  * filename (without extension) contains the product SKU (case-insensitive).
- * Returns a new products array with `.photos` populated.
+ * Returns a new products array with `.photos` populated en ORDEN NATURAL
+ * por nombre de archivo (PROD-1, PROD-2, PROD-10 — no alfabético puro).
+ * Esto garantiza que la primera foto por numeración sea la Principal.
  */
 function matchPhotos(
   products: ParsedProduct[],
@@ -129,12 +131,16 @@ function matchPhotos(
 ): ParsedProduct[] {
   return products.map((p) => ({
     ...p,
-    photos: photos.filter((f) =>
-      f.name
-        .replace(/\.[^.]+$/, "")          // remove extension
-        .toLowerCase()
-        .includes(p.sku.toLowerCase())
-    ),
+    photos: photos
+      .filter((f) =>
+        f.name
+          .replace(/\.[^.]+$/, "")          // remove extension
+          .toLowerCase()
+          .includes(p.sku.toLowerCase())
+      )
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })
+      ),
   }));
 }
 
@@ -219,28 +225,33 @@ export function BulkImportDialog() {
     setUploadProgress({});
     setDoneCount(0);
 
-    // Flat list of (sku, file) pairs to upload
-    const uploads: Array<{ sku: string; file: File }> = products.flatMap((p) =>
-      p.photos.map((file) => ({ sku: p.sku, file }))
-    );
-
-    // Upload all photos concurrently (max 5 at a time)
+    // Upload photos preserving order-per-product.
+    // Promise.all sobre el array de un producto preserva el orden original,
+    // y paralelizamos entre productos distintos para no serializar todo.
     const urlsBySku: Record<string, string[]> = {};
 
     await Promise.all(
-      chunk(uploads, 5).map(async (batch) => {
-        for (const { sku, file } of batch) {
-          try {
-            const result = await uploadToCloudinary(file, (pct) => {
-              setUploadProgress((prev) => ({ ...prev, [sku]: pct }));
-            });
-            if (!urlsBySku[sku]) urlsBySku[sku] = [];
-            urlsBySku[sku].push(result.secure_url);
-          } catch {
-            // Photo upload failed — continue without it
-          }
-          setDoneCount((n) => n + 1);
-        }
+      products.map(async (product) => {
+        if (product.photos.length === 0) return;
+
+        // Dentro de cada producto: uploads paralelos, pero Promise.all mantiene
+        // la correspondencia por índice — la primera foto del array queda en [0].
+        const results = await Promise.all(
+          product.photos.map(async (file) => {
+            try {
+              const result = await uploadToCloudinary(file, (pct) => {
+                setUploadProgress((prev) => ({ ...prev, [product.sku]: pct }));
+              });
+              return result.secure_url;
+            } catch {
+              return null; // foto falló — se descarta, no rompe el resto
+            } finally {
+              setDoneCount((n) => n + 1);
+            }
+          })
+        );
+
+        urlsBySku[product.sku] = results.filter((u): u is string => u !== null);
       })
     );
 
@@ -296,9 +307,14 @@ export function BulkImportDialog() {
 
   // ── Derived values ───────────────────────────────────────────────────────────
 
-  const totalPhotos    = products.reduce((s, p) => s + p.photos.length, 0);
-  const matchedCount   = products.filter((p) => p.photos.length > 0).length;
   const totalUploads   = products.reduce((s, p) => s + p.photos.length, 0);
+  const matchedCount   = products.filter((p) => p.photos.length > 0).length;
+
+  // Archivos únicos que matchearon al menos un SKU (un archivo puede matchear múltiples).
+  const matchedFiles = new Set<File>();
+  products.forEach((p) => p.photos.forEach((f) => matchedFiles.add(f)));
+  const unmatchedCount = Math.max(0, photos.length - matchedFiles.size);
+
   const canImport      = phase === "setup" && products.length > 0;
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -390,7 +406,7 @@ export function BulkImportDialog() {
                     <div className="space-y-0.5">
                       <p className="text-sm font-semibold">{photos.length} foto{photos.length !== 1 ? "s" : ""} cargada{photos.length !== 1 ? "s" : ""}</p>
                       <p className="text-xs opacity-70">
-                        {matchedCount} emparejada{matchedCount !== 1 ? "s" : ""} · {photos.length - totalPhotos} sin coincidencia
+                        {matchedCount} emparejada{matchedCount !== 1 ? "s" : ""} · {unmatchedCount} sin coincidencia
                       </p>
                     </div>
                   ) : (
@@ -417,7 +433,7 @@ export function BulkImportDialog() {
             <div className="flex items-center justify-between gap-3 border-t pt-4">
               <p className="text-xs text-muted-foreground">
                 {products.length > 0
-                  ? `${products.length} productos · ${totalPhotos} fotos emparejadas`
+                  ? `${products.length} productos · ${totalUploads} fotos emparejadas`
                   : "Cargá una planilla para continuar"}
               </p>
               <div className="flex gap-2">
@@ -660,10 +676,3 @@ function ProgressScreen({
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
-}

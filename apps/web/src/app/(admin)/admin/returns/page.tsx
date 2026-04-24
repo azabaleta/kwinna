@@ -61,6 +61,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateReturn, useReturns } from "@/hooks/use-returns";
 import { useProducts } from "@/hooks/use-products";
+import { ProductCombobox } from "@/components/inventory/product-combobox";
 import { cn } from "@/lib/utils";
 
 // ─── Form schema ──────────────────────────────────────────────────────────────
@@ -176,18 +177,14 @@ function RegisterReturnDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Producto <span className="text-destructive">*</span></FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccioná un producto" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {products.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <ProductCombobox
+                      products={products}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      error={!!form.formState.errors.productId}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

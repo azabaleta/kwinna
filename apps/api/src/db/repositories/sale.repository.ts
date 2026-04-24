@@ -23,6 +23,7 @@ export function mapSaleRow(row: typeof salesTable.$inferSelect): Sale {
     shippingCity:     row.shippingCity,
     shippingProvince: row.shippingProvince,
     shippingZipCode:  row.shippingZipCode,
+    shippingMethod:   (row.shippingMethod ?? "delivery") as "delivery" | "pickup",
     shippingCost:     Number(row.shippingCost),
 
     // Channel + POS metadata

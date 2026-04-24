@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight, Heart, Share2, ShoppingBag } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowLeft, ChevronLeft, ChevronRight, Heart, Share2, ShoppingCart } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -10,7 +11,7 @@ import type { Stock } from "@kwinna/contracts";
 import { Button } from "@/components/ui/button";
 import { useProduct } from "@/hooks/use-products";
 import { useProductStock } from "@/hooks/use-stock";
-import { useCartStore } from "@/store/use-cart-store";
+import { selectCartItems, useCartStore } from "@/store/use-cart-store";
 import { useAuthStore } from "@/store/use-auth-store";
 import { useWishlistStore } from "@/store/use-wishlist-store";
 import { trackEvent } from "@/services/analytics";
@@ -64,7 +65,7 @@ function ProductGallery({ images, name }: { images: string[]; name: string }) {
           ))
         ) : (
           <div className="flex aspect-[3/4] w-full items-center justify-center bg-muted text-primary/20">
-            <ShoppingBag className="h-20 w-20" />
+            <ShoppingCart className="h-20 w-20" />
           </div>
         )}
       </div>
@@ -83,7 +84,7 @@ function ProductGallery({ images, name }: { images: string[]; name: string }) {
           />
         ) : (
           <div className="flex h-full items-center justify-center text-primary/20">
-            <ShoppingBag className="h-20 w-20" />
+            <ShoppingCart className="h-20 w-20" />
           </div>
         )}
 
@@ -185,6 +186,7 @@ export function ProductDetailClient({ id }: { id: string }) {
   const { stock,   isLoading: stockLoading }                          = useProductStock(id);
 
   const addItem         = useCartStore((s) => s.addItem);
+  const cartItems       = useCartStore(selectCartItems);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const toggleWishlist  = useWishlistStore((s) => s.toggleItem);
   const inWishlist      = useWishlistStore((s) =>
@@ -192,10 +194,27 @@ export function ProductDetailClient({ id }: { id: string }) {
   );
   const [selectedSize, setSelectedSize] = useState<string | undefined>(undefined);
 
+  // Resetear la selección de talle al navegar entre productos.
+  // Sin esto, el talle elegido en el producto anterior persiste en el nuevo
+  // porque Next.js reutiliza el componente al cambiar el id.
+  useEffect(() => {
+    setSelectedSize(undefined);
+  }, [id]);
+
   const hasSizes    = stock.some((s) => s.size !== undefined && s.size !== "");
   const sortedStock = hasSizes ? sortSizes(stock.filter((s) => s.size)) : [];
-
   const noSizeEntry = !hasSizes ? stock[0] : undefined;
+
+  // Derivado del store — fuente de verdad real.
+  // Para productos con talles: true solo si el talle seleccionado está en el carrito.
+  // Para productos sin talles: true si el producto está en el carrito.
+  // Se actualiza automáticamente al limpiar el carrito (logout, etc.).
+  const addedToCart = product
+    ? cartItems.some(
+        (i) => i.product.id === product.id &&
+               (hasSizes ? i.size === selectedSize : true),
+      )
+    : false;
 
   async function handleShare() {
     const url = `${window.location.origin}/shop/${id}`;
@@ -367,7 +386,7 @@ export function ProductDetailClient({ id }: { id: string }) {
                   disabled={outOfStock || (hasSizes && !selectedSize)}
                   onClick={handleAddToCart}
                 >
-                  <ShoppingBag className="mr-2 h-4 w-4" />
+                  <ShoppingCart className="mr-2 h-4 w-4" />
                   {outOfStock
                     ? "Agotado"
                     : hasSizes && !selectedSize
@@ -398,6 +417,28 @@ export function ProductDetailClient({ id }: { id: string }) {
                   <Share2 className="h-4 w-4" />
                 </Button>
               </div>
+
+              <AnimatePresence>
+                {addedToCart && (
+                  <motion.div
+                    key="go-to-cart"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.22, ease: "easeOut" }}
+                    style={{ overflow: "hidden" }}
+                  >
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="lg"
+                      className="w-full rounded-none text-xs font-semibold tracking-widest uppercase border-foreground"
+                    >
+                      <Link href="/checkout">Ver carrito →</Link>
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {hasSizes && !selectedSize && !outOfStock && (
                 <p className="text-center text-[11px] text-muted-foreground/70">

@@ -12,6 +12,7 @@ import {
 import {
   findLastTokenForUser,
   findValidToken,
+  findValidTokenByCode,
   insertToken,
   markTokenUsed,
 } from "../db/repositories/email-token.repository";
@@ -63,6 +64,13 @@ function sha256(input: string): string {
 
 function generateRawToken(): string {
   return crypto.randomBytes(32).toString("hex");
+}
+
+// Código numérico de 6 dígitos: 100000–999999
+function generateShortCode(): string {
+  const bytes = crypto.randomBytes(3);
+  const num   = (bytes.readUIntBE(0, 3) % 900000) + 100000;
+  return String(num);
 }
 
 // ─── Login ────────────────────────────────────────────────────────────────────
@@ -148,6 +156,26 @@ export async function verifyEmail(rawToken: string): Promise<LoginResponse> {
   return { user, token: makeToken(user) };
 }
 
+// ─── Verify email by short code ───────────────────────────────────────────────
+
+export async function verifyEmailByCode(code: string): Promise<LoginResponse> {
+  const record = await findValidTokenByCode(code);
+
+  if (!record) {
+    throw httpError("El código no es válido o ya fue utilizado.", 400);
+  }
+
+  await markTokenUsed(record.id);
+  await markEmailVerified(record.userId);
+
+  const { findUserById } = await import("../db/repositories/user.repository");
+  const stored = await findUserById(record.userId);
+  if (!stored) throw httpError("Usuario no encontrado", 404);
+
+  const { passwordHash: _, ...user } = stored;
+  return { user, token: makeToken(user) };
+}
+
 // ─── Resend verification ──────────────────────────────────────────────────────
 
 export async function resendVerification(email: string): Promise<void> {
@@ -174,10 +202,11 @@ async function sendEmailVerificationToken(
 ): Promise<void> {
   const rawToken  = generateRawToken();
   const tokenHash = sha256(rawToken);
+  const shortCode = generateShortCode();
   const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
 
-  await insertToken(userId, tokenHash, expiresAt);
-  await sendVerificationEmail(user, rawToken);
+  await insertToken(userId, tokenHash, expiresAt, shortCode);
+  await sendVerificationEmail(user, rawToken, shortCode);
 }
 
 // ─── Forgot password ──────────────────────────────────────────────────────────

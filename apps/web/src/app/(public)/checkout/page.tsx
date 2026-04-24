@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, Loader2, ShoppingBag, Trash2, Truck } from "lucide-react";
+import { ArrowLeft, Loader2, MapPin, Package, ShoppingCart, Trash2, Truck } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -34,9 +34,13 @@ import {
 import { useAuthStore } from "@/store/use-auth-store";
 import {
   CheckoutFormSchema,
+  CHECKOUT_DRAFT_KEY,
+  STORE_ADDRESS,
+  type CheckoutDraft,
   type CheckoutFormValues,
 } from "@/schemas/checkout";
 import { trackEvent } from "@/services/analytics";
+import { cn } from "@/lib/utils";
 import {
   fetchProvincias,
   fetchMunicipios,
@@ -119,7 +123,9 @@ export default function CheckoutPage() {
   useEffect(() => { trackEvent("checkout_start"); }, []);
 
   // ── React Hook Form ───────────────────────────────────────────────────────
-
+  // Inicializamos con valores vacíos para que SSR y cliente rindan IDÉNTICO HTML.
+  // El draft de localStorage se carga DESPUÉS del mount via useEffect — evita
+  // hydration mismatch de Next.js.
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(CheckoutFormSchema),
     defaultValues: {
@@ -127,12 +133,57 @@ export default function CheckoutPage() {
       email:            user?.email ?? "",
       phone:            "",
       dni:              "",
+      shippingMethod:   "delivery",
       shippingAddress:  "",
       shippingCity:     "",
       shippingProvince: "",
       shippingZipCode:  "",
     },
   });
+
+  // ── Cargar draft de localStorage después del mount (evita hydration mismatch) ─
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(CHECKOUT_DRAFT_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as Partial<CheckoutDraft>;
+      form.reset({
+        // Datos del usuario autenticado tienen prioridad sobre el draft
+        name:             user?.name  ?? draft.name            ?? "",
+        email:            user?.email ?? draft.email           ?? "",
+        phone:            draft.phone            ?? "",
+        dni:              draft.dni              ?? "",
+        shippingMethod:   "delivery",
+        shippingAddress:  draft.shippingAddress  ?? "",
+        shippingCity:     draft.shippingCity     ?? "",
+        shippingProvince: draft.shippingProvince ?? "",
+        shippingZipCode:  draft.shippingZipCode  ?? "",
+      });
+    } catch { /* JSON malformado o localStorage bloqueado — ignorar */ }
+    // Intencional: solo correr al mount. form y user no cambian en esta vida del componente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Persistencia — subscribe al form (no re-renderiza todo en cada tecla) ────
+  useEffect(() => {
+    const subscription = form.watch((values) => {
+      if (values.shippingMethod === "pickup") return;
+      const toPersist: CheckoutDraft = {
+        name:             values.name             ?? "",
+        email:            values.email            ?? "",
+        phone:            values.phone            ?? "",
+        dni:              values.dni              ?? "",
+        shippingAddress:  values.shippingAddress  ?? "",
+        shippingCity:     values.shippingCity     ?? "",
+        shippingProvince: values.shippingProvince ?? "",
+        shippingZipCode:  values.shippingZipCode  ?? "",
+      };
+      try {
+        window.localStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify(toPersist));
+      } catch { /* cuota excedida — ignorar */ }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   // ── Georef — provincias y municipios ─────────────────────────────────────
 
@@ -163,13 +214,23 @@ export default function CheckoutPage() {
 
   // ── Shipping reactivo (observa el campo ciudad sin estado extra) ──────────
 
-  const shippingCity = form.watch("shippingCity");
-  const shipping     = computeShipping(shippingCity);
-  const grandTotal   = cartTotal + shipping.cost;
+  const shippingCity   = form.watch("shippingCity");
+  const shippingMethod = form.watch("shippingMethod");
+  const isPickup       = shippingMethod === "pickup";
+  const shipping       = isPickup ? { cost: 0, label: "", isKnown: false } : computeShipping(shippingCity);
+  const grandTotal     = cartTotal + shipping.cost;
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
   async function onSubmit(values: CheckoutFormValues) {
+    // Si es pickup: usar dirección del local (el backend también lo verifica)
+    const address = values.shippingMethod === "pickup" ? STORE_ADDRESS : {
+      shippingAddress:  values.shippingAddress,
+      shippingCity:     values.shippingCity,
+      shippingProvince: values.shippingProvince,
+      shippingZipCode:  values.shippingZipCode,
+    };
+
     const salePayload: SaleOrderInput = {
       items: items.map(({ product, quantity, size }) => ({
         productId: product.id,
@@ -180,10 +241,8 @@ export default function CheckoutPage() {
       customerEmail:    values.email,
       customerPhone:    values.phone,
       customerDni:      values.dni,
-      shippingAddress:  values.shippingAddress,
-      shippingCity:     values.shippingCity,
-      shippingProvince: values.shippingProvince,
-      shippingZipCode:  values.shippingZipCode,
+      shippingMethod:   values.shippingMethod,
+      ...address,
       userId:           user?.id,
     };
 
@@ -210,7 +269,7 @@ export default function CheckoutPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background px-4">
         <div className="flex flex-col items-center gap-6 text-center">
-          <ShoppingBag className="h-10 w-10 text-muted-foreground/20" />
+          <ShoppingCart className="h-10 w-10 text-muted-foreground/20" />
           <div className="space-y-1.5">
             <p className="font-semibold text-foreground">Tu carrito está vacío</p>
             <p className="text-sm text-muted-foreground">
@@ -226,7 +285,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background px-4 py-10 md:px-8">
+    <main className="min-h-screen bg-background px-4 py-10 pb-[calc(9rem+env(safe-area-inset-bottom))] md:px-8 lg:pb-10">
       <div className="mx-auto max-w-5xl">
 
         {/* ── Back nav ─────────────────────────────────────────────── */}
@@ -291,20 +350,25 @@ export default function CheckoutPage() {
 
               {/* Envío (aparece cuando la ciudad tiene costo asignado) */}
               {shipping.isKnown && (
-                <div className="flex items-center gap-4 border-b border-border/40 py-4 last:border-0">
-                  <div className="flex h-16 w-12 shrink-0 items-center justify-center rounded-none bg-muted/50">
-                    <Truck className="h-4 w-4 text-foreground/50" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-normal uppercase tracking-wide text-foreground">
-                      Envío a domicilio
+                <div className="border-b border-border/40 py-4 last:border-0">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-16 w-12 shrink-0 items-center justify-center rounded-none bg-muted/50">
+                      <Truck className="h-4 w-4 text-foreground/50" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-normal uppercase tracking-wide text-foreground">
+                        Envío a domicilio
+                      </p>
+                      <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {shipping.label}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-sm font-normal tabular-nums text-foreground">
+                      ${shipping.cost.toLocaleString("es-AR")}
                     </p>
-                    <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">
-                      {shipping.label}
-                    </p>
                   </div>
-                  <p className="shrink-0 text-sm font-normal tabular-nums text-foreground">
-                    ${shipping.cost.toLocaleString("es-AR")}
+                  <p className="mt-2 pl-16 text-[10px] leading-relaxed text-muted-foreground/80 italic">
+                    Logística propia: entrega directa de la tienda.
                   </p>
                 </div>
               )}
@@ -341,10 +405,56 @@ export default function CheckoutPage() {
           <section aria-label="Datos de contacto y envío" className="order-1 lg:order-2">
             <Form {...form}>
               <form
+                id="checkout-form"
                 onSubmit={form.handleSubmit(onSubmit)}
                 noValidate
                 className="space-y-8"
               >
+
+                {/* ── Método de entrega ─────────────────────────────── */}
+                <fieldset className="space-y-3">
+                  <legend className="mb-3 text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
+                    Método de entrega
+                  </legend>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(["delivery", "pickup"] as const).map((method) => (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => form.setValue("shippingMethod", method, { shouldValidate: true })}
+                        className={cn(
+                          "flex flex-col items-center gap-2 rounded-none border px-4 py-4 text-xs font-medium transition-colors",
+                          shippingMethod === method
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground",
+                        )}
+                      >
+                        {method === "delivery"
+                          ? <Truck className="h-4 w-4" />
+                          : <Package className="h-4 w-4" />}
+                        <span className="tracking-wider uppercase">
+                          {method === "delivery" ? "Envío a domicilio" : "Retiro en local"}
+                        </span>
+                        {method === "pickup" && (
+                          <span className={cn(
+                            "text-[10px]",
+                            shippingMethod === "pickup" ? "text-background/70" : "text-emerald-600",
+                          )}>
+                            Gratis
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  {isPickup && (
+                    <div className="flex items-center gap-2 rounded-none border border-border/50 bg-muted/30 px-4 py-3">
+                      <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <p className="text-xs text-muted-foreground">
+                        Coordinamos el día y horario de retiro por Instagram o WhatsApp.
+                      </p>
+                    </div>
+                  )}
+                </fieldset>
 
                 {/* ── Contacto ─────────────────────────────────────── */}
                 <fieldset className="space-y-5">
@@ -443,7 +553,8 @@ export default function CheckoutPage() {
                   </div>
                 </fieldset>
 
-                {/* ── Envío ────────────────────────────────────────── */}
+                {/* ── Envío (solo en delivery) ──────────────────────── */}
+                {!isPickup && (
                 <fieldset className="space-y-5">
                   <legend className="mb-4 text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
                     Dirección de envío
@@ -579,12 +690,13 @@ export default function CheckoutPage() {
                     )}
                   />
                 </fieldset>
+                )}
 
-                {/* ── Submit ───────────────────────────────────────── */}
+                {/* ── Submit — solo visible en desktop ─────────────── */}
                 <Button
                   type="submit"
                   size="lg"
-                  className="w-full rounded-none text-xs font-semibold tracking-widest uppercase border border-transparent hover:bg-transparent hover:border-foreground hover:text-foreground transition-all"
+                  className="hidden lg:flex w-full rounded-none text-xs font-semibold tracking-widest uppercase border border-transparent hover:bg-transparent hover:border-foreground hover:text-foreground transition-all"
                   disabled={isPending}
                 >
                   {isPending ? (
@@ -597,7 +709,7 @@ export default function CheckoutPage() {
                   )}
                 </Button>
 
-                <p className="text-center text-[11px] leading-relaxed text-muted-foreground/60">
+                <p className="hidden lg:block text-center text-[11px] leading-relaxed text-muted-foreground/60">
                   Al confirmar aceptás nuestros términos y política de privacidad.
                 </p>
 
@@ -607,6 +719,46 @@ export default function CheckoutPage() {
 
         </div>
       </div>
+
+      {/* ── Barra sticky mobile (oculta en desktop) ──────────────────────────── */}
+      {/* pb con env(safe-area-inset-bottom) respeta el home indicator en iOS */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-background px-4 pt-4 lg:hidden"
+        style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+      >
+        <div className="mx-auto max-w-5xl space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                {isPickup ? "Retiro en local · Gratis" : shipping.isKnown ? `Envío a ${shipping.label}` : "Total a pagar"}
+              </p>
+              <p className="text-xl font-normal tabular-nums text-foreground">
+                ${grandTotal.toLocaleString("es-AR")}
+              </p>
+            </div>
+          </div>
+          <Button
+            type="submit"
+            form="checkout-form"
+            size="lg"
+            className="w-full rounded-none text-xs font-semibold tracking-widest uppercase border border-transparent hover:bg-transparent hover:border-foreground hover:text-foreground transition-all"
+            disabled={isPending}
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Procesando…
+              </>
+            ) : (
+              "Confirmar Compra"
+            )}
+          </Button>
+          <p className="text-center text-[10px] text-muted-foreground/50">
+            Al confirmar aceptás nuestros términos y política de privacidad.
+          </p>
+        </div>
+      </div>
+
     </main>
   );
 }

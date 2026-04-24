@@ -1,9 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { BarChart3, CalendarCheck, LayoutDashboard, LogOut, Package2, RotateCcw, ShoppingBag, Users } from "lucide-react";
+import { BarChart3, CalendarCheck, LayoutDashboard, LogOut, Menu, Package2, RotateCcw, ShoppingBag, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { selectUser, useAuthStore } from "@/store/use-auth-store";
@@ -46,6 +47,29 @@ export function Sidebar() {
   const user         = useAuthStore(selectUser);
   const clearSession = useAuthStore((s) => s.clearSession);
 
+  const [open, setOpen] = useState(false);
+
+  // Cerrar drawer al cambiar de ruta
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  // Bloquear scroll del body cuando el drawer está abierto (mobile)
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = ""; };
+    }
+  }, [open]);
+
+  // Cerrar con tecla Escape
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   function handleLogout() {
     clearSession();
     toast.info("Sesión cerrada");
@@ -53,71 +77,125 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-border bg-card">
-
-      {/* ── Brand → link a la tienda ── */}
-      <Link
-        href="/shop"
-        className="group flex h-14 items-center gap-2.5 border-b border-border px-4 transition-opacity hover:opacity-70"
-        title="Ver tienda"
-      >
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10">
-          <IsotipoIcon className="h-4 w-4 text-primary" />
-        </div>
-        <div className="flex flex-col leading-none">
-          <span className="font-semibold text-foreground">Kwinna</span>
-          <span className="text-[10px] text-muted-foreground transition-colors group-hover:text-foreground">
-            Ver tienda →
-          </span>
-        </div>
-      </Link>
-
-      {/* ── Nav ── */}
-      <nav className="flex-1 space-y-0.5 p-3">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
-                active
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <Icon
-                className={cn(
-                  "h-4 w-4 shrink-0",
-                  active ? "text-primary" : "text-muted-foreground"
-                )}
-              />
-              {label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* ── User + Logout ── */}
-      <div className="space-y-2 border-t border-border p-3">
-        {user && (
-          <div className="px-3 py-1">
-            <p className="truncate text-xs font-medium text-foreground">{user.name}</p>
-            <p className="text-xs capitalize text-muted-foreground">{user.role}</p>
-          </div>
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleLogout}
-          className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+    <>
+      {/* ── Mobile top bar — solo visible en mobile ─────────────────────── */}
+      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-card px-4 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Abrir menú"
+          aria-expanded={open}
+          aria-controls="admin-sidebar"
+          className="flex h-9 w-9 items-center justify-center rounded-md text-foreground hover:bg-muted"
         >
-          <LogOut className="h-4 w-4" />
-          Cerrar sesión
-        </Button>
-      </div>
+          <Menu className="h-5 w-5" />
+        </button>
+        <Link href="/shop" className="flex items-center gap-2" title="Ver tienda">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10">
+            <IsotipoIcon className="h-3.5 w-3.5 text-primary" />
+          </div>
+          <span className="font-semibold text-foreground">Kwinna</span>
+        </Link>
+      </header>
 
-    </aside>
+      {/* ── Backdrop mobile — solo cuando el drawer está abierto ─────────── */}
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] lg:hidden"
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ── Sidebar (drawer en mobile, estático en desktop) ───────────────── */}
+      <aside
+        id="admin-sidebar"
+        aria-label="Menú de administración"
+        className={cn(
+          // Base: fixed en mobile, relativo en desktop
+          "fixed inset-y-0 left-0 z-50 flex h-screen w-60 shrink-0 flex-col border-r border-border bg-card transition-transform duration-200 ease-out",
+          "lg:relative lg:z-auto lg:translate-x-0",
+          // Mobile — visibilidad controlada por `open`
+          open ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+
+        {/* ── Brand → link a la tienda ── */}
+        <div className="flex h-14 items-center justify-between gap-2.5 border-b border-border pl-4 pr-2">
+          <Link
+            href="/shop"
+            className="group flex items-center gap-2.5 transition-opacity hover:opacity-70"
+            title="Ver tienda"
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10">
+              <IsotipoIcon className="h-4 w-4 text-primary" />
+            </div>
+            <div className="flex flex-col leading-none">
+              <span className="font-semibold text-foreground">Kwinna</span>
+              <span className="text-[10px] text-muted-foreground transition-colors group-hover:text-foreground">
+                Ver tienda →
+              </span>
+            </div>
+          </Link>
+
+          {/* Botón cerrar — solo en mobile */}
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Cerrar menú"
+            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* ── Nav ── */}
+        <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
+          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href || pathname.startsWith(href + "/");
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                  active
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "h-4 w-4 shrink-0",
+                    active ? "text-primary" : "text-muted-foreground"
+                  )}
+                />
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* ── User + Logout ── */}
+        <div className="space-y-2 border-t border-border p-3">
+          {user && (
+            <div className="px-3 py-1">
+              <p className="truncate text-xs font-medium text-foreground">{user.name}</p>
+              <p className="text-xs capitalize text-muted-foreground">{user.role}</p>
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <LogOut className="h-4 w-4" />
+            Cerrar sesión
+          </Button>
+        </div>
+
+      </aside>
+    </>
   );
 }

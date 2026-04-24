@@ -11,11 +11,12 @@ type UploadStatus = "uploading" | "done" | "error";
 
 interface UploadEntry {
   id:       string;
+  seq:      number;        // orden de encolado — determina la posición final
   file:     File;
-  preview:  string;        // object URL for local preview
+  preview:  string;        // object URL para preview local (liberado al remover)
   status:   UploadStatus;
   progress: number;        // 0–100
-  url?:     string;        // Cloudinary secure_url once done
+  url?:     string;        // Cloudinary secure_url cuando done
   error?:   string;
 }
 
@@ -44,6 +45,11 @@ function validateFile(file: File): string | null {
   return null;
 }
 
+// Orden natural por nombre de archivo: PROD-1, PROD-2, PROD-10 (no alfabético puro)
+function naturalFilenameCompare(a: File, b: File): number {
+  return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ImageUploader({
@@ -56,13 +62,40 @@ export function ImageUploader({
   const [dragging, setDragging] = useState(false);
   const inputRef                = useRef<HTMLInputElement>(null);
 
-  // ── Sync uploading state al padre via useEffect ─────────────────────────────
-  // No llamar onUploadingChange dentro de un setState updater — React lo prohíbe
-  // porque es un setState del componente padre disparado durante el render.
+  // Counter monotónico para el orden de encolado.
+  const seqRef = useRef(0);
 
+  // Ref al valor del parent — siempre fresco. Evita closure stale al llamar onChange
+  // desde callbacks async (la causa de "solo sube una foto" al seleccionar varias).
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  // URLs ya sincronizadas al parent — evita duplicados cuando el efecto re-corre.
+  const syncedUrlsRef = useRef<Set<string>>(new Set());
+
+  // ── Sincronizar uploading state al padre ────────────────────────────────────
   useEffect(() => {
     onUploadingChange?.(uploads.some((e) => e.status === "uploading"));
   }, [uploads, onUploadingChange]);
+
+  // ── Sincronizar URLs "done" al parent en ORDEN DE ENCOLADO ──────────────────
+  // Un único punto de sync evita los race conditions de múltiples onChange paralelos.
+  // React batchea los setUploads de las uploads concurrentes, el efecto corre una
+  // vez por commit y flushea todas las URLs nuevas ordenadas por seq.
+  useEffect(() => {
+    const pending = uploads
+      .filter((e) => e.status === "done" && e.url && !syncedUrlsRef.current.has(e.url))
+      .sort((a, b) => a.seq - b.seq);
+
+    if (pending.length === 0) return;
+
+    const newUrls = pending.map((e) => e.url!);
+    newUrls.forEach((url) => syncedUrlsRef.current.add(url));
+
+    const nextValue = [...valueRef.current, ...newUrls];
+    valueRef.current = nextValue;
+    onChange(nextValue);
+  }, [uploads, onChange]);
 
   // ── Internal helpers ────────────────────────────────────────────────────────
 
@@ -73,7 +106,11 @@ export function ImageUploader({
   }
 
   function removeEntry(id: string) {
-    setUploads((prev) => prev.filter((e) => e.id !== id));
+    setUploads((prev) => {
+      const entry = prev.find((e) => e.id === id);
+      if (entry) URL.revokeObjectURL(entry.preview); // liberar memoria
+      return prev.filter((e) => e.id !== id);
+    });
   }
 
   async function startUpload(entry: UploadEntry) {
@@ -81,9 +118,8 @@ export function ImageUploader({
       const result = await uploadToCloudinary(entry.file, (pct) => {
         updateEntry(entry.id, { progress: pct });
       });
-
+      // Solo actualizamos el entry — el useEffect se encarga de sincronizar al parent
       updateEntry(entry.id, { status: "done", progress: 100, url: result.secure_url });
-      onChange([...value, result.secure_url]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
       updateEntry(entry.id, { status: "error", error: msg });
@@ -98,29 +134,52 @@ export function ImageUploader({
   }
 
   function enqueue(files: FileList | File[]) {
-    const remaining = maxFiles - value.length - uploads.filter((e) => e.status !== "error").length;
-    const toProcess = Array.from(files).slice(0, Math.max(0, remaining));
+    const remaining = maxFiles
+      - valueRef.current.length
+      - uploads.filter((e) => e.status !== "error").length;
 
-    for (const file of toProcess) {
+    // Sort por nombre de archivo (orden natural). El orden del FileList depende
+    // del navegador/OS — normalizamos acá para que `-1-` vaya antes que `-2-`.
+    const sorted = Array.from(files).sort(naturalFilenameCompare);
+    const toProcess = sorted.slice(0, Math.max(0, remaining));
+
+    const newEntries: UploadEntry[] = toProcess.map((file) => {
       const validationError = validateFile(file);
-      const entry: UploadEntry = {
+      return {
         id:       uid(),
+        seq:      seqRef.current++,
         file,
         preview:  URL.createObjectURL(file),
         status:   validationError ? "error" : "uploading",
         progress: 0,
         error:    validationError ?? undefined,
       };
-      setUploads((prev) => [...prev, entry]);
-      if (!validationError) startUpload(entry);
+    });
+
+    setUploads((prev) => [...prev, ...newEntries]);
+
+    // Arrancar uploads solo para los que pasaron validación
+    for (const entry of newEntries) {
+      if (!entry.error) startUpload(entry);
     }
   }
 
   // ── Committed URL removal ────────────────────────────────────────────────────
 
   function removeCommitted(url: string) {
-    onChange(value.filter((u) => u !== url));
+    syncedUrlsRef.current.delete(url); // permite re-subir el mismo archivo si hace falta
+    const nextValue = valueRef.current.filter((u) => u !== url);
+    valueRef.current = nextValue;
+    onChange(nextValue);
   }
+
+  // ── Cleanup: liberar object URLs al desmontar el componente ─────────────────
+  useEffect(() => {
+    return () => {
+      uploads.forEach((e) => URL.revokeObjectURL(e.preview));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // solo al unmount final
 
   // ── Drag handlers ────────────────────────────────────────────────────────────
 
@@ -133,30 +192,24 @@ export function ImageUploader({
     if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false);
   }, []);
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragging(false);
-      if (e.dataTransfer.files.length) enqueue(e.dataTransfer.files);
-    },
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    if (e.dataTransfer.files.length) enqueue(e.dataTransfer.files);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [value, uploads]
-  );
+  }, []);
 
-  const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files?.length) enqueue(e.target.files);
-      // reset so the same file can be re-selected
-      e.target.value = "";
-    },
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.length) enqueue(e.target.files);
+    // reset para que el mismo archivo pueda re-seleccionarse
+    e.target.value = "";
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [value, uploads]
-  );
+  }, []);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
   const totalCommitted = value.length;
-  const activeUploads  = uploads.filter((e) => e.status !== "done"); // done ones merge into `value`
+  const activeUploads  = uploads.filter((e) => e.status !== "done");
   const hasAny         = totalCommitted > 0 || activeUploads.length > 0;
   const canAddMore     = totalCommitted + uploads.filter((e) => e.status === "uploading").length < maxFiles;
 
@@ -175,15 +228,18 @@ export function ImageUploader({
             />
           ))}
 
-          {/* In-flight / errored uploads */}
-          {activeUploads.map((entry) => (
-            <UploadThumb
-              key={entry.id}
-              entry={entry}
-              onRemove={() => removeEntry(entry.id)}
-              onRetry={() => retryUpload(entry.id)}
-            />
-          ))}
+          {/* In-flight / errored uploads (ordenados por seq para preview consistente) */}
+          {activeUploads
+            .slice()
+            .sort((a, b) => a.seq - b.seq)
+            .map((entry) => (
+              <UploadThumb
+                key={entry.id}
+                entry={entry}
+                onRemove={() => removeEntry(entry.id)}
+                onRetry={() => retryUpload(entry.id)}
+              />
+            ))}
 
           {/* "Add more" tile */}
           {canAddMore && (
@@ -253,7 +309,6 @@ function CommittedThumb({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={url} alt="" className="h-full w-full object-cover" loading="lazy" />
 
-      {/* Position badge */}
       {label && (
         <span className={cn(
           "absolute bottom-1 left-1 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide leading-none",
@@ -296,7 +351,6 @@ function UploadThumb({
         isError ? "border-destructive/60" : "border-border/40"
       )}
     >
-      {/* Preview image */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={entry.preview}
@@ -307,14 +361,12 @@ function UploadThumb({
         )}
       />
 
-      {/* Uploading overlay */}
       {isUploading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/20">
           <Loader2 className="h-4 w-4 animate-spin text-white" />
           <span className="text-[10px] font-semibold tabular-nums text-white">
             {entry.progress}%
           </span>
-          {/* Progress bar */}
           <div className="absolute bottom-0 left-0 h-1 w-full bg-black/30">
             <div
               className="h-full bg-primary transition-all duration-150"
@@ -324,7 +376,6 @@ function UploadThumb({
         </div>
       )}
 
-      {/* Error overlay */}
       {isError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-destructive/10 p-1">
           <p className="line-clamp-2 text-center text-[9px] font-medium leading-tight text-destructive">
@@ -341,7 +392,6 @@ function UploadThumb({
         </div>
       )}
 
-      {/* Remove button (visible on hover for non-uploading) */}
       {!isUploading && (
         <button
           type="button"

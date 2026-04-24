@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ProductCombobox } from "@/components/inventory/product-combobox";
 import { useStockIn } from "@/hooks/use-stock";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -155,19 +156,12 @@ export function RestockDialog({ products, stockByProduct }: RestockDialogProps) 
             {/* ── Producto ── */}
             <div className="space-y-1.5">
               <Label htmlFor="rs-product">Producto</Label>
-              <Select value={form.productId} onValueChange={handleProductChange}>
-                <SelectTrigger id="rs-product" aria-invalid={!!errors.productId}>
-                  <SelectValue placeholder="Seleccioná un producto…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.productId && (
-                <p className="text-xs text-destructive">{errors.productId}</p>
-              )}
+              <ProductCombobox
+                products={products}
+                value={form.productId}
+                onValueChange={handleProductChange}
+                error={!!errors.productId}
+              />
             </div>
 
             {/* ── Talle ── */}

@@ -71,6 +71,27 @@
       "when": 1776986437675,
       "tag": "0009_spicy_zeigeist",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1745808800000,
+      "tag": "0010_email_verification_short_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1745895200000,
+      "tag": "0011_shipping_method",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1777063397401,
+      "tag": "0012_giant_hellion",
+      "breakpoints": true
     }
   ]
 }

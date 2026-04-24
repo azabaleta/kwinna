@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShoppingBag, Trash2, X } from "lucide-react";
+import { ShoppingCart, Trash2, X } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,7 +44,7 @@ export function CartPanel() {
           onClick={() => setOpen(true)}
           className="fixed bottom-6 right-6 z-40 flex items-center gap-3 rounded-full bg-primary px-5 py-3.5 text-primary-foreground shadow-soft transition-all duration-200 hover:scale-105 hover:shadow-[0_8px_32px_rgba(112,0,94,0.45)] active:scale-95"
         >
-          <ShoppingBag className="h-4 w-4" />
+          <ShoppingCart className="h-4 w-4" />
           <span className="text-xs font-semibold tracking-wide">
             {count} {count === 1 ? "pieza" : "piezas"}
           </span>
@@ -72,7 +72,7 @@ export function CartPanel() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-3">
-            <ShoppingBag className="h-4 w-4 text-primary" />
+            <ShoppingCart className="h-4 w-4 text-primary" />
             <h2 className="text-sm font-semibold tracking-widest text-foreground uppercase">
               Tu selección
             </h2>
@@ -96,7 +96,7 @@ export function CartPanel() {
         <div className="flex-1 space-y-2 overflow-y-auto px-5 py-5">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-              <ShoppingBag className="h-10 w-10 text-muted-foreground/20" />
+              <ShoppingCart className="h-10 w-10 text-muted-foreground/20" />
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">
                   Tu selección está vacía
@@ -124,7 +124,7 @@ export function CartPanel() {
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
-                      <ShoppingBag className="h-3.5 w-3.5 text-primary/50" />
+                      <ShoppingCart className="h-3.5 w-3.5 text-primary/50" />
                     </div>
                   )}
                 </div>

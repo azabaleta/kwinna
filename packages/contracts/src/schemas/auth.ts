@@ -61,6 +61,12 @@ export const VerifyEmailInputSchema = z.object({
 
 export type VerifyEmailInput = z.infer<typeof VerifyEmailInputSchema>;
 
+export const VerifyEmailByCodeInputSchema = z.object({
+  code: z.string().length(6).regex(/^\d{6}$/, "El código debe ser de 6 dígitos numéricos"),
+});
+
+export type VerifyEmailByCodeInput = z.infer<typeof VerifyEmailByCodeInputSchema>;
+
 export const ResendVerificationInputSchema = z.object({
   email: z.string().email(),
 });

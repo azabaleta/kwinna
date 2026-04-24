@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShoppingBag, Heart, Share2 } from "lucide-react";
+import { ShoppingCart, Heart, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Product } from "@kwinna/contracts";
 import { useAuthStore } from "@/store/use-auth-store";
@@ -152,7 +152,7 @@ export function ProductCard({ product, stockQty, cartQty, onAdd }: ProductCardPr
           {/* Cart badge */}
           {cartQty > 0 && !lowStock && (
             <div className="absolute left-2.5 top-2.5 z-10 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold tracking-wide text-primary-foreground shadow-soft">
-              <ShoppingBag className="h-2.5 w-2.5" />
+              <ShoppingCart className="h-2.5 w-2.5" />
               {cartQty}
             </div>
           )}

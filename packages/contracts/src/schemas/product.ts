@@ -4,13 +4,14 @@ import { z } from "zod";
 
 // Temporada interna — solo visible en el panel de administración.
 // null = sin temporada asignada (ej: accesorios).
-export const ProductSeasonSchema = z.enum(["invierno", "verano", "media_estacion"]);
+export const ProductSeasonSchema = z.enum(["invierno", "verano", "media_estacion", "deportivo"]);
 export type ProductSeason = z.infer<typeof ProductSeasonSchema>;
 
 export const SEASON_LABELS: Record<ProductSeason, string> = {
   invierno:       "Invierno",
   verano:         "Verano",
   media_estacion: "Media estación",
+  deportivo:      "Deportivo",
 };
 
 export const ProductSchema = z.object({

@@ -58,6 +58,7 @@ export const productSeasonEnum = pgEnum("product_season", [
   "invierno",
   "verano",
   "media_estacion",
+  "deportivo",
 ]);
 
 export const snapshotPeriodEnum = pgEnum("snapshot_period", [
@@ -87,6 +88,7 @@ export const emailVerificationTokensTable = pgTable("email_verification_tokens",
   id:        uuid("id").primaryKey().defaultRandom(),
   userId:    uuid("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  shortCode: varchar("short_code", { length: 6 }).unique(),  // código numérico de 6 dígitos — UNIQUE permite múltiples NULL
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   usedAt:    timestamp("used_at",    { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -202,6 +204,9 @@ export const salesTable = pgTable("sales", {
 
   // ── Opcional: cliente registrado ───────────────────────────────────────────
   userId: uuid("user_id"),
+
+  // ── Método de envío ─────────────────────────────────────────────────────────
+  shippingMethod: varchar("shipping_method", { length: 20 }).notNull().default("delivery"),
 
   // ── POS metadata ────────────────────────────────────────────────────────────
   channel:       saleChannelEnum("channel").notNull().default("web"),
