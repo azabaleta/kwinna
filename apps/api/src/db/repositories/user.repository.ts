@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type { CustomerMetrics, User } from "@kwinna/contracts";
 import { db } from "../index";
 import { salesTable, usersTable } from "../schema";
@@ -71,56 +71,69 @@ export async function createUser(input: CreateUserInput): Promise<StoredUser> {
 }
 
 /**
- * Lista todos los clientes registrados con métricas de compras calculadas en BD.
- * Una sola query con LEFT JOIN y agregación condicional — sin N+1.
- * Solo usuarios con role = "customer". Nunca expone passwordHash.
+ * Lista todos los clientes registrados con métricas de compras.
+ * Dos queries simples + cálculo en memoria — evita sql templates complejos
+ * que tienen comportamiento distinto entre versiones de Drizzle.
  */
 export async function findAllCustomers(): Promise<CustomerMetrics[]> {
   const now          = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
 
-  const rows = await db
+  // 1 — Todos los clientes registrados, sin passwordHash
+  const customers = await db
     .select({
       id:            usersTable.id,
       name:          usersTable.name,
       email:         usersTable.email,
       emailVerified: usersTable.emailVerified,
       createdAt:     usersTable.createdAt,
-      totalLifetime: sql<number>`
-        COALESCE(SUM(CASE WHEN ${salesTable.status} = 'completed'
-          THEN CAST(${salesTable.total} AS numeric) ELSE 0 END), 0)
-      `.mapWith(Number),
-      totalMonth: sql<number>`
-        COALESCE(SUM(CASE WHEN ${salesTable.status} = 'completed'
-          AND ${salesTable.createdAt} >= ${startOfMonth}
-          THEN CAST(${salesTable.total} AS numeric) ELSE 0 END), 0)
-      `.mapWith(Number),
-      totalSemester: sql<number>`
-        COALESCE(SUM(CASE WHEN ${salesTable.status} = 'completed'
-          AND ${salesTable.createdAt} >= ${sixMonthsAgo}
-          THEN CAST(${salesTable.total} AS numeric) ELSE 0 END), 0)
-      `.mapWith(Number),
     })
     .from(usersTable)
-    .leftJoin(salesTable, eq(salesTable.userId, usersTable.id))
     .where(eq(usersTable.role, "customer"))
-    .groupBy(
-      usersTable.id,
-      usersTable.name,
-      usersTable.email,
-      usersTable.emailVerified,
-      usersTable.createdAt,
-    )
-    .orderBy(sql`${usersTable.createdAt} DESC`);
+    .orderBy(desc(usersTable.createdAt));
 
-  return rows.map((r) => ({
-    ...r,
-    createdAt:     r.createdAt.toISOString(),
-    totalLifetime: Number(r.totalLifetime),
-    totalMonth:    Number(r.totalMonth),
-    totalSemester: Number(r.totalSemester),
-  }));
+  if (customers.length === 0) return [];
+
+  // 2 — Todas las ventas completadas de estos clientes en una sola query
+  const customerIds = customers.map((c) => c.id);
+  const sales = await db
+    .select({
+      userId:    salesTable.userId,
+      total:     salesTable.total,
+      createdAt: salesTable.createdAt,
+    })
+    .from(salesTable)
+    .where(
+      and(
+        eq(salesTable.status, "completed"),
+        inArray(salesTable.userId, customerIds),
+      ),
+    );
+
+  // 3 — Calcular métricas en memoria (O(S) — S = total de ventas completadas)
+  return customers.map((c) => {
+    const own = sales.filter((s) => s.userId === c.id);
+
+    const totalLifetime = own.reduce((sum, s) => sum + Number(s.total), 0);
+    const totalSemester = own
+      .filter((s) => s.createdAt >= sixMonthsAgo)
+      .reduce((sum, s) => sum + Number(s.total), 0);
+    const totalMonth = own
+      .filter((s) => s.createdAt >= startOfMonth)
+      .reduce((sum, s) => sum + Number(s.total), 0);
+
+    return {
+      id:            c.id,
+      name:          c.name,
+      email:         c.email,
+      emailVerified: c.emailVerified,
+      createdAt:     c.createdAt.toISOString(),
+      totalLifetime,
+      totalSemester,
+      totalMonth,
+    };
+  });
 }
 
 export async function markEmailVerified(userId: string): Promise<void> {
