@@ -107,12 +107,6 @@ function StockChips({ entries }: { entries: Stock[] }) {
   const sized = entries.filter((s) => s.size);
   const unsized = entries.filter((s) => !s.size);
 
-  if (sized.length === 0) {
-    // Accessory (no size)
-    const qty = totalQty(unsized);
-    return <StockBadge quantity={qty} />;
-  }
-
   return (
     <div className="flex flex-wrap gap-1">
       {sized.map((s) => (
@@ -130,6 +124,20 @@ function StockChips({ entries }: { entries: Stock[] }) {
           {s.size}: {s.quantity}
         </span>
       ))}
+      {unsized.length > 0 && (
+        <span
+          className={[
+            "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium tabular-nums",
+            totalQty(unsized) === 0
+              ? "bg-destructive/10 text-destructive line-through"
+              : totalQty(unsized) <= 3
+              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+              : "bg-muted text-muted-foreground",
+          ].join(" ")}
+        >
+          Talle único: {totalQty(unsized)}
+        </span>
+      )}
     </div>
   );
 }
@@ -506,24 +514,21 @@ export default function InventoryPage() {
                             ${product.price.toLocaleString("es-AR")}
                           </TableCell>
 
-                          {/* Stock total + botón "Ver talles" */}
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <StockBadge quantity={qty} />
-                              {hasSizes && (
-                                <button
-                                  type="button"
-                                  onClick={() => toggleExpanded(product.id)}
-                                  aria-expanded={isOpen}
-                                  aria-controls={`stock-detail-${product.id}`}
-                                  className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:border-foreground/50 hover:text-foreground"
-                                >
-                                  {sizedEntries.length} talle{sizedEntries.length !== 1 ? "s" : ""}
-                                  {isOpen
-                                    ? <ChevronDown className="h-3 w-3" />
-                                    : <ChevronRight className="h-3 w-3" />}
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => toggleExpanded(product.id)}
+                                aria-expanded={isOpen}
+                                aria-controls={`stock-detail-${product.id}`}
+                                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:border-foreground/50 hover:text-foreground"
+                              >
+                                {hasSizes ? `${sizedEntries.length} talle${sizedEntries.length !== 1 ? "s" : ""}` : "Detalle"}
+                                {isOpen
+                                  ? <ChevronDown className="h-3 w-3" />
+                                  : <ChevronRight className="h-3 w-3" />}
+                              </button>
                             </div>
                           </TableCell>
 
@@ -538,7 +543,7 @@ export default function InventoryPage() {
                         </TableRow>
 
                         {/* Fila expandida con detalle por talle */}
-                        {hasSizes && isOpen && (
+                        {isOpen && (
                           <TableRow
                             id={`stock-detail-${product.id}`}
                             className="bg-muted/20 hover:bg-muted/20"
@@ -546,10 +551,14 @@ export default function InventoryPage() {
                             <TableCell colSpan={6} className="pl-4 pr-6 py-3">
                               <div className="flex flex-wrap items-center gap-3 pl-[56px]">
                                 <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                                  Detalle por talle
+                                  Detalle de stock
                                 </span>
                                 <div className="flex flex-wrap gap-1.5">
-                                  <StockChips entries={entries} />
+                                  {entries.length > 0 ? (
+                                    <StockChips entries={entries} />
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">Sin inventario registrado</span>
+                                  )}
                                 </div>
                               </div>
                             </TableCell>
