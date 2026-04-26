@@ -401,6 +401,7 @@ export const handlers = [
       id: uuid(), items: saleItems, total, status: "completed", channel: "web",
       customerName, customerEmail, customerPhone,
       shippingAddress, shippingCity, shippingProvince, shippingZipCode: "", shippingMethod: "delivery" as const, shippingCost, userId,
+      isDismissed: false,
       createdAt: now(), updatedAt: now(),
     };
     sales.push(sale);
@@ -594,6 +595,7 @@ export const handlers = [
       status: "pending", channel: "web",
       customerName, customerEmail, customerPhone,
       shippingAddress, shippingCity, shippingProvince, shippingZipCode: "", shippingMethod: "delivery" as const, shippingCost, userId,
+      isDismissed: false,
       createdAt: now(), updatedAt: now(),
     };
     sales.push(sale);
