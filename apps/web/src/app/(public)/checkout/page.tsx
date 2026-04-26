@@ -713,7 +713,10 @@ export default function CheckoutPage() {
                 </Button>
 
                 <p className="hidden lg:block text-center text-[11px] leading-relaxed text-muted-foreground/60">
-                  Al confirmar aceptás nuestros términos y política de privacidad.
+                  Al confirmar aceptás nuestros{" "}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">
+                    términos y política de privacidad
+                  </a>.
                 </p>
 
               </form>
@@ -757,7 +760,10 @@ export default function CheckoutPage() {
             )}
           </Button>
           <p className="text-center text-[10px] text-muted-foreground/50">
-            Al confirmar aceptás nuestros términos y política de privacidad.
+            Al confirmar aceptás nuestros{" "}
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">
+              términos y política de privacidad
+            </a>.
           </p>
         </div>
       </div>
