@@ -254,7 +254,6 @@ export default function CheckoutPage() {
         return;
       }
 
-      trackEvent("sale_complete");
       clearCart();
       window.location.assign(data.initPoint);
     } catch (err) {
@@ -349,7 +348,7 @@ export default function CheckoutPage() {
               ))}
 
               {/* Envío (aparece cuando la ciudad tiene costo asignado) */}
-              {shipping.isKnown && (
+              {!isPickup && (
                 <div className="border-b border-border/40 py-4 last:border-0">
                   <div className="flex items-center gap-4">
                     <div className="flex h-16 w-12 shrink-0 items-center justify-center rounded-none bg-muted/50">
@@ -357,18 +356,22 @@ export default function CheckoutPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-normal uppercase tracking-wide text-foreground">
-                        Envío a domicilio
+                        {shipping.isKnown ? "Envío a domicilio" : "Envío al resto del país"}
                       </p>
                       <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">
-                        {shipping.label}
+                        {shipping.isKnown ? shipping.label : "Método a coordinar con vendedor"}
                       </p>
                     </div>
-                    <p className="shrink-0 text-sm font-normal tabular-nums text-foreground">
-                      ${shipping.cost.toLocaleString("es-AR")}
-                    </p>
+                    {shipping.isKnown && (
+                      <p className="shrink-0 text-sm font-normal tabular-nums text-foreground">
+                        ${shipping.cost.toLocaleString("es-AR")}
+                      </p>
+                    )}
                   </div>
                   <p className="mt-2 pl-16 text-[10px] leading-relaxed text-muted-foreground/80 italic">
-                    Logística propia: entrega directa de la tienda.
+                    {shipping.isKnown 
+                      ? "Logística propia: entrega directa de la tienda."
+                      : "Costo sujeto a empresa de transporte."}
                   </p>
                 </div>
               )}
@@ -382,11 +385,11 @@ export default function CheckoutPage() {
                   <span className="tabular-nums">${cartTotal.toLocaleString("es-AR")}</span>
                 </div>
               )}
-              {shipping.isKnown && (
+              {!isPickup && (
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
                   <span className="text-[11px] tracking-wide uppercase">Envío</span>
-                  <span className="tabular-nums text-emerald-600">
-                    +${shipping.cost.toLocaleString("es-AR")}
+                  <span className={shipping.isKnown ? "tabular-nums text-emerald-600" : "text-[10px] italic"}>
+                    {shipping.isKnown ? `+$${shipping.cost.toLocaleString("es-AR")}` : "A coordinar"}
                   </span>
                 </div>
               )}

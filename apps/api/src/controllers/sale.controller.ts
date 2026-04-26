@@ -5,6 +5,7 @@ import { cancelSaleAndRestoreStock, createSale, createPendingSale, dismissSale }
 import { createMPPreference, getMPPayment, verifyMPSignature } from "../services/mp.service";
 import { findAllSales, findSaleById, findWebOrdersToProcess, updateSaleStatus } from "../db/repositories/sale.repository";
 import { sendSaleConfirmationEmail } from "../services/email.service";
+import { insertAnalyticsEvent } from "../db/repositories/analytics.repository";
 
 // ─── POST /sales ──────────────────────────────────────────────────────────────
 // Venta directa POS — crea la venta como `completed` de inmediato.
@@ -192,6 +193,7 @@ export async function postWebhook(
       sendSaleConfirmationEmail(completed).catch((err: Error) =>
         console.error("[Email] Error enviando confirmación MP:", err.message)
       );
+      insertAnalyticsEvent("sale_complete", "mp-" + saleId, completed.userId).catch(() => {});
     }
 
   } catch (err) {

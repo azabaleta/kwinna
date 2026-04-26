@@ -68,16 +68,35 @@ function buildEmailHtml(sale: Sale, productNames: Map<string, string>): string {
     })
     .join("");
 
-  const shippingRow =
-    sale.shippingCost > 0
-      ? `<tr>
-          <td colspan="3" style="padding:8px 0;text-align:right;color:#6b7280;">Envío</td>
-          <td style="padding:8px 0;text-align:right;color:#6b7280;">${formatPrice(sale.shippingCost)}</td>
-        </tr>`
-      : `<tr>
-          <td colspan="3" style="padding:8px 0;text-align:right;color:#6b7280;">Envío</td>
+  let shippingRow = "";
+  if (sale.shippingMethod === "pickup") {
+    shippingRow = `<tr>
+          <td colspan="3" style="padding:8px 0;text-align:right;color:#6b7280;">Retiro en local</td>
           <td style="padding:8px 0;text-align:right;color:#16a34a;">Gratis</td>
         </tr>`;
+  } else {
+    if (sale.shippingCost > 0) {
+      shippingRow = `<tr>
+          <td colspan="3" style="padding:8px 0;text-align:right;color:#6b7280;">Envío a domicilio</td>
+          <td style="padding:8px 0;text-align:right;color:#6b7280;">${formatPrice(sale.shippingCost)}</td>
+        </tr>
+        <tr>
+          <td colspan="4" style="padding:0 0 8px;text-align:right;font-size:10px;color:#9ca3af;font-style:italic;">
+            Logística propia: entrega directa de la tienda.
+          </td>
+        </tr>`;
+    } else {
+      shippingRow = `<tr>
+          <td colspan="3" style="padding:8px 0;text-align:right;color:#6b7280;">Envío al resto del país</td>
+          <td style="padding:8px 0;text-align:right;color:#6b7280;font-size:12px;">A coordinar</td>
+        </tr>
+        <tr>
+          <td colspan="4" style="padding:0 0 8px;text-align:right;font-size:10px;color:#9ca3af;font-style:italic;">
+            Método a tratar con el vendedor. Costo sujeto a empresa de transporte.
+          </td>
+        </tr>`;
+    }
+  }
 
   const address = [
     sale.shippingAddress,

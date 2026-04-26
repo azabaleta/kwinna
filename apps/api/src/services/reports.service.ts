@@ -29,7 +29,7 @@ async function computeSnapshotData(from: Date, to: Date): Promise<SnapshotData> 
     findAllProducts(),
   ]);
 
-  const sales = salesRows.map(mapSaleRow);
+  const sales = salesRows.map(mapSaleRow).filter(s => s.status === "completed");
 
   // ── 2. Product lookup map (id → name) ─────────────────────────────────────
   const productName = new Map(products.map((p) => [p.id, p.name]));
