@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2, MapPin, Package, ShoppingCart, Trash2, Truck } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -314,7 +315,21 @@ export default function CheckoutPage() {
                   key={`${product.id}::${size ?? ""}`}
                   className="flex items-center gap-4 border-b border-border/40 py-4 last:border-0"
                 >
-                  <div className="h-16 w-12 shrink-0 rounded-none bg-primary/10" />
+                  <div className="relative h-16 w-12 shrink-0 overflow-hidden bg-primary/10">
+                    {product.images?.[0] ? (
+                      <Image
+                        src={product.images[0]}
+                        alt={product.name}
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Package className="h-4 w-4 text-primary/40" />
+                      </div>
+                    )}
+                  </div>
 
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-normal uppercase tracking-wide text-foreground">
