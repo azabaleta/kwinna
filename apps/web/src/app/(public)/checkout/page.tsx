@@ -217,7 +217,7 @@ export default function CheckoutPage() {
   const shippingCity   = form.watch("shippingCity");
   const shippingMethod = form.watch("shippingMethod");
   const isPickup       = shippingMethod === "pickup";
-  const shipping       = isPickup ? { cost: 0, label: "", isKnown: false } : computeShipping(shippingCity);
+  const shipping       = isPickup ? { cost: 0, label: "", isKnown: false } : computeShipping(shippingCity ?? "");
   const grandTotal     = cartTotal + shipping.cost;
 
   // ── Submit ────────────────────────────────────────────────────────────────

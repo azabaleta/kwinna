@@ -31,9 +31,17 @@ export function SearchBar({
   // Controlled value mirrors the URL param — stays in sync on navigation.
   const [value, setValue] = useState(() => searchParams.get("q") ?? "");
 
-  // Keep controlled value in sync when the URL changes externally (e.g. back button).
+  // Track whether the user is actively typing to avoid resetting the input
+  // mid-keystroke when Next.js re-renders the page after router.push.
+  const isTypingRef = useRef(false);
+
+  // Keep controlled value in sync when the URL changes externally (e.g. back button),
+  // but ONLY when the user is not actively typing — otherwise the sync resets the
+  // input on mobile browsers and the search appears "broken".
   useEffect(() => {
-    setValue(searchParams.get("q") ?? "");
+    if (!isTypingRef.current) {
+      setValue(searchParams.get("q") ?? "");
+    }
   }, [searchParams]);
 
   // ── Debounced URL push ───────────────────────────────────────────────────
@@ -50,12 +58,17 @@ export function SearchBar({
       }
       const query = params.toString();
       router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+
+      // After pushing, mark typing as finished so subsequent URL changes
+      // (e.g. browser back) sync normally again.
+      isTypingRef.current = false;
     },
     [router, pathname, searchParams],
   );
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const next = e.target.value;
+    isTypingRef.current = true;
     setValue(next);
 
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -63,9 +76,20 @@ export function SearchBar({
   }
 
   function handleClear() {
+    isTypingRef.current = false;
     setValue("");
     if (timerRef.current) clearTimeout(timerRef.current);
     pushQuery("");
+  }
+
+  // Submit on Enter — flush the debounce immediately and dismiss mobile keyboard.
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (timerRef.current) clearTimeout(timerRef.current);
+      pushQuery(value);
+      (e.target as HTMLInputElement).blur(); // dismiss mobile keyboard
+    }
   }
 
   // Cleanup on unmount
@@ -81,12 +105,19 @@ export function SearchBar({
     <div className={cn("relative w-full max-w-sm", className)}>
       <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
       <Input
-        type="search"
+        type="text"
+        inputMode="search"
+        enterKeyHint="search"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
         value={value}
         onChange={handleChange}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         aria-label="Buscar productos"
-        className="h-9 pl-8 pr-8 text-sm"
+        className="h-9 pl-8 pr-8 text-sm [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
       />
       {value && (
         <button
@@ -101,3 +132,4 @@ export function SearchBar({
     </div>
   );
 }
+
