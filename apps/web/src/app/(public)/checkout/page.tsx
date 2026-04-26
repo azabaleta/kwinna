@@ -225,10 +225,10 @@ export default function CheckoutPage() {
   async function onSubmit(values: CheckoutFormValues) {
     // Si es pickup: usar dirección del local (el backend también lo verifica)
     const address = values.shippingMethod === "pickup" ? STORE_ADDRESS : {
-      shippingAddress:  values.shippingAddress,
-      shippingCity:     values.shippingCity,
-      shippingProvince: values.shippingProvince,
-      shippingZipCode:  values.shippingZipCode,
+      shippingAddress:  values.shippingAddress  ?? "",
+      shippingCity:     values.shippingCity      ?? "",
+      shippingProvince: values.shippingProvince  ?? "",
+      shippingZipCode:  values.shippingZipCode   ?? "",
     };
 
     const salePayload: SaleOrderInput = {
