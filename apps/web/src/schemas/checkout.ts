@@ -22,18 +22,25 @@ export const CheckoutFormSchema = z.object({
   shippingMethod: z.enum(["delivery", "pickup"]),
 
   // ── Envío (siempre presentes — se completan con datos del local si es pickup) ──
-  shippingAddress: z
-    .string()
-    .min(1, { message: "Ingresá tu dirección" }),
-  shippingCity: z
-    .string()
-    .min(2, { message: "Ingresá la ciudad" }),
-  shippingProvince: z
-    .string()
-    .min(2, { message: "Ingresá la provincia" }),
-  shippingZipCode: z
-    .string()
-    .min(1, { message: "El código postal es obligatorio" }),
+  shippingAddress: z.string().optional(),
+  shippingCity: z.string().optional(),
+  shippingProvince: z.string().optional(),
+  shippingZipCode: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.shippingMethod === "delivery") {
+    if (!data.shippingAddress || data.shippingAddress.trim().length < 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ingresá tu dirección", path: ["shippingAddress"] });
+    }
+    if (!data.shippingCity || data.shippingCity.trim().length < 2) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ingresá la ciudad", path: ["shippingCity"] });
+    }
+    if (!data.shippingProvince || data.shippingProvince.trim().length < 2) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ingresá la provincia", path: ["shippingProvince"] });
+    }
+    if (!data.shippingZipCode || data.shippingZipCode.trim().length < 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El código postal es obligatorio", path: ["shippingZipCode"] });
+    }
+  }
 });
 
 export type CheckoutFormValues = z.infer<typeof CheckoutFormSchema>;

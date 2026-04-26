@@ -6,15 +6,13 @@ import { fetchProductsSSR } from "@/lib/server-products";
 // ─── Metadata estática ────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
-  title:       "Tienda Kwinna | Colección 2025",
-  description:
-    "Descubrí piezas únicas diseñadas para la mujer que define su propio estilo. Vestidos, tops, pantalones y accesorios — nueva temporada disponible.",
+  title:       "Kwinna shop | Colección 2026",
+  description: "Juntas llegamos mas lejos, cada cuerpo es único. Descubrí tu outfit perfecto!",
   openGraph: {
     type:        "website",
-    siteName:    "Kwinna",
-    title:       "Tienda Kwinna | Colección 2025",
-    description:
-      "Descubrí piezas únicas diseñadas para la mujer que define su propio estilo.",
+    siteName:    "Kwinna shop",
+    title:       "Kwinna shop | Colección 2026",
+    description: "Juntas llegamos mas lejos, cada cuerpo es único. Descubrí tu outfit perfecto!",
     locale:      "es_AR",
   },
 };

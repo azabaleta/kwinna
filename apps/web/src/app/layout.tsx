@@ -18,33 +18,33 @@ export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
 
   title: {
-    default: "Kwinna — Moda Femenina y Piezas Únicas. Colección 2025",
+    default: "Kwinna shop | Colección 2026",
     template: "%s | Kwinna",
   },
   description:
-    "Descubrí la colección 2025 de Kwinna: vestidos, tops, pantalones y accesorios únicos para la mujer moderna. Envíos a Neuquén, Plottier, Cipolletti y Centenario.",
+    "Juntas llegamos mas lejos, cada cuerpo es único. Descubrí tu outfit perfecto!",
 
   openGraph: {
     type:        "website",
     locale:      "es_AR",
     url:         APP_URL,
-    siteName:    "Kwinna",
-    title:       "Kwinna — Moda Femenina y Piezas Únicas. Colección 2025",
-    description: "Vestidos, tops y accesorios de diseño. Envíos a toda la región de Neuquén.",
+    siteName:    "Kwinna shop",
+    title:       "Kwinna shop | Colección 2026",
+    description: "Juntas llegamos mas lejos, cada cuerpo es único. Descubrí tu outfit perfecto!",
     images: [
       {
         url:    "/og-default.jpg",
         width:  1200,
         height: 630,
-        alt:    "Kwinna — Moda Femenina Colección 2025",
+        alt:    "Kwinna shop | Colección 2026",
       },
     ],
   },
 
   twitter: {
     card:        "summary_large_image",
-    title:       "Kwinna — Moda Femenina y Piezas Únicas. Colección 2025",
-    description: "Vestidos, tops y accesorios de diseño. Envíos a toda la región de Neuquén.",
+    title:       "Kwinna shop | Colección 2026",
+    description: "Juntas llegamos mas lejos, cada cuerpo es único. Descubrí tu outfit perfecto!",
     images:      ["/og-default.jpg"],
   },
 

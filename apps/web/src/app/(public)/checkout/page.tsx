@@ -741,8 +741,8 @@ export default function CheckoutPage() {
             </div>
           </div>
           <Button
-            type="submit"
-            form="checkout-form"
+            type="button"
+            onClick={form.handleSubmit(onSubmit)}
             size="lg"
             className="w-full rounded-none text-xs font-semibold tracking-widest uppercase border border-transparent hover:bg-transparent hover:border-foreground hover:text-foreground transition-all"
             disabled={isPending}
