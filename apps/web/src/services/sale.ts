@@ -50,3 +50,12 @@ export async function patchDismissSale(
   const res = await apiClient.patch(`/sales/${id}/dismiss`, payload);
   return SaleResponseSchema.parse(res.data);
 }
+
+/** PATCH /sales/:id/status — cambia el estado de una venta (ej. completed → assembled). */
+export async function patchSaleStatus(
+  id: string,
+  status: string
+): Promise<SaleResponse> {
+  const res = await apiClient.patch(`/sales/${id}/status`, { status });
+  return SaleResponseSchema.parse(res.data);
+}

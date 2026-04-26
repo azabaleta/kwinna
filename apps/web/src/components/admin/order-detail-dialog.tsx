@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Mail,
   MapPin,
+  PackageCheck,
   Phone,
   RefreshCw,
   Truck,
@@ -31,6 +32,11 @@ import { Textarea } from "@/components/ui/textarea";
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
 export function StatusBadge({ status }: { status: Sale["status"] }) {
+  if (status === "assembled") {
+    return (
+      <Badge className="bg-blue-500 text-white hover:bg-blue-600">Entregado</Badge>
+    );
+  }
   if (status === "completed") {
     return (
       <Badge className="bg-green-500 text-white hover:bg-green-600">Pagado</Badge>
@@ -59,12 +65,14 @@ export function DismissBadge({ isDismissed }: { isDismissed?: boolean }) {
 // ─── Order Detail Dialog ──────────────────────────────────────────────────────
 
 export interface OrderDetailDialogProps {
-  sale:         Sale | null;
-  onClose:      () => void;
-  onCancel:     (id: string) => Promise<void>;
-  onDismiss:    (id: string, reason: string, restoreStock: boolean) => Promise<void>;
-  isCancelling: boolean;
-  isDismissing: boolean;
+  sale:              Sale | null;
+  onClose:           () => void;
+  onCancel:          (id: string) => Promise<void>;
+  onDismiss:         (id: string, reason: string, restoreStock: boolean) => Promise<void>;
+  onMarkAssembled?:  (id: string) => Promise<void>;
+  isCancelling:      boolean;
+  isDismissing:      boolean;
+  isMarkingAssembled?: boolean;
 }
 
 export function OrderDetailDialog({
@@ -72,8 +80,10 @@ export function OrderDetailDialog({
   onClose,
   onCancel,
   onDismiss,
+  onMarkAssembled,
   isCancelling,
   isDismissing,
+  isMarkingAssembled,
 }: OrderDetailDialogProps) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [showDismiss, setShowDismiss] = useState(false);
@@ -221,6 +231,26 @@ export function OrderDetailDialog({
                   </div>
                 </div>
               </section>
+
+              {/* ── Marcar como entregado: solo para completed ── */}
+              {sale.status === "completed" && !sale.isDismissed && onMarkAssembled && (
+                <section>
+                  <Button
+                    size="sm"
+                    className="w-full gap-2 bg-blue-600 text-white hover:bg-blue-700"
+                    disabled={isMarkingAssembled}
+                    onClick={async () => {
+                      await onMarkAssembled(sale.id);
+                    }}
+                  >
+                    {isMarkingAssembled ? (
+                      <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Actualizando…</>
+                    ) : (
+                      <><PackageCheck className="h-4 w-4" /> Marcar como entregado</>
+                    )}
+                  </Button>
+                </section>
+              )}
 
               {/* ── Zona destructiva: solo para pending ── */}
               {sale.status === "pending" && !sale.isDismissed && (

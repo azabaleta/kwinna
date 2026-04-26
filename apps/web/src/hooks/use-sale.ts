@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Sale, SaleCheckoutResponse, SaleListResponse, SaleResponse } from "@kwinna/contracts";
-import { fetchSales, postCheckout, postSale, putCancelSale, patchDismissSale, type SaleOrderInput } from "@/services/sale";
+import { fetchSales, postCheckout, postSale, putCancelSale, patchDismissSale, patchSaleStatus, type SaleOrderInput } from "@/services/sale";
 import type { SaleDismissInput } from "@kwinna/contracts";
 import { saleKeys, stockKeys } from "./query-keys";
 
@@ -86,6 +86,7 @@ export function useSales(): UseSalesResult {
     queryKey: saleKeys.lists(),
     queryFn:  fetchSales,
     select:   (data) => data.data,
+    refetchInterval: 30_000,
   });
 
   return {
@@ -152,5 +153,28 @@ export function useDismissSale(): UseDismissSaleResult {
     isPending:   mutation.isPending,
     isError:     mutation.isError,
     error:       mutation.error,
+  };
+}
+
+// ─── useUpdateSaleStatus — actualiza estado de venta (ej. completed → assembled) ─
+
+export interface UseUpdateSaleStatusResult {
+  mutateAsync: (args: { id: string; status: string }) => Promise<SaleResponse>;
+  isPending:   boolean;
+}
+
+export function useUpdateSaleStatus(): UseUpdateSaleStatusResult {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => patchSaleStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: saleKeys.all });
+    },
+  });
+
+  return {
+    mutateAsync: mutation.mutateAsync,
+    isPending:   mutation.isPending,
   };
 }

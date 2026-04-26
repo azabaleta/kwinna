@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useCancelSale, useSales, useDismissSale } from "@/hooks/use-sale";
+import { useCancelSale, useSales, useDismissSale, useUpdateSaleStatus } from "@/hooks/use-sale";
 import { OrderDetailDialog, StatusBadge, DismissBadge } from "@/components/admin/order-detail-dialog";
 
 // ─── Skeleton Row ─────────────────────────────────────────────────────────────
@@ -49,6 +49,7 @@ export default function OrdersPage() {
   const { sales, isLoading, isError, refetch } = useSales();
   const { mutateAsync: cancelSaleMutation, isPending: isCancelling } = useCancelSale();
   const { mutateAsync: dismissSaleMutation, isPending: isDismissing } = useDismissSale();
+  const { mutateAsync: updateStatusMutation, isPending: isMarkingAssembled } = useUpdateSaleStatus();
 
   const pendingCount   = sales.filter((s) => s.status === "pending" && !s.isDismissed).length;
   const completedCount = sales.filter((s) => s.status === "completed" && !s.isDismissed).length;
@@ -80,6 +81,19 @@ export default function OrdersPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error al desestimar la venta";
       toast.error("No se pudo desestimar", { description: message });
+    }
+  }
+
+  async function handleMarkAssembled(id: string) {
+    try {
+      const result = await updateStatusMutation({ id, status: "assembled" });
+      toast.success("Orden marcada como entregada", {
+        description: `Orden #${id.slice(0, 8).toUpperCase()}`,
+      });
+      setSelectedSale(result.data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Error al actualizar el estado";
+      toast.error("No se pudo actualizar", { description: message });
     }
   }
 
@@ -220,8 +234,10 @@ export default function OrdersPage() {
         onClose={() => setSelectedSale(null)}
         onCancel={handleCancel}
         onDismiss={handleDismiss}
+        onMarkAssembled={handleMarkAssembled}
         isCancelling={isCancelling}
         isDismissing={isDismissing}
+        isMarkingAssembled={isMarkingAssembled}
       />
     </main>
   );

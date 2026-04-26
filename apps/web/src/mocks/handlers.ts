@@ -516,6 +516,21 @@ export const handlers = [
     return HttpResponse.json(parsed);
   }),
 
+  // PATCH /sales/:id/status — actualiza el status de una venta
+  http.patch(`${BASE}/sales/:id/status`, async ({ params, request }) => {
+    const { id } = params as { id: string };
+    const body = await request.json() as { status?: string };
+    const sale = sales.find((s) => s.id === id);
+    if (!sale) return HttpResponse.json({ error: "Sale not found" }, { status: 404 });
+    if (!body.status) return HttpResponse.json({ error: "Status required" }, { status: 400 });
+
+    sale.status = body.status as Sale["status"];
+    sale.updatedAt = new Date().toISOString();
+
+    const parsed = SaleResponseSchema.parse({ data: sale });
+    return HttpResponse.json(parsed);
+  }),
+
   // POST /sales/checkout — mock del Checkout Pro con MercadoPago
   // Valida contra SaleOrderInputSchema — precios calculados desde mock products[]
   http.post(`${BASE}/sales/checkout`, async ({ request }) => {
