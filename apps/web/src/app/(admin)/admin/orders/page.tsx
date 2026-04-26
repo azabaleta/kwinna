@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
   ClipboardList,
   RefreshCw,
 } from "lucide-react";
-import type { Sale } from "@kwinna/contracts";
+import type { Product, Sale } from "@kwinna/contracts";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useCancelSale, useSales, useDismissSale, useUpdateSaleStatus } from "@/hooks/use-sale";
+import { useProducts } from "@/hooks/use-products";
 import { OrderDetailDialog, StatusBadge, DismissBadge } from "@/components/admin/order-detail-dialog";
 
 // ─── Skeleton Row ─────────────────────────────────────────────────────────────
@@ -50,6 +51,13 @@ export default function OrdersPage() {
   const { mutateAsync: cancelSaleMutation, isPending: isCancelling } = useCancelSale();
   const { mutateAsync: dismissSaleMutation, isPending: isDismissing } = useDismissSale();
   const { mutateAsync: updateStatusMutation, isPending: isMarkingAssembled } = useUpdateSaleStatus();
+  const { products } = useProducts();
+
+  const productMap = useMemo(() => {
+    const map = new Map<string, Pick<Product, "sku" | "name">>();
+    for (const p of products) map.set(p.id, { sku: p.sku, name: p.name });
+    return map;
+  }, [products]);
 
   const pendingCount   = sales.filter((s) => s.status === "pending" && !s.isDismissed).length;
   const completedCount = sales.filter((s) => s.status === "completed" && !s.isDismissed).length;
@@ -231,6 +239,7 @@ export default function OrdersPage() {
 
       <OrderDetailDialog
         sale={selectedSale}
+        productMap={productMap}
         onClose={() => setSelectedSale(null)}
         onCancel={handleCancel}
         onDismiss={handleDismiss}

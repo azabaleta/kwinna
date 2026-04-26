@@ -15,7 +15,7 @@ import {
   EyeOff,
   RotateCcw,
 } from "lucide-react";
-import type { Sale } from "@kwinna/contracts";
+import type { Product, Sale } from "@kwinna/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,6 +66,7 @@ export function DismissBadge({ isDismissed }: { isDismissed?: boolean }) {
 
 export interface OrderDetailDialogProps {
   sale:              Sale | null;
+  productMap?:       Map<string, Pick<Product, "sku" | "name">>;
   onClose:           () => void;
   onCancel:          (id: string) => Promise<void>;
   onDismiss:         (id: string, reason: string, restoreStock: boolean) => Promise<void>;
@@ -77,6 +78,7 @@ export interface OrderDetailDialogProps {
 
 export function OrderDetailDialog({
   sale,
+  productMap,
   onClose,
   onCancel,
   onDismiss,
@@ -200,29 +202,39 @@ export function OrderDetailDialog({
                   Productos
                 </p>
                 <div className="divide-y rounded-lg border">
-                  {sale.items.map((item, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between px-3 py-2 text-sm"
-                    >
-                      <div>
-                        <code className="font-mono text-xs text-muted-foreground">
-                          {item.productId.slice(0, 8)}
-                        </code>
-                        {item.size && (
-                          <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
-                            {item.size}
-                          </span>
-                        )}
-                        <span className="ml-2 text-muted-foreground">
-                          × {item.quantity}
+                  {sale.items.map((item, i) => {
+                    const prod = productMap?.get(item.productId);
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <code className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                              {prod?.sku ?? item.productId.slice(0, 8)}
+                            </code>
+                            {item.size && (
+                              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                                {item.size}
+                              </span>
+                            )}
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              × {item.quantity}
+                            </span>
+                          </div>
+                          {prod?.name && (
+                            <p className="mt-0.5 truncate text-xs text-foreground">
+                              {prod.name}
+                            </p>
+                          )}
+                        </div>
+                        <span className="shrink-0 tabular-nums">
+                          ${item.subtotal.toLocaleString("es-AR")}
                         </span>
                       </div>
-                      <span className="tabular-nums">
-                        ${item.subtotal.toLocaleString("es-AR")}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                   <div className="flex items-center justify-between px-3 py-2 text-sm font-semibold">
                     <span>Total</span>
                     <span className="tabular-nums">
