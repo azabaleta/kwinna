@@ -14,7 +14,10 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useCustomers } from "@/hooks/use-customers";
+import { useSales } from "@/hooks/use-sale";
 import { cn } from "@/lib/utils";
+import { CustomerDetailSheet } from "@/components/admin/customer-detail-sheet";
+import type { CustomerMetrics } from "@kwinna/contracts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -52,7 +55,10 @@ function SkeletonRow() {
 
 export default function CustomersPage() {
   const [query, setQuery] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerMetrics | null>(null);
+
   const { customers, isLoading, isError } = useCustomers();
+  const { sales } = useSales();
 
   const filtered = query
     ? customers.filter((c) => {
@@ -183,7 +189,11 @@ export default function CustomersPage() {
                       </TableRow>
                     )
                     : filtered.map((c) => (
-                      <TableRow key={c.id}>
+                      <TableRow
+                        key={c.id}
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => setSelectedCustomer(c)}
+                      >
                         {/* Nombre + estado */}
                         <TableCell className="pl-6">
                           <div className="flex items-center gap-2">
@@ -245,6 +255,12 @@ export default function CustomersPage() {
         </Card>
 
       </div>
+
+      <CustomerDetailSheet
+        customer={selectedCustomer}
+        onClose={() => setSelectedCustomer(null)}
+        sales={sales.filter((s) => s.userId === selectedCustomer?.id || s.customerEmail === selectedCustomer?.email)}
+      />
     </main>
   );
 }

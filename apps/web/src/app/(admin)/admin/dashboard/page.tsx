@@ -313,7 +313,9 @@ export default function DashboardPage() {
 
   const { products, isLoading: loadingProducts } = useProducts();
   const { stock,    isLoading: loadingStock    } = useStock();
-  const { sales,    isLoading: loadingSales    } = useSales();
+  const { sales: rawSales, isLoading: loadingSales } = useSales();
+
+  const sales = useMemo(() => rawSales.filter(s => !s.isDismissed), [rawSales]);
 
   const [from, to]         = useMemo(() => getRange(period),     [period]);
   const [prevFrom, prevTo] = useMemo(() => getPrevRange(period), [period]);

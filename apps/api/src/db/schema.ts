@@ -214,6 +214,10 @@ export const salesTable = pgTable("sales", {
   saleNotes:     text("sale_notes"),
   customerDni:   varchar("customer_dni", { length: 20 }),
 
+  // ── Dismissal ───────────────────────────────────────────────────────────────
+  isDismissed:   boolean("is_dismissed").notNull().default(false),
+  dismissReason: text("dismiss_reason"),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

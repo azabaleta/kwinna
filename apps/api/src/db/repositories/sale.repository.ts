@@ -33,6 +33,9 @@ export function mapSaleRow(row: typeof salesTable.$inferSelect): Sale {
 
     userId: row.userId ?? undefined,
 
+    isDismissed:   row.isDismissed,
+    dismissReason: row.dismissReason ?? undefined,
+
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

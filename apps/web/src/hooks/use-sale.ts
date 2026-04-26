@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Sale, SaleCheckoutResponse, SaleListResponse, SaleResponse } from "@kwinna/contracts";
-import { fetchSales, postCheckout, postSale, putCancelSale, type SaleOrderInput } from "@/services/sale";
+import { fetchSales, postCheckout, postSale, putCancelSale, patchDismissSale, type SaleOrderInput } from "@/services/sale";
+import type { SaleDismissInput } from "@kwinna/contracts";
 import { saleKeys, stockKeys } from "./query-keys";
 
 // ─── useCreateSale — venta directa POS ───────────────────────────────────────
@@ -113,6 +114,36 @@ export function useCancelSale(): UseCancelSaleResult {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: saleKeys.all });
       queryClient.invalidateQueries({ queryKey: stockKeys.all });
+    },
+  });
+
+  return {
+    mutateAsync: mutation.mutateAsync,
+    isPending:   mutation.isPending,
+    isError:     mutation.isError,
+    error:       mutation.error,
+  };
+}
+
+// ─── useDismissSale — desestima venta (excluir de métricas) ─────────────────
+
+export interface UseDismissSaleResult {
+  mutateAsync: (args: { id: string; payload: SaleDismissInput }) => Promise<SaleResponse>;
+  isPending:   boolean;
+  isError:     boolean;
+  error:       Error | null;
+}
+
+export function useDismissSale(): UseDismissSaleResult {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: SaleDismissInput }) => patchDismissSale(id, payload),
+    onSuccess: (_, { payload }) => {
+      queryClient.invalidateQueries({ queryKey: saleKeys.all });
+      if (payload.restoreStock) {
+        queryClient.invalidateQueries({ queryKey: stockKeys.all });
+      }
     },
   });
 

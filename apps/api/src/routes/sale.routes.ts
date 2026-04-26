@@ -1,7 +1,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { SaleOrderInputSchema } from "@kwinna/contracts";
-import { cancelSale, getSales, getWebOrders, patchSaleStatus, postCheckout, postSale, postWebhook } from "../controllers/sale.controller";
+import { cancelSale, getSales, getWebOrders, patchSaleStatus, postCheckout, postSale, postWebhook, patchSaleDismiss } from "../controllers/sale.controller";
 import { authGuard, optionalAuth, requireRole, validate } from "../middlewares";
 
 // 10 checkouts por IP por hora — previene reserva masiva de stock con ventas pending
@@ -70,6 +70,14 @@ router.put(
   authGuard,
   requireRole(["admin", "operator"]),
   cancelSale
+);
+
+// PATCH /sales/:id/dismiss — desestima una venta para excluirla de las métricas
+router.patch(
+  "/:id/dismiss",
+  authGuard,
+  requireRole(["admin", "operator"]),
+  patchSaleDismiss
 );
 
 export default router;

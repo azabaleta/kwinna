@@ -346,3 +346,75 @@ export async function cancelSaleAndRestoreStock(id: string): Promise<Sale> {
 
   return mapSaleRow(row);
 }
+
+// ─── dismissSale ──────────────────────────────────────────────────────────────
+
+/**
+ * Desestima una venta para excluirla del dashboard.
+ * Opcionalmente restaura el inventario si la orden había consumido stock.
+ */
+export async function dismissSale(id: string, reason: string, restoreStock: boolean): Promise<Sale> {
+  const sale = await findSaleById(id);
+
+  if (!sale) {
+    throw Object.assign(new Error("Venta no encontrada"), { statusCode: 404 });
+  }
+
+  const row = await db.transaction(async (tx) => {
+    if (restoreStock) {
+      for (const item of sale.items) {
+        if (item.size) {
+          const [stockRow] = await tx
+            .select()
+            .from(stockTable)
+            .where(and(
+              eq(stockTable.productId, item.productId),
+              eq(stockTable.size, item.size),
+            ))
+            .for("update");
+
+          if (stockRow) {
+            await tx
+              .update(stockTable)
+              .set({ quantity: sql`${stockTable.quantity} + ${item.quantity}`, updatedAt: new Date() })
+              .where(eq(stockTable.id, stockRow.id));
+          }
+        } else {
+          const [stockRow] = await tx
+            .select()
+            .from(stockTable)
+            .where(and(
+              eq(stockTable.productId, item.productId),
+              eq(stockTable.size, ""),
+            ))
+            .for("update");
+
+          if (stockRow) {
+            await tx
+              .update(stockTable)
+              .set({ quantity: sql`${stockTable.quantity} + ${item.quantity}`, updatedAt: new Date() })
+              .where(eq(stockTable.id, stockRow.id));
+          }
+        }
+
+        await tx.insert(stockMovementsTable).values({
+          productId: item.productId,
+          type:      "in",
+          quantity:  item.quantity,
+          reason:    `desestimacion-venta-${id}`,
+          createdAt: new Date(),
+        });
+      }
+    }
+
+    const [updated] = await tx
+      .update(salesTable)
+      .set({ isDismissed: true, dismissReason: reason, updatedAt: new Date() })
+      .where(eq(salesTable.id, id))
+      .returning();
+
+    return updated!;
+  });
+
+  return mapSaleRow(row);
+}

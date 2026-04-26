@@ -55,6 +55,10 @@ export const SaleSchema = z.object({
   // ── Opcional: cliente registrado ───────────────────────────────────────────
   userId: z.string().uuid().optional(),
 
+  // ── Dismissal ───────────────────────────────────────────────────────────────
+  isDismissed:   z.boolean().default(false),
+  dismissReason: z.string().nullable().optional(),
+
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -140,3 +144,12 @@ export const SaleCheckoutResponseSchema = z.object({
 });
 
 export type SaleCheckoutResponse = z.infer<typeof SaleCheckoutResponseSchema>;
+
+// ─── Dismiss Sale ─────────────────────────────────────────────────────────────
+
+export const SaleDismissInputSchema = z.object({
+  reason:       z.string().min(1, "El motivo es requerido").max(500),
+  restoreStock: z.boolean().default(false),
+});
+
+export type SaleDismissInput = z.infer<typeof SaleDismissInputSchema>;

@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import type { SaleOrderInput, SaleStatus } from "@kwinna/contracts";
 import { SaleStatusSchema } from "@kwinna/contracts";
-import { cancelSaleAndRestoreStock, createSale, createPendingSale } from "../services/sale.service";
+import { cancelSaleAndRestoreStock, createSale, createPendingSale, dismissSale } from "../services/sale.service";
 import { createMPPreference, getMPPayment, verifyMPSignature } from "../services/mp.service";
 import { findAllSales, findSaleById, findWebOrdersToProcess, updateSaleStatus } from "../db/repositories/sale.repository";
 import { sendSaleConfirmationEmail } from "../services/email.service";
@@ -277,6 +277,37 @@ export async function cancelSale(
   try {
     const { id } = req.params as { id: string };
     const sale = await cancelSaleAndRestoreStock(id);
+    res.json({ data: sale });
+  } catch (err) {
+    const typed = err as Error & { statusCode?: number };
+    if (typed.statusCode) res.status(typed.statusCode);
+    next(err);
+  }
+}
+
+// ─── PATCH /sales/:id/dismiss ──────────────────────────────────────────────────
+// Desestima una venta para excluirla de las métricas.
+// Solo admin/operator.
+
+import { SaleDismissInputSchema } from "@kwinna/contracts";
+
+export async function patchSaleDismiss(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    
+    const parsed = SaleDismissInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Datos inválidos", detail: parsed.error.issues });
+      return;
+    }
+
+    const { reason, restoreStock } = parsed.data;
+    const sale = await dismissSale(id, reason, restoreStock);
+    
     res.json({ data: sale });
   } catch (err) {
     const typed = err as Error & { statusCode?: number };

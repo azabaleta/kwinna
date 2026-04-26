@@ -6,6 +6,7 @@ import {
   type SaleListResponse,
   type SaleOrderInput,
   type SaleResponse,
+  type SaleDismissInput,
 } from "@kwinna/contracts";
 import apiClient from "@/lib/axios";
 
@@ -38,5 +39,14 @@ export async function fetchSales(): Promise<SaleListResponse> {
 /** PUT /sales/:id/cancel — cancela venta pending y restaura stock. */
 export async function putCancelSale(id: string): Promise<SaleResponse> {
   const res = await apiClient.put(`/sales/${id}/cancel`);
+  return SaleResponseSchema.parse(res.data);
+}
+
+/** PATCH /sales/:id/dismiss — desestima una venta (ej. orden de test). */
+export async function patchDismissSale(
+  id: string,
+  payload: SaleDismissInput
+): Promise<SaleResponse> {
+  const res = await apiClient.patch(`/sales/${id}/dismiss`, payload);
   return SaleResponseSchema.parse(res.data);
 }

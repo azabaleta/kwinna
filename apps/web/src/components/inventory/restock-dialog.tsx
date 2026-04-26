@@ -60,6 +60,7 @@ const REASON_OPTIONS = [
 
 export function RestockDialog({ products, stockByProduct }: RestockDialogProps) {
   const [open, setOpen]   = useState(false);
+  const [customSize, setCustomSize] = useState("");
   const [form, setForm]   = useState<FormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 
@@ -107,24 +108,26 @@ export function RestockDialog({ products, stockByProduct }: RestockDialogProps) 
     if (!validate()) return;
 
     const qty     = Number(form.quantity);
+    const finalSize = form.size === "__new__" ? customSize : form.size;
     const product = products.find((p) => p.id === form.productId);
     const entries = stockByProduct[form.productId] ?? [];
-    const entry   = entries.find((s) => (s.size ?? "") === (form.size ?? ""));
+    const entry   = entries.find((s) => (s.size ?? "") === (finalSize ?? ""));
     const prevQty = entry?.quantity ?? 0;
 
     try {
       await mutateAsync({
         productId: form.productId,
         quantity:  qty,
-        size:      form.size || undefined,
+        size:      finalSize || undefined,
         reason:    form.reason || undefined,
       });
 
-      const sizeLabel = form.size ? ` · talle ${form.size}` : "";
+      const sizeLabel = finalSize ? ` · talle ${finalSize}` : "";
       toast.success("Stock repuesto", {
         description: `${product?.name ?? ""}${sizeLabel}: ${prevQty} → ${prevQty + qty} uds.`,
       });
       setOpen(false);
+      setCustomSize("");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error al reponer el stock";
       toast.error("Error al reponer", { description: message });
@@ -197,10 +200,8 @@ export function RestockDialog({ products, stockByProduct }: RestockDialogProps) 
                     {form.size === "__new__" && (
                       <Input
                         placeholder="Ej: XS, XXL, 42…"
-                        value={""}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, size: e.target.value }))
-                        }
+                        value={customSize}
+                        onChange={(e) => setCustomSize(e.target.value)}
                         autoFocus
                       />
                     )}

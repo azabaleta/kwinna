@@ -10,6 +10,7 @@ const router = Router();
 const StockInBodySchema = StockMovementSchema.pick({
   productId: true,
   quantity:  true,
+  size:      true,
   reason:    true,
 });
 

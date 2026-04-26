@@ -1,0 +1,27 @@
+# Dependencias
+node_modules/
+.npm/
+.yarn/
+
+# Builds y Salidas (Fundamentales para ahorrar tokens)
+dist/
+.next/
+out/
+build/
+*.exe
+*.apk
+*.dmg
+
+# Directorios específicos de plataformas
+android/app/build/
+android/.gradle/
+ios/Pods/
+
+# Archivos de ambiente y secretos
+.env*
+*.log
+.DS_Store
+
+# Git y caché
+.git/
+.cache/
