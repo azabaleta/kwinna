@@ -299,8 +299,8 @@ export async function sendVerificationEmail(
               <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.8;">
                 Si el botón no funciona, copiá y pegá este enlace en tu navegador:
               </p>
-              <p style="margin:8px 0 0;font-size:12px;word-break:break-all;background:#f3f4f6;border-radius:6px;padding:10px 14px;text-align:left;">
-                <a href="${verifyUrl}" style="color:#111827;text-decoration:underline;">${verifyUrl}</a>
+              <p style="margin:8px 0 0;font-size:11px;word-break:break-all;background:#f3f4f6;border-radius:6px;padding:10px 14px;text-align:left;color:#111827;font-family:monospace;user-select:all;">
+                ${verifyUrl}
               </p>
             </td>
           </tr>
@@ -404,8 +404,8 @@ export async function sendPasswordResetEmail(
               <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.8;">
                 Si el botón no funciona, copiá y pegá este enlace en tu navegador:
               </p>
-              <p style="margin:8px 0 0;font-size:12px;word-break:break-all;background:#f3f4f6;border-radius:6px;padding:10px 14px;text-align:left;">
-                <a href="${resetUrl}" style="color:#111827;text-decoration:underline;">${resetUrl}</a>
+              <p style="margin:8px 0 0;font-size:11px;word-break:break-all;background:#f3f4f6;border-radius:6px;padding:10px 14px;text-align:left;color:#111827;font-family:monospace;user-select:all;">
+                ${resetUrl}
               </p>
             </td>
           </tr>
