@@ -366,6 +366,7 @@ export default function ReturnsPage() {
   const { products } = useProducts();
 
   const productName = Object.fromEntries(products.map((p) => [p.id, p.name]));
+  const productSku  = Object.fromEntries(products.map((p) => [p.id, p.sku]));
 
   const sorted = [...returns].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -522,6 +523,7 @@ export default function ReturnsPage() {
                         })}
                       </TableCell>
                       <TableCell className="font-medium text-foreground">
+                        <code className="mr-1.5 font-mono text-[10px] text-muted-foreground">{productSku[ret.productId] ?? "—"}</code>
                         {productName[ret.productId] ?? ret.productId.slice(0, 8) + "…"}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">

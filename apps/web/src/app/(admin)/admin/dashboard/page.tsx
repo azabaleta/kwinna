@@ -347,6 +347,7 @@ export default function DashboardPage() {
   }, [products, stock]);
 
   const productName = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.name])), [products]);
+  const productSku  = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.sku])), [products]);
 
   const conversionRate     = summary.shopViews > 0       ? (curr.orders / summary.shopViews) * 100 : null;
   const prevConversionRate = prevSummary.shopViews > 0   ? (prev.orders / prevSummary.shopViews) * 100 : null;
@@ -579,6 +580,7 @@ export default function DashboardPage() {
                     <div key={item.productId} className="flex items-center gap-3 px-4 py-3">
                       <span className="w-5 shrink-0 text-center text-[11px] font-bold text-muted-foreground/50">{i + 1}</span>
                       <p className="flex-1 truncate text-sm font-medium text-foreground">
+                        <code className="mr-1.5 font-mono text-[10px] text-muted-foreground">{productSku[item.productId] ?? "—"}</code>
                         {productName[item.productId] ?? item.productId.slice(0, 8) + "…"}
                       </p>
                       <span className="shrink-0 text-[11px] text-muted-foreground">{item.units} UN</span>
@@ -796,6 +798,7 @@ export default function DashboardPage() {
                           </span>
                         )}
                         <p className="truncate text-sm font-medium text-foreground">
+                          <code className="mr-1.5 font-mono text-[10px] text-muted-foreground">{productSku[productId] ?? "—"}</code>
                           {productName[productId] ?? productId.slice(0, 8) + "…"}
                         </p>
                       </div>
