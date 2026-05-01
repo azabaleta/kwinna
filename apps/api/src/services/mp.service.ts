@@ -167,13 +167,11 @@ export async function searchApprovedPayment(
 
   const result = await paymentClient.search({
     options: {
-      criteria: "desc",
-      sort: "date_created",
-    },
-    body: {
       external_reference: saleId,
       status: "approved",
-    } as Record<string, unknown>,
+      sort: "date_created",
+      criteria: "desc",
+    },
   });
 
   const items = result.results ?? [];
@@ -181,7 +179,7 @@ export async function searchApprovedPayment(
 
   const first = items[0]!;
   return {
-    id:                first.id ?? 0,
+    id:                Number(first.id) || 0,
     status:            first.status ?? "unknown",
     externalReference: (first as Record<string, unknown>).external_reference as string ?? null,
   };
