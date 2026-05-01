@@ -59,3 +59,9 @@ export async function patchSaleStatus(
   const res = await apiClient.patch(`/sales/${id}/status`, { status });
   return SaleResponseSchema.parse(res.data);
 }
+
+/** POST /sales/:id/reconcile — verifica pago en MP y actualiza la orden si está paga. */
+export async function postReconcileSale(id: string): Promise<SaleResponse> {
+  const res = await apiClient.post(`/sales/${id}/reconcile`);
+  return SaleResponseSchema.parse(res.data);
+}

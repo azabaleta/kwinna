@@ -153,3 +153,37 @@ export function verifyMPSignature(params: {
     Buffer.from(expected, "hex")
   );
 }
+
+// ─── Payment search by external_reference ─────────────────────────────────────
+
+/**
+ * Busca pagos aprobados en MP cuyo `external_reference` coincide con el saleId.
+ * Usado para reconciliar órdenes que quedaron "pending" por un webhook perdido.
+ */
+export async function searchApprovedPayment(
+  saleId: string
+): Promise<MPPaymentInfo | null> {
+  const paymentClient = getPaymentClient();
+
+  const result = await paymentClient.search({
+    options: {
+      criteria: "desc",
+      sort: "date_created",
+    },
+    body: {
+      external_reference: saleId,
+      status: "approved",
+    } as Record<string, unknown>,
+  });
+
+  const items = result.results ?? [];
+  if (items.length === 0) return null;
+
+  const first = items[0]!;
+  return {
+    id:                first.id ?? 0,
+    status:            first.status ?? "unknown",
+    externalReference: (first as Record<string, unknown>).external_reference as string ?? null,
+  };
+}
+

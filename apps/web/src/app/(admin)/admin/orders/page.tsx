@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useCancelSale, useSales, useDismissSale, useUpdateSaleStatus } from "@/hooks/use-sale";
+import { useCancelSale, useSales, useDismissSale, useUpdateSaleStatus, useReconcileSale } from "@/hooks/use-sale";
 import { useProducts } from "@/hooks/use-products";
 import { OrderDetailDialog, StatusBadge, DismissBadge } from "@/components/admin/order-detail-dialog";
 
@@ -51,6 +51,7 @@ export default function OrdersPage() {
   const { mutateAsync: cancelSaleMutation, isPending: isCancelling } = useCancelSale();
   const { mutateAsync: dismissSaleMutation, isPending: isDismissing } = useDismissSale();
   const { mutateAsync: updateStatusMutation, isPending: isMarkingAssembled } = useUpdateSaleStatus();
+  const { mutateAsync: reconcileSaleMutation, isPending: isReconciling } = useReconcileSale();
   const { products } = useProducts();
 
   const productMap = useMemo(() => {
@@ -92,18 +93,28 @@ export default function OrdersPage() {
     }
   }
 
-  async function handleMarkAssembled(id: string) {
+  const handleMarkAssembled = async (id: string) => {
     try {
-      const result = await updateStatusMutation({ id, status: "assembled" });
-      toast.success("Orden marcada como entregada", {
-        description: `Orden #${id.slice(0, 8).toUpperCase()}`,
-      });
-      setSelectedSale(result.data);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Error al actualizar el estado";
-      toast.error("No se pudo actualizar", { description: message });
+      await updateStatusMutation({ id, status: "assembled" });
+      toast.success("Pedido marcado como entregado");
+    } catch {
+      toast.error("Error al actualizar pedido");
+      throw new Error("Failed to update status");
     }
-  }
+  };
+
+  const handleReconcile = async (id: string) => {
+    try {
+      await reconcileSaleMutation(id);
+      toast.success("Pago verificado en MercadoPago", {
+        description: "La orden se marcó como pagada exitosamente.",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error desconocido";
+      toast.error("Error al verificar pago", { description: msg });
+      throw new Error("Failed to reconcile");
+    }
+  };
 
   return (
     <main className="px-4 py-8 md:px-8">
@@ -244,9 +255,11 @@ export default function OrdersPage() {
         onCancel={handleCancel}
         onDismiss={handleDismiss}
         onMarkAssembled={handleMarkAssembled}
+        onReconcile={handleReconcile}
         isCancelling={isCancelling}
         isDismissing={isDismissing}
         isMarkingAssembled={isMarkingAssembled}
+        isReconciling={isReconciling}
       />
     </main>
   );

@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import type { SaleOrderInput, SaleStatus } from "@kwinna/contracts";
 import { SaleStatusSchema } from "@kwinna/contracts";
 import { cancelSaleAndRestoreStock, createSale, createPendingSale, dismissSale } from "../services/sale.service";
-import { createMPPreference, getMPPayment, verifyMPSignature } from "../services/mp.service";
+import { createMPPreference, getMPPayment, verifyMPSignature, searchApprovedPayment } from "../services/mp.service";
 import { findAllSales, findSaleById, findWebOrdersToProcess, updateSaleStatus } from "../db/repositories/sale.repository";
 import { sendSaleConfirmationEmail } from "../services/email.service";
 import { insertAnalyticsEvent } from "../db/repositories/analytics.repository";
@@ -314,6 +314,54 @@ export async function patchSaleDismiss(
   } catch (err) {
     const typed = err as Error & { statusCode?: number };
     if (typed.statusCode) res.status(typed.statusCode);
+    next(err);
+  }
+}
+
+// ─── POST /sales/:id/reconcile ────────────────────────────────────────────────
+// Reconcilia manualmente el pago de una orden 'pending' consultando la API de MP.
+// Solo admin/operator.
+
+export async function postReconcile(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+
+    const sale = await findSaleById(id);
+    if (!sale) {
+      res.status(404).json({ error: "Venta no encontrada" });
+      return;
+    }
+
+    if (sale.status !== "pending") {
+      res.status(400).json({ error: `La venta ya se encuentra en estado ${sale.status}` });
+      return;
+    }
+
+    const approvedPayment = await searchApprovedPayment(id);
+
+    if (!approvedPayment) {
+      res.status(404).json({ error: "No se encontró un pago aprobado en MercadoPago para esta orden" });
+      return;
+    }
+
+    const completed = await updateSaleStatus(id, "completed");
+    if (!completed) {
+      res.status(500).json({ error: "Error al actualizar el estado de la orden" });
+      return;
+    }
+
+    // Fire-and-forget
+    sendSaleConfirmationEmail(completed).catch((err: Error) =>
+      console.error("[Email] Error enviando confirmación post-reconciliación:", err.message)
+    );
+    insertAnalyticsEvent("sale_complete", "mp-reconcile-" + id, completed.userId).catch(() => {});
+
+    res.json({ data: completed });
+  } catch (err) {
     next(err);
   }
 }

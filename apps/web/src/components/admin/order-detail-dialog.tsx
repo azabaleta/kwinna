@@ -71,9 +71,11 @@ export interface OrderDetailDialogProps {
   onCancel:          (id: string) => Promise<void>;
   onDismiss:         (id: string, reason: string, restoreStock: boolean) => Promise<void>;
   onMarkAssembled?:  (id: string) => Promise<void>;
+  onReconcile?:      (id: string) => Promise<void>;
   isCancelling:      boolean;
   isDismissing:      boolean;
   isMarkingAssembled?: boolean;
+  isReconciling?:    boolean;
 }
 
 export function OrderDetailDialog({
@@ -83,9 +85,11 @@ export function OrderDetailDialog({
   onCancel,
   onDismiss,
   onMarkAssembled,
+  onReconcile,
   isCancelling,
   isDismissing,
   isMarkingAssembled,
+  isReconciling,
 }: OrderDetailDialogProps) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [showDismiss, setShowDismiss] = useState(false);
@@ -259,6 +263,41 @@ export function OrderDetailDialog({
                       <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Actualizando…</>
                     ) : (
                       <><PackageCheck className="h-4 w-4" /> Marcar como entregado</>
+                    )}
+                  </Button>
+                </section>
+              )}
+
+            {/* ── Acciones de Administrador ── */}
+            <div className="space-y-3 pt-2 border-t mt-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Acciones Administrativas
+              </h3>
+
+              {/* ── Reconciliar pago (MP fallback) ── */}
+              {sale.status === "pending" && !sale.isDismissed && onReconcile && (
+                <section className="space-y-2 rounded-lg border border-border bg-muted/10 p-3">
+                  <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <RefreshCw className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Si el cliente pagó pero la orden sigue pendiente, podés verificar el pago manualmente en MercadoPago.
+                    </span>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="w-full gap-2"
+                    disabled={isReconciling}
+                    onClick={() => onReconcile(sale.id)}
+                  >
+                    {isReconciling ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Verificando...
+                      </>
+                    ) : (
+                      "Verificar pago en MercadoPago"
                     )}
                   </Button>
                 </section>

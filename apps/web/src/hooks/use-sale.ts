@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Sale, SaleCheckoutResponse, SaleListResponse, SaleResponse } from "@kwinna/contracts";
-import { fetchSales, postCheckout, postSale, putCancelSale, patchDismissSale, patchSaleStatus, type SaleOrderInput } from "@/services/sale";
+import { fetchSales, postCheckout, postSale, putCancelSale, patchDismissSale, patchSaleStatus, postReconcileSale, type SaleOrderInput } from "@/services/sale";
 import type { SaleDismissInput } from "@kwinna/contracts";
 import { saleKeys, stockKeys } from "./query-keys";
 
@@ -168,6 +168,24 @@ export function useUpdateSaleStatus(): UseUpdateSaleStatusResult {
 
   const mutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => patchSaleStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: saleKeys.all });
+    },
+  });
+
+  return {
+    mutateAsync: mutation.mutateAsync,
+    isPending:   mutation.isPending,
+  };
+}
+
+// ─── useReconcileSale — verificar pago en MP ────────────────────────────────
+
+export function useReconcileSale() {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: (id: string) => postReconcileSale(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: saleKeys.all });
     },
