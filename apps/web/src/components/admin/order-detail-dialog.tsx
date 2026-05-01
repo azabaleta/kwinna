@@ -432,6 +432,7 @@ export function OrderDetailDialog({
               )}
 
             </div>
+            </div>
 
             <DialogFooter>
               <Button variant="outline" onClick={onClose}>
