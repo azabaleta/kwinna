@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Copy, ExternalLink, Loader2, Landmark } from "lucide-react";
 import Link from "next/link";
@@ -18,7 +18,7 @@ const BANK_DETAILS = {
 
 const WHATSAPP_NUMBER = "5492993294998"; // Formato internacional sin '+'
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
   
@@ -163,5 +163,19 @@ export default function CheckoutSuccessPage() {
 
       </div>
     </main>
+  );
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-background">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/30" />
+        </main>
+      }
+    >
+      <CheckoutSuccessContent />
+    </Suspense>
   );
 }
