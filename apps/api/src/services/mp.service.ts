@@ -37,6 +37,14 @@ export async function createMPPreference(
 
   const preference = getPreferenceClient();
 
+  // Calcular cuotas máximas según el total de la venta
+  let maxInstallments = 1;
+  if (sale.total >= 20000) {
+    maxInstallments = 3;
+  } else if (sale.total >= 10000) {
+    maxInstallments = 2;
+  }
+
   const result = await preference.create({
     body: {
       external_reference: sale.id,
@@ -76,6 +84,11 @@ export async function createMPPreference(
 
       // MP llama a este endpoint cuando el pago cambia de estado
       notification_url: `${apiUrl}/sales/webhook`,
+
+      // Configuración de cuotas (installments)
+      payment_methods: {
+        installments: maxInstallments,
+      },
     },
   });
 

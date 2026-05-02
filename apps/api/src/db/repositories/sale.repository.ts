@@ -102,3 +102,19 @@ export async function findWebOrdersToProcess(): Promise<Sale[]> {
     .orderBy(salesTable.createdAt);
   return rows.map(mapSaleRow);
 }
+
+/**
+ * Busca todas las ventas pendientes asociadas a un email (o userId).
+ */
+export async function findPendingSalesByEmail(email: string): Promise<Sale[]> {
+  const rows = await db
+    .select()
+    .from(salesTable)
+    .where(
+      and(
+        eq(salesTable.customerEmail, email),
+        eq(salesTable.status, "pending")
+      )
+    );
+  return rows.map(mapSaleRow);
+}

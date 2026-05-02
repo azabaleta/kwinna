@@ -76,6 +76,8 @@ export interface OrderDetailDialogProps {
   isDismissing:      boolean;
   isMarkingAssembled?: boolean;
   isReconciling?:    boolean;
+  onApproveTransfer?: (id: string) => Promise<void>;
+  isApprovingTransfer?: boolean;
 }
 
 export function OrderDetailDialog({
@@ -90,6 +92,8 @@ export function OrderDetailDialog({
   isDismissing,
   isMarkingAssembled,
   isReconciling,
+  onApproveTransfer,
+  isApprovingTransfer,
 }: OrderDetailDialogProps) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [showDismiss, setShowDismiss] = useState(false);
@@ -275,8 +279,32 @@ export function OrderDetailDialog({
                 Acciones Administrativas
               </h3>
 
+              {/* ── Aprobar Transferencia ── */}
+              {sale.status === "pending" && !sale.isDismissed && sale.paymentMethod === "transfer" && onApproveTransfer && (
+                <section className="space-y-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
+                  <div className="flex items-start gap-2 text-xs text-emerald-800 dark:text-emerald-300">
+                    <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Si recibiste el pago de la transferencia bancaria, aprobá la orden para marcarla como pagada.
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+                    disabled={isApprovingTransfer}
+                    onClick={() => onApproveTransfer(sale.id)}
+                  >
+                    {isApprovingTransfer ? (
+                      <><RefreshCw className="h-4 w-4 animate-spin" /> Aprobando...</>
+                    ) : (
+                      <><ClipboardList className="h-4 w-4" /> Aprobar Transferencia</>
+                    )}
+                  </Button>
+                </section>
+              )}
+
               {/* ── Reconciliar pago (MP fallback) ── */}
-              {sale.status === "pending" && !sale.isDismissed && onReconcile && (
+              {sale.status === "pending" && !sale.isDismissed && sale.paymentMethod !== "transfer" && onReconcile && (
                 <section className="space-y-2 rounded-lg border border-border bg-muted/10 p-3">
                   <div className="flex items-start gap-2 text-xs text-muted-foreground">
                     <RefreshCw className="mt-0.5 h-3.5 w-3.5 shrink-0" />

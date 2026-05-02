@@ -134,7 +134,10 @@ export async function createSale(input: SaleOrderInput): Promise<Sale> {
     // Pickup siempre tiene envío gratis, independientemente de la ciudad.
     const isPickup    = input.shippingMethod === "pickup";
     const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity);
-    const total = saleItems.reduce((sum, i) => sum + i.subtotal, 0) + shippingCost;
+    
+    const itemsTotal = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
+    const discount   = input.paymentMethod === "transfer" ? itemsTotal * 0.25 : 0;
+    const total      = itemsTotal - discount + shippingCost;
 
     // 4 — Insertar venta ───────────────────────────────────────────────────
     const [inserted] = await tx
@@ -224,7 +227,10 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
     // Pickup siempre tiene envío gratis, independientemente de la ciudad.
     const isPickup     = input.shippingMethod === "pickup";
     const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity);
-    const total = saleItems.reduce((sum, i) => sum + i.subtotal, 0) + shippingCost;
+
+    const itemsTotal = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
+    const discount   = input.paymentMethod === "transfer" ? itemsTotal * 0.25 : 0;
+    const total      = itemsTotal - discount + shippingCost;
 
     // 4 — Insertar venta pending ───────────────────────────────────────────
     const [inserted] = await tx

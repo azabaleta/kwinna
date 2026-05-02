@@ -25,6 +25,7 @@ import { useStock, useStockMovements } from "@/hooks/use-stock";
 import { useSales } from "@/hooks/use-sale";
 import { useAnalyticsSummary } from "@/hooks/use-analytics";
 import { useReturnsSummary } from "@/hooks/use-returns";
+import { MetricsChartDialog, type ChartMetric } from "@/components/admin/metrics-chart-dialog";
 import { cn } from "@/lib/utils";
 import { RETURN_REASON_LABELS, type ReturnReason, type Sale, type Stock, type StockMovement } from "@kwinna/contracts";
 
@@ -76,6 +77,7 @@ interface Metrics {
   avgTicket: number;
   pending:   number;
   cancelled: number;
+  webOrders: number;
 }
 
 function computeMetrics(sales: Sale[], from: Date, to: Date): Metrics {
@@ -90,7 +92,16 @@ function computeMetrics(sales: Sale[], from: Date, to: Date): Metrics {
     avgTicket: completed.length > 0 ? revenue / completed.length : 0,
     pending:   inRange.filter((s) => s.status === "pending").length,
     cancelled: inRange.filter((s) => s.status === "cancelled").length,
+    webOrders: inRange.filter((s) => s.channel === "web" && s.status === "completed").length,
   };
+}
+
+function formatDateRange(from: Date, to: Date): string {
+  const d1 = new Date(from);
+  const d2 = new Date(to.getTime() - 1); // Subtract 1ms to get the last day of the period inclusive
+  
+  const formatter = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short" });
+  return `Del ${formatter.format(d1)} al ${formatter.format(d2)}`;
 }
 
 function topProducts(sales: Sale[], from: Date, to: Date, limit = 5) {
@@ -256,13 +267,20 @@ interface MetricCardProps {
   title: string; value: string; description: string; icon: React.ElementType;
   current: number; previous: number; isLoading?: boolean;
   variant?: "default" | "warning" | "success";
+  onClick?: () => void;
 }
 
-function MetricCard({ title, value, description, icon: Icon, current, previous, isLoading, variant = "default" }: MetricCardProps) {
+function MetricCard({ title, value, description, icon: Icon, current, previous, isLoading, variant = "default", onClick }: MetricCardProps) {
   const iconBg    = variant === "warning" ? "bg-amber-500/10" : variant === "success" ? "bg-emerald-500/10" : "bg-primary/10";
   const iconColor = variant === "warning" ? "text-amber-500"  : variant === "success" ? "text-emerald-600"  : "text-primary";
   return (
-    <Card>
+    <Card 
+      onClick={onClick}
+      className={cn(
+        "transition-all duration-200", 
+        onClick && "cursor-pointer hover:border-primary/50 hover:shadow-md active:scale-[0.98]"
+      )}
+    >
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
         <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg", iconBg)}>
@@ -310,6 +328,7 @@ function SmallStatCard({ title, value, icon: Icon, color, isLoading }: {
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState<Period>("month");
+  const [activeChart, setActiveChart] = useState<ChartMetric | null>(null);
 
   const { products, isLoading: loadingProducts } = useProducts();
   const { stock,    isLoading: loadingStock    } = useStock();
@@ -349,10 +368,10 @@ export default function DashboardPage() {
   const productName = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.name])), [products]);
   const productSku  = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.sku])), [products]);
 
-  const conversionRate     = summary.shopViews > 0       ? (curr.orders / summary.shopViews) * 100 : null;
-  const prevConversionRate = prevSummary.shopViews > 0   ? (prev.orders / prevSummary.shopViews) * 100 : null;
-  const abandonmentRate    = summary.checkoutStarts > 0  ? ((summary.checkoutStarts - summary.saleCompletes) / summary.checkoutStarts) * 100 : null;
-  const prevAbandonmentRate = prevSummary.checkoutStarts > 0 ? ((prevSummary.checkoutStarts - prevSummary.saleCompletes) / prevSummary.checkoutStarts) * 100 : null;
+  const conversionRate     = summary.shopViews > 0       ? (curr.webOrders / summary.shopViews) * 100 : null;
+  const prevConversionRate = prevSummary.shopViews > 0   ? (prev.webOrders / prevSummary.shopViews) * 100 : null;
+  const abandonmentRate    = summary.checkoutStarts > 0  ? ((summary.checkoutStarts - curr.webOrders) / summary.checkoutStarts) * 100 : null;
+  const prevAbandonmentRate = prevSummary.checkoutStarts > 0 ? ((prevSummary.checkoutStarts - prev.webOrders) / prevSummary.checkoutStarts) * 100 : null;
 
   const retention     = useMemo(() => computeRetention(sales, from, to),         [sales, from, to]);
   const prevRetention = useMemo(() => computeRetention(sales, prevFrom, prevTo), [sales, prevFrom, prevTo]);
@@ -532,14 +551,14 @@ export default function DashboardPage() {
         ════════════════════════════════════════════════════════════════ */}
         <section className="space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-            Ventas · {PERIOD_LABELS[period]}
+            Ventas · {PERIOD_LABELS[period]} ({formatDateRange(from, to)})
           </h2>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard title="Ingresos"      value={fmt(curr.revenue)}                       description={`vs. ${PERIOD_LABELS[period].toLowerCase()} anterior`} icon={BadgeDollarSign} current={curr.revenue}   previous={prev.revenue}   isLoading={isLoading} variant="success" />
-            <MetricCard title="Órdenes"       value={fmtN(curr.orders)}                       description="Ventas completadas"                                    icon={ShoppingBag}    current={curr.orders}    previous={prev.orders}    isLoading={isLoading} />
-            <MetricCard title="Ticket promedio" value={curr.orders > 0 ? fmt(curr.avgTicket) : "—"} description="Por orden completada"                          icon={BarChart3}      current={curr.avgTicket} previous={prev.avgTicket} isLoading={isLoading} />
-            <MetricCard title="Unidades"      value={fmtN(curr.units)}                        description="Prendas vendidas"                                      icon={TrendingUp}     current={curr.units}     previous={prev.units}     isLoading={isLoading} />
+            <MetricCard title="Ingresos"      value={fmt(curr.revenue)}                       description={`vs. ${PERIOD_LABELS[period].toLowerCase()} anterior`} icon={BadgeDollarSign} current={curr.revenue}   previous={prev.revenue}   isLoading={isLoading} variant="success" onClick={() => setActiveChart("revenue")} />
+            <MetricCard title="Órdenes"       value={fmtN(curr.orders)}                       description="Ventas completadas"                                    icon={ShoppingBag}    current={curr.orders}    previous={prev.orders}    isLoading={isLoading} onClick={() => setActiveChart("orders")} />
+            <MetricCard title="Ticket promedio" value={curr.orders > 0 ? fmt(curr.avgTicket) : "—"} description="Por orden completada"                          icon={BarChart3}      current={curr.avgTicket} previous={prev.avgTicket} isLoading={isLoading} onClick={() => setActiveChart("aov")} />
+            <MetricCard title="Unidades"      value={fmtN(curr.units)}                        description="Prendas vendidas"                                      icon={TrendingUp}     current={curr.units}     previous={prev.units}     isLoading={isLoading} onClick={() => setActiveChart("units")} />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
@@ -556,7 +575,7 @@ export default function DashboardPage() {
 
           <section className="space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-              Top productos · {PERIOD_LABELS[period]}
+              Top productos · {PERIOD_LABELS[period]} ({formatDateRange(from, to)})
             </h2>
             <Card>
               {isLoading ? (
@@ -1010,6 +1029,17 @@ export default function DashboardPage() {
           </section>
         )}
 
+        {/* ── Gráficos Interactivos Modal ── */}
+        {activeChart && (
+          <MetricsChartDialog 
+            isOpen={!!activeChart} 
+            onClose={() => setActiveChart(null)} 
+            metric={activeChart}
+            sales={sales}
+            from={from}
+            to={to}
+          />
+        )}
       </div>
     </main>
   );

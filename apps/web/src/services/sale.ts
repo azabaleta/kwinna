@@ -36,6 +36,12 @@ export async function fetchSales(): Promise<SaleListResponse> {
   return SaleListResponseSchema.parse(res.data);
 }
 
+/** GET /sales/:id — obtiene el detalle de una venta por su ID. */
+export async function fetchSaleById(id: string): Promise<SaleResponse> {
+  const res = await apiClient.get(`/sales/${id}`);
+  return SaleResponseSchema.parse(res.data);
+}
+
 /** PUT /sales/:id/cancel — cancela venta pending y restaura stock. */
 export async function putCancelSale(id: string): Promise<SaleResponse> {
   const res = await apiClient.put(`/sales/${id}/cancel`);
@@ -63,5 +69,11 @@ export async function patchSaleStatus(
 /** POST /sales/:id/reconcile — verifica pago en MP y actualiza la orden si está paga. */
 export async function postReconcileSale(id: string): Promise<SaleResponse> {
   const res = await apiClient.post(`/sales/${id}/reconcile`);
+  return SaleResponseSchema.parse(res.data);
+}
+
+/** POST /sales/:id/approve-transfer — aprueba manualmente una transferencia. */
+export async function postApproveTransfer(id: string): Promise<SaleResponse> {
+  const res = await apiClient.post(`/sales/${id}/approve-transfer`);
   return SaleResponseSchema.parse(res.data);
 }

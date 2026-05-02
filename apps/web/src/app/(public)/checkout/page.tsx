@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, Loader2, MapPin, Package, ShoppingCart, Trash2, Truck } from "lucide-react";
+import { ArrowLeft, Loader2, MapPin, Package, ShoppingCart, Trash2, Truck, CreditCard, Landmark } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -135,6 +135,7 @@ export default function CheckoutPage() {
       phone:            "",
       dni:              "",
       shippingMethod:   "delivery",
+      paymentMethod:    "mercadopago",
       shippingAddress:  "",
       shippingCity:     "",
       shippingProvince: "",
@@ -155,6 +156,7 @@ export default function CheckoutPage() {
         phone:            draft.phone            ?? "",
         dni:              draft.dni              ?? "",
         shippingMethod:   "delivery",
+        paymentMethod:    "mercadopago",
         shippingAddress:  draft.shippingAddress  ?? "",
         shippingCity:     draft.shippingCity     ?? "",
         shippingProvince: draft.shippingProvince ?? "",
@@ -217,9 +219,17 @@ export default function CheckoutPage() {
 
   const shippingCity   = form.watch("shippingCity");
   const shippingMethod = form.watch("shippingMethod");
+  const paymentMethod  = form.watch("paymentMethod");
+  
   const isPickup       = shippingMethod === "pickup";
   const shipping       = isPickup ? { cost: 0, label: "", isKnown: false } : computeShipping(shippingCity ?? "");
-  const grandTotal     = cartTotal + shipping.cost;
+  
+  const discount       = paymentMethod === "transfer" ? cartTotal * 0.25 : 0;
+  const grandTotal     = cartTotal - discount + shipping.cost;
+  
+  // MP Cuotas: Minimo 10.000 para 2 cuotas, 20.000 para 3 cuotas (aplicado sobre total MP)
+  const mpTotal = cartTotal + shipping.cost;
+  const maxInstallments = mpTotal >= 20000 ? 3 : mpTotal >= 10000 ? 2 : 1;
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
@@ -243,6 +253,7 @@ export default function CheckoutPage() {
       customerPhone:    values.phone,
       customerDni:      values.dni,
       shippingMethod:   values.shippingMethod,
+      paymentMethod:    values.paymentMethod,
       ...address,
       userId:           user?.id,
     };
@@ -250,12 +261,19 @@ export default function CheckoutPage() {
     try {
       const { data } = await mutateAsync(salePayload);
 
-      if (!isMercadoPagoUrl(data.initPoint)) {
+      clearCart();
+      
+      // Si es transferencia, no hay initPoint de MP
+      if (values.paymentMethod === "transfer") {
+        window.location.assign(`/checkout/success?id=${data.sale.id}`);
+        return;
+      }
+
+      if (!data.initPoint || !isMercadoPagoUrl(data.initPoint)) {
         toast.error("Error en la compra", { description: "URL de pago inválida. Contactá soporte." });
         return;
       }
 
-      clearCart();
       window.location.assign(data.initPoint);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error al procesar la compra";
@@ -408,7 +426,13 @@ export default function CheckoutPage() {
                   </span>
                 </div>
               )}
-              <div className="flex items-center justify-between">
+              {paymentMethod === "transfer" && discount > 0 && (
+                <div className="flex items-center justify-between text-sm text-emerald-600 font-medium">
+                  <span className="text-[11px] tracking-wide uppercase">Descuento Transferencia (25%)</span>
+                  <span className="tabular-nums">-${discount.toLocaleString("es-AR")}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between pt-2">
                 <span className="text-[11px] tracking-widest text-muted-foreground uppercase">
                   Total a pagar
                 </span>
@@ -472,6 +496,53 @@ export default function CheckoutPage() {
                       </p>
                     </div>
                   )}
+                </fieldset>
+
+                {/* ── Método de pago ───────────────────────────────── */}
+                <fieldset className="space-y-3">
+                  <legend className="mb-3 text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
+                    Método de pago
+                  </legend>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => form.setValue("paymentMethod", "mercadopago", { shouldValidate: true })}
+                      className={cn(
+                        "flex flex-col items-center gap-2 rounded-none border px-4 py-4 text-xs font-medium transition-colors",
+                        paymentMethod === "mercadopago"
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground",
+                      )}
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      <span className="tracking-wider uppercase text-center">Mercado Pago</span>
+                      <span className={cn(
+                        "text-[10px]",
+                        paymentMethod === "mercadopago" ? "text-background/70" : "text-blue-600 font-medium",
+                      )}>
+                        {maxInstallments > 1 ? `Hasta ${maxInstallments} cuotas s/interés` : "Tarjetas / Dinero"}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => form.setValue("paymentMethod", "transfer", { shouldValidate: true })}
+                      className={cn(
+                        "flex flex-col items-center gap-2 rounded-none border px-4 py-4 text-xs font-medium transition-colors",
+                        paymentMethod === "transfer"
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground",
+                      )}
+                    >
+                      <Landmark className="h-4 w-4" />
+                      <span className="tracking-wider uppercase text-center">Transferencia</span>
+                      <span className={cn(
+                        "text-[10px]",
+                        paymentMethod === "transfer" ? "text-background/70" : "text-emerald-600",
+                      )}>
+                        25% OFF
+                      </span>
+                    </button>
+                  </div>
                 </fieldset>
 
                 {/* ── Contacto ─────────────────────────────────────── */}

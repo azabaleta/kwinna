@@ -210,6 +210,11 @@ export function ProductCard({ product, stockQty, cartQty, onAdd }: ProductCardPr
         <p className="mt-0.5 text-xs font-normal tracking-wide tabular-nums text-foreground">
           ${product.price.toLocaleString("es-AR")}
         </p>
+        {product.price >= 10000 && (
+          <p className="text-[9px] font-medium tracking-widest uppercase text-emerald-600/90 mt-0.5">
+            {product.price >= 20000 ? "3" : "2"} cuotas sin interés
+          </p>
+        )}
       </Link>
     </article>
   );

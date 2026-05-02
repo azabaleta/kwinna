@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Sale, SaleCheckoutResponse, SaleListResponse, SaleResponse } from "@kwinna/contracts";
-import { fetchSales, postCheckout, postSale, putCancelSale, patchDismissSale, patchSaleStatus, postReconcileSale, type SaleOrderInput } from "@/services/sale";
+import { fetchSales, fetchSaleById, postCheckout, postSale, putCancelSale, patchDismissSale, patchSaleStatus, postReconcileSale, postApproveTransfer, type SaleOrderInput } from "@/services/sale";
 import type { SaleDismissInput } from "@kwinna/contracts";
 import { saleKeys, stockKeys } from "./query-keys";
 
@@ -186,6 +186,35 @@ export function useReconcileSale() {
 
   const mutation = useMutation({
     mutationFn: (id: string) => postReconcileSale(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: saleKeys.all });
+    },
+  });
+
+  return {
+    mutateAsync: mutation.mutateAsync,
+    isPending:   mutation.isPending,
+  };
+}
+
+// ─── useSaleById ──────────────────────────────────────────────────────────────
+
+export function useSaleById(id: string | null) {
+  return useQuery({
+    queryKey: saleKeys.detail(id ?? ""),
+    queryFn: () => fetchSaleById(id!),
+    enabled: !!id,
+    staleTime: 1000 * 60 * 5, // 5 min
+  });
+}
+
+// ─── useApproveTransfer ───────────────────────────────────────────────────────
+
+export function useApproveTransfer() {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: (id: string) => postApproveTransfer(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: saleKeys.all });
     },

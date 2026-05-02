@@ -3,7 +3,7 @@ import type { SaleOrderInput, SaleStatus } from "@kwinna/contracts";
 import { SaleStatusSchema } from "@kwinna/contracts";
 import { cancelSaleAndRestoreStock, createSale, createPendingSale, dismissSale } from "../services/sale.service";
 import { createMPPreference, getMPPayment, verifyMPSignature, searchApprovedPayment } from "../services/mp.service";
-import { findAllSales, findSaleById, findWebOrdersToProcess, updateSaleStatus } from "../db/repositories/sale.repository";
+import { findAllSales, findSaleById, findWebOrdersToProcess, updateSaleStatus, findPendingSalesByEmail } from "../db/repositories/sale.repository";
 import { sendSaleConfirmationEmail } from "../services/email.service";
 import { insertAnalyticsEvent } from "../db/repositories/analytics.repository";
 
@@ -53,20 +53,68 @@ export async function postCheckout(
     // 1 — Crear venta pending + descontar stock (atómico)
     const sale = await createPendingSale({ ...input, userId });
 
-    // 2 — Crear Preference en MP
-    const { sandboxInitPoint, initPoint } = await createMPPreference(sale);
+    let point: string | undefined = undefined;
 
-    // Usar sandbox en desarrollo/test, producción en live
-    const isSandbox = (process.env["MP_ACCESS_TOKEN"] ?? "").startsWith("TEST-");
-    const point = isSandbox ? sandboxInitPoint : initPoint;
+    if (input.paymentMethod !== "transfer") {
+      // 2 — Crear Preference en MP
+      const { sandboxInitPoint, initPoint } = await createMPPreference(sale);
+
+      // Usar sandbox en desarrollo/test, producción en live
+      const isSandbox = (process.env["MP_ACCESS_TOKEN"] ?? "").startsWith("TEST-");
+      point = isSandbox ? sandboxInitPoint : initPoint;
+    }
 
     res.status(201).json({
       data: { sale, initPoint: point },
     });
+
+    // Fire-and-forget: Limpieza de órdenes pendientes abandonadas
+    cleanupAbandonedPendingOrders(input.customerEmail, sale.id).catch((err) => 
+      console.error("[Cleanup] Error al limpiar órdenes pendientes:", err)
+    );
   } catch (err) {
     const typed = err as Error & { statusCode?: number };
     if (typed.statusCode) res.status(typed.statusCode);
     next(err);
+  }
+}
+
+// ─── BACKGROUND JOBS ──────────────────────────────────────────────────────────
+
+/**
+ * Job en segundo plano para limpiar órdenes pendientes anteriores de un mismo email.
+ * - Si MP dice que se pagó -> se completa.
+ * - Si MP dice que no -> se cancela y se restaura el stock.
+ */
+async function cleanupAbandonedPendingOrders(customerEmail: string, currentSaleId: string): Promise<void> {
+  const pendingSales = await findPendingSalesByEmail(customerEmail);
+  const oldSales = pendingSales.filter(s => s.id !== currentSaleId && !s.isDismissed);
+
+  if (oldSales.length === 0) return;
+
+  console.log(`[Cleanup] Revisando ${oldSales.length} órdenes pendientes para ${customerEmail}`);
+
+  for (const oldSale of oldSales) {
+    try {
+      let approvedPayment = null;
+      if (oldSale.paymentMethod !== "transfer") {
+        approvedPayment = await searchApprovedPayment(oldSale.id);
+      }
+
+      if (approvedPayment) {
+        const completed = await updateSaleStatus(oldSale.id, "completed");
+        if (completed) {
+          sendSaleConfirmationEmail(completed).catch(() => {});
+          insertAnalyticsEvent("sale_complete", "mp-reconcile-auto-" + oldSale.id, completed.userId).catch(() => {});
+          console.log(`[Cleanup] Orden ${oldSale.id} fue pagada en realidad. Actualizada a completed.`);
+        }
+      } else {
+        await cancelSaleAndRestoreStock(oldSale.id);
+        console.log(`[Cleanup] Orden ${oldSale.id} no fue pagada. Cancelada y stock restaurado.`);
+      }
+    } catch (err) {
+      console.error(`[Cleanup] Error procesando orden antigua ${oldSale.id}:`, err);
+    }
   }
 }
 
@@ -236,6 +284,26 @@ export async function getWebOrders(
   }
 }
 
+// ─── GET /sales/:id ───────────────────────────────────────────────────────────
+// Público. Usado para mostrar la pantalla de éxito / transferencias.
+export async function getSale(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    const sale = await findSaleById(id);
+    if (!sale) {
+      res.status(404).json({ error: "Venta no encontrada" });
+      return;
+    }
+    res.json({ data: sale });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ─── PATCH /sales/:id/status ──────────────────────────────────────────────────
 // Actualiza el status de una venta (ej: completed → assembled desde el POS).
 // Solo admin/operator.
@@ -359,6 +427,50 @@ export async function postReconcile(
       console.error("[Email] Error enviando confirmación post-reconciliación:", err.message)
     );
     insertAnalyticsEvent("sale_complete", "mp-reconcile-" + id, completed.userId).catch(() => {});
+
+    res.json({ data: completed });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── POST /sales/:id/approve-transfer ───────────────────────────────────────
+// Aprueba manualmente una transferencia bancaria y completa la orden.
+export async function postApproveTransfer(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+
+    const sale = await findSaleById(id);
+    if (!sale) {
+      res.status(404).json({ error: "Venta no encontrada" });
+      return;
+    }
+
+    if (sale.status !== "pending") {
+      res.status(400).json({ error: `La venta ya se encuentra en estado ${sale.status}` });
+      return;
+    }
+
+    if (sale.paymentMethod !== "transfer") {
+      res.status(400).json({ error: "Esta orden no es por transferencia bancaria" });
+      return;
+    }
+
+    const completed = await updateSaleStatus(id, "completed");
+    if (!completed) {
+      res.status(500).json({ error: "Error al actualizar el estado de la orden" });
+      return;
+    }
+
+    // Fire-and-forget
+    sendSaleConfirmationEmail(completed).catch((err: Error) =>
+      console.error("[Email] Error enviando confirmación post-aprobación:", err.message)
+    );
+    insertAnalyticsEvent("sale_complete", "transfer-approve-" + id, completed.userId).catch(() => {});
 
     res.json({ data: completed });
   } catch (err) {

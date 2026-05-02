@@ -314,6 +314,11 @@ export function ProductDetailClient({ id }: { id: string }) {
               <p className="text-2xl font-light tabular-nums text-foreground">
                 ${product.price.toLocaleString("es-AR")}
               </p>
+              {product.price >= 10000 && (
+                <p className="text-[11px] font-medium tracking-widest uppercase text-emerald-600 mt-1">
+                  {product.price >= 20000 ? "Hasta 3 cuotas sin interés" : "Hasta 2 cuotas sin interés"}
+                </p>
+              )}
             </div>
 
             {product.tags.length > 0 && (

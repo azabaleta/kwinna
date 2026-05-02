@@ -1,7 +1,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { SaleOrderInputSchema } from "@kwinna/contracts";
-import { cancelSale, getSales, getWebOrders, patchSaleStatus, postCheckout, postSale, postWebhook, patchSaleDismiss, postReconcile } from "../controllers/sale.controller";
+import { cancelSale, getSales, getWebOrders, patchSaleStatus, postCheckout, postSale, postWebhook, patchSaleDismiss, postReconcile, postApproveTransfer, getSale } from "../controllers/sale.controller";
 import { authGuard, optionalAuth, requireRole, validate } from "../middlewares";
 
 // 10 checkouts por IP por hora — previene reserva masiva de stock con ventas pending
@@ -55,6 +55,9 @@ router.get(
   getWebOrders
 );
 
+// GET /sales/:id — detalle público de venta (para success page)
+router.get("/:id", getSale);
+
 // PATCH /sales/:id/status — actualiza status (ej: assembled desde POS)
 router.patch(
   "/:id/status",
@@ -86,6 +89,14 @@ router.post(
   authGuard,
   requireRole(["admin", "operator"]),
   postReconcile
+);
+
+// POST /sales/:id/approve-transfer — aprueba una transferencia bancaria manualmente
+router.post(
+  "/:id/approve-transfer",
+  authGuard,
+  requireRole(["admin", "operator"]),
+  postApproveTransfer
 );
 
 export default router;

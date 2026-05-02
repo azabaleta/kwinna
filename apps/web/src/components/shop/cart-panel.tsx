@@ -177,6 +177,13 @@ export function CartPanel() {
               </span>
             </div>
 
+            {/* Promo Cuotas */}
+            {total >= 10000 && (
+              <p className="text-center text-[11px] text-emerald-600 font-medium tracking-wide">
+                Podés pagar en hasta {total >= 20000 ? "3" : "2"} cuotas sin interés
+              </p>
+            )}
+
             {/* CTA → checkout */}
             <Button
               className="w-full rounded-full text-xs font-semibold tracking-widest uppercase"

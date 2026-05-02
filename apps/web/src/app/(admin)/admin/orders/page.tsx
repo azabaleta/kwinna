@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useCancelSale, useSales, useDismissSale, useUpdateSaleStatus, useReconcileSale } from "@/hooks/use-sale";
+import { useCancelSale, useSales, useDismissSale, useUpdateSaleStatus, useReconcileSale, useApproveTransfer } from "@/hooks/use-sale";
 import { useProducts } from "@/hooks/use-products";
 import { OrderDetailDialog, StatusBadge, DismissBadge } from "@/components/admin/order-detail-dialog";
 
@@ -52,6 +52,7 @@ export default function OrdersPage() {
   const { mutateAsync: dismissSaleMutation, isPending: isDismissing } = useDismissSale();
   const { mutateAsync: updateStatusMutation, isPending: isMarkingAssembled } = useUpdateSaleStatus();
   const { mutateAsync: reconcileSaleMutation, isPending: isReconciling } = useReconcileSale();
+  const { mutateAsync: approveTransferMutation, isPending: isApprovingTransfer } = useApproveTransfer();
   const { products } = useProducts();
 
   const productMap = useMemo(() => {
@@ -113,6 +114,19 @@ export default function OrdersPage() {
       const msg = err instanceof Error ? err.message : "Error desconocido";
       toast.error("Error al verificar pago", { description: msg });
       throw new Error("Failed to reconcile");
+    }
+  };
+
+  const handleApproveTransfer = async (id: string) => {
+    try {
+      await approveTransferMutation(id);
+      toast.success("Transferencia aprobada", {
+        description: "La orden se marcó como pagada exitosamente.",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error desconocido";
+      toast.error("Error al aprobar transferencia", { description: msg });
+      throw new Error("Failed to approve transfer");
     }
   };
 
@@ -260,6 +274,8 @@ export default function OrdersPage() {
         isDismissing={isDismissing}
         isMarkingAssembled={isMarkingAssembled}
         isReconciling={isReconciling}
+        onApproveTransfer={handleApproveTransfer}
+        isApprovingTransfer={isApprovingTransfer}
       />
     </main>
   );

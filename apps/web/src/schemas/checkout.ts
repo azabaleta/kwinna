@@ -21,6 +21,9 @@ export const CheckoutFormSchema = z.object({
   // ── Método de entrega ─────────────────────────────────────────────────────
   shippingMethod: z.enum(["delivery", "pickup"]),
 
+  // ── Método de pago ────────────────────────────────────────────────────────
+  paymentMethod: z.enum(["mercadopago", "transfer"]).default("mercadopago"),
+
   // ── Envío (siempre presentes — se completan con datos del local si es pickup) ──
   shippingAddress: z.string().optional(),
   shippingCity: z.string().optional(),
