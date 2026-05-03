@@ -1,0 +1,78 @@
+name: Build Kwinna POS (Windows)
+
+# Dispará manualmente desde la pestaña Actions de GitHub
+# o automáticamente cuando pusheás un tag tipo "v1.0.0"
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-windows:
+    name: Build Windows Installer
+    runs-on: windows-latest
+
+    steps:
+      # 1 — Clonar el repositorio
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2 — Instalar pnpm
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      # 3 — Instalar Node.js con caché de pnpm
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # 4 — Instalar Rust (stable, target Windows 64-bit)
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      # 5 — Caché de Cargo para acelerar builds futuros
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      # 6 — Instalar dependencias del monorepo
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 7 — Compilar el paquete de contratos compartidos primero
+      - name: Build @kwinna/contracts
+        run: pnpm --filter @kwinna/contracts build
+
+      # 8 — Compilar la app de escritorio con la URL de producción
+      #     VITE_API_URL viene de un Secret de GitHub (ver instrucciones abajo)
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        with:
+          projectPath: apps/desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: "Kwinna POS ${{ github.ref_name }}"
+          releaseBody: |
+            ## Kwinna POS — Instalador para Windows
+
+            ### Instalación
+            1. Descargá el archivo `Kwinna POS_x.x.x_x64-setup.exe`
+            2. Ejecutalo y seguí el asistente de instalación
+            3. La app se conecta automáticamente al servidor de producción
+
+            ### Requisitos
+            - Windows 10 / Windows 11 (64-bit)
+            - WebView2 Runtime (se instala automáticamente si no está presente)
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: false
