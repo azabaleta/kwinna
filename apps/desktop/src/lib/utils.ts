@@ -8,6 +8,12 @@ export function formatPrice(value: number): string {
   }).format(value);
 }
 
+/** Round a number to the nearest 100 and format as ARS */
+export function formatRoundedPrice(value: number): string {
+  const rounded = Math.round(value / 100) * 100;
+  return formatPrice(rounded);
+}
+
 /** Format ISO date string to locale date */
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("es-AR", {

@@ -25,7 +25,7 @@ app.set("trust proxy", 1);
 // Example (multi):    CORS_ORIGIN=https://kwinna.vercel.app,https://kwinna.com.ar
 
 const allowedOrigins: Set<string> = new Set(
-  (process.env["CORS_ORIGIN"] ?? "http://localhost:3000")
+  (process.env["CORS_ORIGIN"] ?? "http://localhost:3000,http://localhost:1420,tauri://localhost")
     .split(",")
     .map((o) => o.trim())
     .filter(Boolean)

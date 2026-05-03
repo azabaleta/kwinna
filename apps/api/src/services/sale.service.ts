@@ -120,7 +120,14 @@ export async function createSale(input: SaleOrderInput): Promise<Sale> {
     for (const item of input.items) {
       await deductStockItem(tx, item);
 
-      const unitPrice = priceMap.get(item.productId)!;
+      let unitPrice = priceMap.get(item.productId)!;
+      
+      if (input.priceTier === "efectivo") {
+        unitPrice = Math.round((unitPrice * 0.8) / 100) * 100;
+      } else if (input.priceTier === "mayorista") {
+        unitPrice = Math.round((unitPrice * 0.65) / 100) * 100;
+      }
+
       saleItems.push({
         productId: item.productId,
         quantity:  item.quantity,
@@ -136,7 +143,9 @@ export async function createSale(input: SaleOrderInput): Promise<Sale> {
     const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity);
     
     const itemsTotal = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
-    const discount   = input.paymentMethod === "transfer" ? itemsTotal * 0.25 : 0;
+    // Si la venta usa priceTier del POS, el descuento ya está aplicado en el precio unitario.
+    // Si es una venta de la web sin priceTier, se aplica el 25% de transferencia globalmente.
+    const discount   = (!input.priceTier && input.paymentMethod === "transfer") ? itemsTotal * 0.25 : 0;
     const total      = itemsTotal - discount + shippingCost;
 
     // 4 — Insertar venta ───────────────────────────────────────────────────
@@ -213,7 +222,14 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
     for (const item of input.items) {
       await deductStockItem(tx, item);
 
-      const unitPrice = priceMap.get(item.productId)!;
+      let unitPrice = priceMap.get(item.productId)!;
+
+      if (input.priceTier === "efectivo") {
+        unitPrice = Math.round((unitPrice * 0.8) / 100) * 100;
+      } else if (input.priceTier === "mayorista") {
+        unitPrice = Math.round((unitPrice * 0.65) / 100) * 100;
+      }
+
       saleItems.push({
         productId: item.productId,
         quantity:  item.quantity,
@@ -229,7 +245,7 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
     const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity);
 
     const itemsTotal = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
-    const discount   = input.paymentMethod === "transfer" ? itemsTotal * 0.25 : 0;
+    const discount   = (!input.priceTier && input.paymentMethod === "transfer") ? itemsTotal * 0.25 : 0;
     const total      = itemsTotal - discount + shippingCost;
 
     // 4 — Insertar venta pending ───────────────────────────────────────────

@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, X, Plus, Minus, ShoppingCart, AlertTriangle, CheckCircle2 } from "lucide-react";
-import type { Product, Stock } from "@kwinna/contracts";
+import { Search, X, Plus, Minus, ShoppingCart, AlertTriangle, CheckCircle2, Printer } from "lucide-react";
+import type { Product, Stock, PriceTier } from "@kwinna/contracts";
 import { usePosStore } from "../store/use-pos-store";
 import { fetchProducts } from "../services/products";
 import { fetchAllStock } from "../services/stock";
 import { createPosSale } from "../services/sales";
-import { formatPrice, matchProduct, normalize } from "../lib/utils";
+import { formatPrice, formatRoundedPrice, matchProduct, normalize } from "../lib/utils";
 import { ApiError } from "../lib/api";
+import ReceiptTicket from "../components/ReceiptTicket";
+import type { ReceiptData } from "../components/ReceiptTicket";
 
 const PAYMENT_METHODS = [
   { label: "Efectivo",        value: "efectivo"         },
@@ -33,9 +35,9 @@ function SkuBar({
   stock:    Stock[];
   onAdd:    (p: Product, size?: string) => void;
 }) {
-  const [sku,    setSku]    = useState("");
-  const [result, setResult] = useState<Product | null>(null);
-  const [warn,   setWarn]   = useState("");
+  const [sku,     setSku]     = useState("");
+  const [results, setResults] = useState<Product[]>([]);
+  const [warn,    setWarn]    = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   function getStock(productId: string, size?: string): number {
@@ -46,20 +48,26 @@ function SkuBar({
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    const found = products.find((p) => normalize(p.sku) === normalize(sku));
-    if (!found) {
-      setResult(null);
-      setWarn(`SKU "${sku}" no encontrado.`);
+    if (!sku.trim()) return;
+
+    // Priorizar búsqueda exacta por SKU
+    const exact = products.find((p) => normalize(p.sku) === normalize(sku));
+    if (exact) {
+      setWarn("");
+      setResults([exact]);
       return;
     }
-    const totalStock = getStock(found.id);
-    if (totalStock <= 0) {
-      setWarn(`Sin stock disponible para ${found.name}.`);
-      setResult(found);
+
+    // Búsqueda flexible por nombre o SKU parcial
+    const matches = products.filter((p) => matchProduct(p.name, p.sku, sku));
+    if (matches.length === 0) {
+      setResults([]);
+      setWarn(`No se encontró nada para "${sku}".`);
       return;
     }
+
     setWarn("");
-    setResult(found);
+    setResults(matches);
   }
 
   function addProduct(product: Product, size?: string) {
@@ -70,7 +78,7 @@ function SkuBar({
     }
     onAdd(product, size);
     setSku("");
-    setResult(null);
+    setResults([]);
     setWarn("");
     inputRef.current?.focus();
   }
@@ -84,7 +92,7 @@ function SkuBar({
             ref={inputRef}
             autoFocus
             value={sku}
-            onChange={(e) => { setSku(e.target.value); setWarn(""); setResult(null); }}
+            onChange={(e) => { setSku(e.target.value); setWarn(""); setResults([]); }}
             placeholder="Buscar por SKU o nombre..."
             className="w-full bg-zinc-900 text-white rounded-lg pl-9 pr-4 py-2.5 text-sm
                        border border-zinc-800 focus:border-zinc-600 outline-none transition-colors"
@@ -106,51 +114,60 @@ function SkuBar({
         </div>
       )}
 
-      {result && (
-        <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4">
-          <div className="flex items-start gap-3">
-            {result.images[0] && (
-              <img src={result.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover" />
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white">{result.name}</p>
-              <p className="text-xs text-zinc-500">{result.sku} · {formatPrice(result.price)}</p>
-              {/* Sizes */}
-              {(() => {
-                const sizes = stock
-                  .filter((s) => s.productId === result.id && s.size && s.quantity > 0)
-                  .map((s) => s.size!);
-                const noSizeStock = getStock(result.id, "");
+      {results.length > 0 && (
+        <div className="flex flex-col gap-3">
+          {results.map((result) => (
+            <div key={result.id} className="bg-zinc-900 border border-zinc-700 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                {result.images[0] && (
+                  <img src={result.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white">{result.name}</p>
+                  <p className="text-[11px] text-zinc-500">{result.sku}</p>
+                  <div className="flex gap-3 text-[11px] mt-1 bg-zinc-950/50 rounded p-1.5 border border-zinc-800">
+                    <span className="text-zinc-400">Lista: <span className="text-zinc-200">{formatRoundedPrice(result.price)}</span></span>
+                    <span className="text-emerald-400 font-medium">Efvo: {formatRoundedPrice(result.price * 0.8)}</span>
+                    <span className="text-amber-400 font-medium">May: {formatRoundedPrice(result.price * 0.65)}</span>
+                  </div>
+                  {/* Sizes */}
+                  {(() => {
+                    const sizes = stock
+                      .filter((s) => s.productId === result.id && s.size && s.quantity > 0)
+                      .map((s) => s.size!);
+                    const noSizeStock = getStock(result.id, "");
 
-                if (sizes.length > 0) {
-                  return (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {sizes.map((sz) => (
-                        <button
-                          key={sz}
-                          onClick={() => addProduct(result, sz)}
-                          className="text-xs bg-zinc-800 hover:bg-white hover:text-zinc-900 text-white
-                                     rounded px-2 py-1 transition-colors font-medium"
-                        >
-                          {sz}
-                        </button>
-                      ))}
-                    </div>
-                  );
-                }
-                return (
-                  <button
-                    onClick={() => addProduct(result)}
-                    disabled={noSizeStock <= 0}
-                    className="mt-2 text-xs bg-white text-zinc-900 rounded px-3 py-1
-                               hover:bg-zinc-100 transition-colors font-medium disabled:opacity-40"
-                  >
-                    Agregar al carrito
-                  </button>
-                );
-              })()}
+                    if (sizes.length > 0) {
+                      return (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {sizes.map((sz) => (
+                            <button
+                              key={sz}
+                              onClick={() => addProduct(result, sz)}
+                              className="text-xs bg-zinc-800 hover:bg-white hover:text-zinc-900 text-white
+                                         rounded px-2 py-1 transition-colors font-medium"
+                            >
+                              {sz}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return (
+                      <button
+                        onClick={() => addProduct(result)}
+                        disabled={noSizeStock <= 0}
+                        className="mt-2 text-xs bg-white text-zinc-900 rounded px-3 py-1
+                                   hover:bg-zinc-100 transition-colors font-medium disabled:opacity-40"
+                      >
+                        {noSizeStock <= 0 ? "Sin stock" : "Agregar al carrito"}
+                      </button>
+                    );
+                  })()}
+                </div>
+              </div>
             </div>
-          </div>
+          ))}
         </div>
       )}
     </div>
@@ -163,11 +180,17 @@ function CartRow({
   item,
   onRemove,
   onDelta,
+  priceTier,
 }: {
   item:     ReturnType<typeof usePosStore.getState>["cart"][number];
   onRemove: () => void;
   onDelta:  (d: number) => void;
+  priceTier: PriceTier;
 }) {
+  let unitPrice = item.product.price;
+  if (priceTier === "efectivo") unitPrice = Math.round((unitPrice * 0.8) / 100) * 100;
+  if (priceTier === "mayorista") unitPrice = Math.round((unitPrice * 0.65) / 100) * 100;
+
   return (
     <div className="flex items-center gap-3 py-3 border-b border-zinc-800 last:border-0">
       {item.product.images[0] && (
@@ -193,7 +216,7 @@ function CartRow({
         </button>
       </div>
       <span className="text-sm font-medium text-white w-20 text-right">
-        {formatPrice(item.product.price * item.quantity)}
+        {formatRoundedPrice(unitPrice * item.quantity)}
       </span>
       <button onClick={onRemove} className="text-zinc-600 hover:text-red-400 transition-colors">
         <X size={15} />
@@ -419,10 +442,17 @@ export default function SellView() {
   const [success,  setSuccess]  = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saleError,  setSaleError]  = useState("");
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
-  const { cart, addToCart, removeFromCart, updateQty, clearCart } = usePosStore();
+  const { cart, addToCart, removeFromCart, updateQty, clearCart, priceTier, setPriceTier } = usePosStore();
 
-  const subtotal = cart.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+  const subtotal = cart.reduce((sum, i) => {
+    let p = i.product.price;
+    if (priceTier === "efectivo") p = Math.round((p * 0.8) / 100) * 100;
+    else if (priceTier === "mayorista") p = Math.round((p * 0.65) / 100) * 100;
+    return sum + p * i.quantity;
+  }, 0);
 
   useEffect(() => {
     Promise.all([fetchProducts(), fetchAllStock()])
@@ -455,12 +485,37 @@ export default function SellView() {
         shippingProvince: data.shippingProvince,
         channel:          "pos",
         paymentMethod:    data.paymentMethod || undefined,
+        priceTier:        priceTier,
         saleNotes:        data.saleNotes     || undefined,
       });
+
+      // Snapshot receipt data BEFORE clearing the cart
+      const receiptItems = cart.map((i) => {
+        let p = i.product.price;
+        if (priceTier === "efectivo") p = Math.round((p * 0.8) / 100) * 100;
+        else if (priceTier === "mayorista") p = Math.round((p * 0.65) / 100) * 100;
+        return {
+          name:      i.product.name,
+          sku:       i.product.sku,
+          size:      i.size,
+          quantity:  i.quantity,
+          unitPrice: p,
+        };
+      });
+
+      setReceiptData({
+        items:         receiptItems,
+        total:         subtotal,
+        customerName:  data.customerName,
+        customerDni:   data.customerDni || undefined,
+        paymentMethod: data.paymentMethod,
+        priceTier:     priceTier,
+        saleNotes:     data.saleNotes || undefined,
+        date:          new Date(),
+      });
+
       clearCart();
       setModal(false);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 4000);
     } catch (err) {
       setSaleError(
         err instanceof ApiError ? err.message : "Error al registrar la venta."
@@ -501,6 +556,7 @@ export default function SellView() {
               <CartRow
                 key={`${item.product.id}:${item.size ?? ""}`}
                 item={item}
+                priceTier={priceTier}
                 onRemove={() => removeFromCart(item.product.id, item.size)}
                 onDelta={(d) => updateQty(item.product.id, item.size, d)}
               />
@@ -516,7 +572,26 @@ export default function SellView() {
                 {saleError}
               </p>
             )}
-            <div className="flex items-center justify-between">
+
+            <div className="flex flex-col gap-1.5 mb-1">
+              <label className="text-xs text-zinc-400">Lista de Precios</label>
+              <div className="flex rounded-lg overflow-hidden border border-zinc-700">
+                <button
+                  onClick={() => setPriceTier("lista")}
+                  className={`flex-1 py-1.5 text-xs font-medium transition-colors ${priceTier === "lista" ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"}`}
+                >Lista</button>
+                <button
+                  onClick={() => setPriceTier("efectivo")}
+                  className={`flex-1 py-1.5 text-xs font-medium transition-colors border-l border-zinc-700 ${priceTier === "efectivo" ? "bg-emerald-400 text-emerald-950" : "bg-zinc-800 text-emerald-400/70 hover:bg-zinc-700"}`}
+                >Efvo</button>
+                <button
+                  onClick={() => setPriceTier("mayorista")}
+                  className={`flex-1 py-1.5 text-xs font-medium transition-colors border-l border-zinc-700 ${priceTier === "mayorista" ? "bg-amber-400 text-amber-950" : "bg-zinc-800 text-amber-400/70 hover:bg-zinc-700"}`}
+                >Mayorista</button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between mt-1">
               <span className="text-xs text-zinc-500">Subtotal</span>
               <span className="text-base font-bold text-white">{formatPrice(subtotal)}</span>
             </div>
@@ -543,10 +618,50 @@ export default function SellView() {
         />
       )}
 
-      {success && (
-        <div className="fixed bottom-6 right-6 flex items-center gap-2 bg-emerald-900 border
-                        border-emerald-700 text-emerald-200 text-sm rounded-xl px-4 py-3 shadow-xl">
-          <CheckCircle2 size={16} /> Venta registrada correctamente
+      {receiptData && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 rounded-2xl border border-zinc-700 flex flex-col max-h-[90vh] w-full max-w-sm">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-400" />
+                Venta registrada
+              </h2>
+              <button
+                onClick={() => setReceiptData(null)}
+                className="text-zinc-500 hover:text-white transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto flex justify-center p-4 bg-zinc-800/50">
+              <ReceiptTicket ref={receiptRef} data={receiptData} />
+            </div>
+
+            <div className="flex gap-3 px-5 py-3 border-t border-zinc-800">
+              <button
+                onClick={() => setReceiptData(null)}
+                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl py-2.5 text-sm
+                           font-medium transition-colors"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="flex-1 bg-white text-zinc-900 rounded-xl py-2.5 text-sm font-semibold
+                           hover:bg-zinc-100 transition-colors flex items-center justify-center gap-2"
+              >
+                <Printer size={15} /> Imprimir ticket
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden print area — only visible during window.print() */}
+      {receiptData && (
+        <div id="receipt-print-area" style={{ display: "none" }}>
+          <ReceiptTicket ref={receiptRef} data={receiptData} />
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Product } from "@kwinna/contracts";
+import type { Product, PriceTier } from "@kwinna/contracts";
 
 export interface CartItem {
   product:   Product;
@@ -36,6 +36,9 @@ interface PosState {
   saleNotes:        string;
   setPaymentMethod: (v: string) => void;
   setSaleNotes:     (v: string) => void;
+
+  priceTier:    PriceTier;
+  setPriceTier: (t: PriceTier) => void;
 }
 
 const emptyCustomer: CustomerForm = {
@@ -98,4 +101,7 @@ export const usePosStore = create<PosState>((set) => ({
   saleNotes:        "",
   setPaymentMethod: (v) => set({ paymentMethod: v }),
   setSaleNotes:     (v) => set({ saleNotes: v }),
+
+  priceTier:    "lista",
+  setPriceTier: (t) => set({ priceTier: t }),
 }));

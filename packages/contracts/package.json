@@ -3,10 +3,12 @@
   "version": "0.0.1",
   "private": false,
   "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
   "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
+      "import": "./dist/index.mjs",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
     }
@@ -16,8 +18,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format cjs --dts --out-dir dist --clean",
-    "dev": "tsup src/index.ts --format cjs --dts --out-dir dist --watch",
+    "build": "tsup src/index.ts --format esm,cjs --dts --out-dir dist --clean",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --out-dir dist --watch",
     "lint": "eslint .",
     "clean": "rm -rf dist"
   },

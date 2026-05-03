@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import type { Product } from "@kwinna/contracts";
 import { SEASON_LABELS } from "@kwinna/contracts";
 import { fetchProducts } from "../services/products";
-import { formatPrice, matchProduct } from "../lib/utils";
+import { formatRoundedPrice, matchProduct } from "../lib/utils";
 import { usePosStore } from "../store/use-pos-store";
 
 export default function SearchView() {
@@ -115,12 +115,28 @@ function ProductCard({
           <p className="text-sm font-medium text-white leading-tight line-clamp-2">{product.name}</p>
           <p className="text-[11px] text-zinc-500 mt-0.5">{product.sku}</p>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold text-white">{formatPrice(product.price)}</span>
+
+        {/* Pricing */}
+        <div className="flex flex-col gap-1 border-t border-zinc-800 pt-2 pb-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-zinc-400">Lista</span>
+            <span className="text-xs text-zinc-300">{formatRoundedPrice(product.price)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-zinc-400">Efectivo</span>
+            <span className="text-sm font-semibold text-emerald-400">{formatRoundedPrice(product.price * 0.8)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-zinc-400">Mayorista</span>
+            <span className="text-xs font-semibold text-amber-400">{formatRoundedPrice(product.price * 0.65)}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end mt-1">
           <button
             onClick={() => onAdd(product)}
             className="flex items-center gap-1 text-xs bg-white text-zinc-900 rounded-lg px-2.5 py-1.5
-                       hover:bg-zinc-100 transition-colors font-medium"
+                       hover:bg-zinc-100 transition-colors font-medium w-full justify-center"
           >
             <Plus size={13} /> Agregar
           </button>

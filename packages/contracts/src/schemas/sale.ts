@@ -25,8 +25,18 @@ export type SaleChannel = z.infer<typeof SaleChannelSchema>;
 export const ShippingMethodSchema = z.enum(["delivery", "pickup"]);
 export type ShippingMethod = z.infer<typeof ShippingMethodSchema>;
 
-export const PaymentMethodSchema = z.enum(["mercadopago", "transfer"]);
+export const PaymentMethodSchema = z.enum([
+  "mercadopago", 
+  "transfer",
+  "efectivo",
+  "debito",
+  "credito",
+  "orden_de_compra"
+]);
 export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
+
+export const PriceTierSchema = z.enum(["lista", "efectivo", "mayorista"]);
+export type PriceTier = z.infer<typeof PriceTierSchema>;
 
 export const SaleSchema = z.object({
   id:     z.string().uuid(),
@@ -102,6 +112,7 @@ export const SaleOrderInputSchema = z.object({
   // ── POS metadata (opcionales — solo el cliente de mostrador los envía) ───
   channel:       SaleChannelSchema.optional(),
   paymentMethod: PaymentMethodSchema.optional(),
+  priceTier:     PriceTierSchema.optional(),
   saleNotes:     z.string().max(500).optional(),
   customerDni:   z.string().max(20).optional(),       // opcional: POS puede omitirlo
 });

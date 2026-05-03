@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useAuthStore } from "./store/use-auth-store";
 import AppShell from "./components/layout/AppShell";
 import LoginView from "./views/LoginView";
@@ -26,8 +26,8 @@ export default function App() {
   const token = useAuthStore((s) => s.token);
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       {token ? <PrivateRoutes /> : <LoginView />}
-    </BrowserRouter>
+    </HashRouter>
   );
 }
