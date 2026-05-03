@@ -14,6 +14,10 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # 0 — Configurar git para tolerar rutas con ':' (Zone.Identifier de Windows)
+      - name: Configure git (Windows NTFS compat)
+        run: git config --global core.protectNTFS false
+
       # 1 — Clonar el repositorio
       - name: Checkout
         uses: actions/checkout@v4
