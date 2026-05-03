@@ -59,3 +59,6 @@ docs/
 #Rust
 apps/desktop/src-tauri/target/
 rustup.sh
+
+# Windows Zone.Identifier streams (generados al descargar archivos en Windows)
+*:Zone.Identifier

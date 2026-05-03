@@ -17,6 +17,14 @@ jobs:
       # 1 — Clonar el repositorio
       - name: Checkout
         uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+      # 1b — Limpiar Zone.Identifier streams que Windows agrega a los archivos
+      - name: Remove Zone.Identifier files
+        run: git ls-files | Where-Object { $_ -like '*:Zone.Identifier' } | ForEach-Object { git rm --cached $_ }
+        shell: pwsh
+        continue-on-error: true
 
       # 2 — Instalar pnpm
       - name: Setup pnpm
@@ -28,7 +36,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
 
       # 4 — Instalar Rust (stable, target Windows 64-bit)
