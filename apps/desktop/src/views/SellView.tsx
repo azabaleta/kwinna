@@ -439,7 +439,6 @@ export default function SellView() {
   const [stock,    setStock]    = useState<Stock[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [modal,    setModal]    = useState(false);
-  const [success,  setSuccess]  = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saleError,  setSaleError]  = useState("");
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);

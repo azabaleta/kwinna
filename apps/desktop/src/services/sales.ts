@@ -1,5 +1,5 @@
 import { api } from "../lib/api";
-import type { Sale, SaleListResponse, SaleResponse } from "@kwinna/contracts";
+import type { Sale, SaleListResponse, SaleResponse, PriceTier } from "@kwinna/contracts";
 
 export interface PosSalePayload {
   items:            Array<{ productId: string; quantity: number; size?: string }>;
@@ -12,6 +12,7 @@ export interface PosSalePayload {
   shippingProvince: string;
   channel:          "pos";
   paymentMethod?:   string;
+  priceTier?:       PriceTier;
   saleNotes?:       string;
 }
 
