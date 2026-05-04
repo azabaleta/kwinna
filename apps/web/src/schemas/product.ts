@@ -11,6 +11,7 @@ const baseFormFields = {
   images: z.array(z.string().url({ message: "Ingresá una URL válida" })),
   tags:   z.array(z.string()),
   season: ProductSeasonSchema.optional(),
+  showInShop: z.boolean(),
 };
 
 // Temporada requerida salvo que el producto lleve el tag "Accesorios".

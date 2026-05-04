@@ -35,6 +35,7 @@ import {
 import { ImageUploader } from "@/components/inventory/image-uploader";
 import { useCreateProduct } from "@/hooks/use-products";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
 import { ProductFormSchema, type ProductFormValues, CATEGORIES, PRODUCT_TAGS, ACCESSORY_TAG } from "@/schemas/product";
 import { SEASON_LABELS, type ProductSeason } from "@kwinna/contracts";
 
@@ -57,6 +58,7 @@ export function CreateProductDialog() {
       images:      [],
       tags:        [],
       season:      undefined,
+      showInShop:  true,
     },
   });
 
@@ -349,11 +351,31 @@ export function CreateProductDialog() {
                   </span>
                 </div>
                 {watchedTags.length > 0 && (
-                  <p className="text-[11px] text-muted-foreground">
-                    Seleccionadas: {watchedTags.join(", ")}
                   </p>
                 )}
               </div>
+
+              {/* ── Visibilidad ── */}
+              <FormField
+                control={form.control}
+                name="showInShop"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border/40 p-3 shadow-sm bg-muted/10">
+                    <div className="space-y-0.5">
+                      <FormLabel>Visible en la Web</FormLabel>
+                      <p className="text-[11px] text-muted-foreground">
+                        Si se desactiva, el producto solo aparecerá en el POS (Exclusivo tienda).
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
 
             </div>
 
