@@ -24,30 +24,6 @@ export const metadata: Metadata = {
   description:
     "Juntas llegamos mas lejos, cada cuerpo es único. Descubrí tu outfit perfecto!",
 
-  openGraph: {
-    type:        "website",
-    locale:      "es_AR",
-    url:         APP_URL,
-    siteName:    "Kwinna shop",
-    title:       "Kwinna shop | Colección 2026",
-    description: "Juntas llegamos mas lejos, cada cuerpo es único. Descubrí tu outfit perfecto!",
-    images: [
-      {
-        url:    "/og-default.jpg",
-        width:  1200,
-        height: 630,
-        alt:    "Kwinna shop | Colección 2026",
-      },
-    ],
-  },
-
-  twitter: {
-    card:        "summary_large_image",
-    title:       "Kwinna shop | Colección 2026",
-    description: "Juntas llegamos mas lejos, cada cuerpo es único. Descubrí tu outfit perfecto!",
-    images:      ["/og-default.jpg"],
-  },
-
   robots: {
     index:  true,
     follow: true,

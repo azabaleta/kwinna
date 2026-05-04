@@ -1,6 +1,17 @@
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import { AuthGuard } from "@/components/auth-guard";
 import { Sidebar } from "@/components/admin/sidebar";
+
+// PWA metadata solo en el área admin — requiere login, los clientes no pueden instalarla.
+export const metadata: Metadata = {
+  manifest:    "/manifest.webmanifest",
+  appleWebApp: {
+    capable:        true,
+    statusBarStyle: "black-translucent",
+    title:          "Kwinna POS",
+  },
+};
 
 /** Layout del área admin. Doble capa de protección: middleware + AuthGuard client. */
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -10,6 +21,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         <Sidebar />
         {/* pt-14 en mobile deja espacio para la top bar con el hamburger. */}
         <div className="flex-1 overflow-y-auto pt-14 lg:pt-0">
+          {/* Registrar el SW solo al entrar al área admin */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.register('/sw.js');
+                }
+              `,
+            }}
+          />
           {children}
         </div>
       </div>
