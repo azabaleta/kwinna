@@ -271,6 +271,7 @@ export function BulkImportDialog() {
           price:       p.price,
           images:      p.images,
           tags:        p.tags,
+          showInShop:  true,
         },
         stock: p.stock,
       })),

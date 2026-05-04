@@ -28,7 +28,7 @@ export const ProductSchema = z.object({
   // Etiqueta interna de temporada — solo en panel admin, no se muestra en tienda
   season:      ProductSeasonSchema.optional(),
   // Visibilidad en la web pública — false = solo visible en POS ("Exclusivo tienda")
-  showInShop:  z.boolean().default(true),
+  showInShop:  z.boolean().optional().default(true),
   createdAt:   z.string().datetime(),
   updatedAt:   z.string().datetime(),
 });
