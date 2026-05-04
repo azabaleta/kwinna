@@ -171,6 +171,7 @@ export const handlers = [
       categoryId:  result.data.categoryId,
       images:      result.data.images,
       tags:        result.data.tags,
+      showInShop:  result.data.showInShop ?? true,
       createdAt:   now(),
       updatedAt:   now(),
     };
@@ -434,6 +435,7 @@ export const handlers = [
         categoryId:  item.product.categoryId,
         images:      item.product.images ?? [],
         tags:        item.product.tags ?? [],
+        showInShop:  item.product.showInShop ?? true,
         createdAt:   now(),
         updatedAt:   now(),
       };
