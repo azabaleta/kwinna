@@ -375,6 +375,8 @@ export function EditProductDialog({ product }: EditProductDialogProps) {
                   </span>
                 </div>
                 {watchedTags.length > 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Seleccionadas: {watchedTags.join(", ")}
                   </p>
                 )}
               </div>
