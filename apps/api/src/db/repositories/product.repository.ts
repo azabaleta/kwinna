@@ -1,4 +1,4 @@
-import { eq, ilike, inArray, or } from "drizzle-orm";
+import { eq, ilike, inArray, or, and } from "drizzle-orm";
 import type { Product, ProductBulkItem, ProductCreateInput, ProductQuery, ProductSeason, ProductUpdateInput } from "@kwinna/contracts";
 import { db } from "../index";
 import { productsTable, stockMovementsTable, stockTable } from "../schema";
@@ -19,6 +19,7 @@ function mapRow(row: typeof productsTable.$inferSelect): Product {
     images:      row.images,
     tags:        row.tags,
     season:      (row.season as ProductSeason) ?? undefined,
+    showInShop:  row.showInShop,
     createdAt:   row.createdAt.toISOString(),
     updatedAt:   row.updatedAt.toISOString(),
   };
@@ -26,19 +27,27 @@ function mapRow(row: typeof productsTable.$inferSelect): Product {
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export async function findAllProducts(query?: ProductQuery): Promise<Product[]> {
+export async function findAllProducts(query?: ProductQuery, opts?: { shopOnly?: boolean }): Promise<Product[]> {
   const q = query?.q?.trim();
-  const rows = q
-    ? await db
-        .select()
-        .from(productsTable)
-        .where(
-          or(
-            ilike(productsTable.name, `%${q}%`),
-            ilike(productsTable.description, `%${q}%`),
-          ),
-        )
+  const conditions = [];
+
+  if (q) {
+    conditions.push(
+      or(
+        ilike(productsTable.name, `%${q}%`),
+        ilike(productsTable.description, `%${q}%`),
+      ),
+    );
+  }
+
+  if (opts?.shopOnly) {
+    conditions.push(eq(productsTable.showInShop, true));
+  }
+
+  const rows = conditions.length > 0
+    ? await db.select().from(productsTable).where(and(...conditions))
     : await db.select().from(productsTable);
+
   return rows.map(mapRow);
 }
 
@@ -62,6 +71,7 @@ export async function insertProduct(input: ProductCreateInput): Promise<Product>
       images:      input.images,
       tags:        input.tags,
       season:      input.season ?? null,
+      showInShop:  input.showInShop ?? true,
       createdAt:   new Date(),
       updatedAt:   new Date(),
     })
@@ -86,6 +96,7 @@ export async function updateProduct(
   if (input.images      !== undefined) patch["images"]      = input.images;
   if (input.tags        !== undefined) patch["tags"]        = input.tags;
   if (input.season      !== undefined) patch["season"]      = input.season ?? null;
+  if (input.showInShop  !== undefined) patch["showInShop"]  = input.showInShop;
 
   const rows = await db
     .update(productsTable)
@@ -148,6 +159,7 @@ export async function bulkInsertProductsAndStock(
           categoryId:  item.product.categoryId,
           images:      item.product.images ?? [],
           tags:        item.product.tags ?? [],
+          showInShop:  item.product.showInShop ?? true,
           createdAt:   new Date(),
           updatedAt:   new Date(),
         })

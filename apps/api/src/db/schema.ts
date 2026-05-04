@@ -122,6 +122,7 @@ export const productsTable = pgTable("products", {
   images:      jsonb("images").$type<string[]>().notNull().default([]),
   tags:        jsonb("tags").$type<string[]>().notNull().default([]),
   season:      productSeasonEnum("season"),
+  showInShop:  boolean("show_in_shop").notNull().default(true),
   createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

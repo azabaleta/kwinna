@@ -16,8 +16,8 @@ function httpError(message: string, status: number): Error {
   return err;
 }
 
-export async function getAllProducts(query?: ProductQuery): Promise<Product[]> {
-  return findAllProducts(query);
+export async function getAllProducts(query?: ProductQuery, opts?: { shopOnly?: boolean }): Promise<Product[]> {
+  return findAllProducts(query, opts);
 }
 
 export async function getProductById(id: string): Promise<Product | undefined> {

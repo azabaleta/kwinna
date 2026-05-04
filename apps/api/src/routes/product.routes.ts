@@ -17,6 +17,7 @@ import {
   postProduct,
 } from "../controllers/product.controller";
 import { authGuard } from "../middlewares/auth-guard";
+import { optionalAuth } from "../middlewares/optional-auth";
 import { requireRole } from "../middlewares/require-role";
 import { validate } from "../middlewares/validate";
 
@@ -41,8 +42,8 @@ function validateUuidParam(req: Request, res: Response, next: NextFunction): voi
   next();
 }
 
-// GET /products — público (catálogo de tienda)
-router.get("/",    productReadLimiter, listProducts);
+// GET /products — público (catálogo de tienda), con optionalAuth para detectar admins
+router.get("/",    productReadLimiter, optionalAuth, listProducts);
 // GET /products/:id — público
 router.get("/:id", productReadLimiter, validateUuidParam, getProduct);
 

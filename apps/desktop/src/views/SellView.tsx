@@ -123,7 +123,14 @@ function SkuBar({
                   <img src={result.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white">{result.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-white">{result.name}</p>
+                    {result.showInShop === false && (
+                      <span className="text-[9px] bg-violet-600/90 text-white px-1.5 py-0.5 rounded font-medium whitespace-nowrap">
+                        Exclusivo tienda
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-zinc-500">{result.sku}</p>
                   <div className="flex gap-3 text-[11px] mt-1 bg-zinc-950/50 rounded p-1.5 border border-zinc-800">
                     <span className="text-zinc-400">Lista: <span className="text-zinc-200">{formatRoundedPrice(result.price)}</span></span>

@@ -107,6 +107,12 @@ function ProductCard({
             {SEASON_LABELS[product.season]}
           </span>
         )}
+        {/* Exclusivo tienda badge */}
+        {product.showInShop === false && (
+          <span className="absolute top-2 right-2 text-[10px] bg-violet-600/90 text-white px-1.5 py-0.5 rounded font-medium">
+            Exclusivo tienda
+          </span>
+        )}
       </div>
 
       {/* Info */}

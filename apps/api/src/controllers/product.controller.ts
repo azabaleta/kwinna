@@ -18,7 +18,13 @@ export async function listProducts(
   try {
     const parsed = ProductQuerySchema.safeParse(req.query);
     const query  = parsed.success ? parsed.data : {};
-    const products = await getAllProducts(query);
+
+    // Admin/operator (POS) ve todos los productos; la web pública solo ve showInShop=true
+    const role     = req.user?.role;
+    const isStaff  = role === "admin" || role === "operator";
+    const shopOnly = !isStaff;
+
+    const products = await getAllProducts(query, { shopOnly });
     res.json({ data: products });
   } catch (err) {
     next(err);
