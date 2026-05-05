@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Kwinna POS capabilities",
+  "windows": ["main"],
+  "permissions": [
+    {
+      "identifier": "http:allow-fetch",
+      "allow": [{ "url": "https://*" }]
+    },
+    "http:allow-fetch-send",
+    "http:allow-fetch-read-body",
+    "http:allow-fetch-cancel",
+    "http:allow-fetch-cancel-body"
+  ]
+}
