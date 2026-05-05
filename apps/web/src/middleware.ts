@@ -7,8 +7,9 @@ const LOGIN_PATH     = "/login";
 const DEFAULT_ADMIN  = "/admin/dashboard";
 const COOKIE_NAME    = "kwinna-token";
 
-// Roles con acceso al panel de administración
-const ADMIN_ROLES = new Set(["admin", "operator"]);
+// Solo admin tiene acceso al panel de administración web.
+// Los operadores acceden únicamente al POS (desktop/Android).
+const ADMIN_ROLES = new Set(["admin"]);
 
 function redirectTo(req: NextRequest, path: string): NextResponse {
   const url = req.nextUrl.clone();
@@ -73,7 +74,7 @@ export async function middleware(req: NextRequest) {
       }
     }
 
-    // Usuario autenticado con rol admin/operator en /login → panel
+    // Admin autenticado en /login → panel
     if (isLogin && payload && ADMIN_ROLES.has(payload.role)) {
       return redirectTo(req, DEFAULT_ADMIN);
     }

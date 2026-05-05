@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { login } from "../services/auth";
 import { useAuthStore } from "../store/use-auth-store";
-import { ApiError, API_BASE } from "../lib/api";
+import { ApiError } from "../lib/api";
 
 export default function LoginView() {
   const [email,    setEmail]    = useState("");
@@ -87,10 +87,6 @@ export default function LoginView() {
             {loading ? "Ingresando..." : "Ingresar"}
           </button>
         </form>
-
-        <p className="text-[10px] text-zinc-600 mt-4 text-center break-all">
-          API: {API_BASE}
-        </p>
       </div>
     </div>
   );

@@ -66,7 +66,10 @@ export const SaleSchema = z.object({
   saleNotes:     z.string().optional(),
 
   // ── Opcional: cliente registrado ───────────────────────────────────────────
-  userId: z.string().uuid().optional(),
+  userId:   z.string().uuid().optional(),
+
+  // ── Opcional: operador que procesó la venta (POS) ─────────────────────────
+  vendorId: z.string().uuid().optional(),
 
   // ── Dismissal ───────────────────────────────────────────────────────────────
   isDismissed:   z.boolean().default(false),
@@ -104,6 +107,7 @@ export const SaleOrderInputSchema = z.object({
   shippingProvince: z.string().min(1).max(100),
   shippingZipCode:  z.string().max(20).optional(),    // opcional: POS puede omitirlo
   userId:           z.string().uuid().optional(),
+  vendorId:         z.string().uuid().optional(),
   // total y shippingCost son calculados exclusivamente por el backend
 
   // ── Método de envío ───────────────────────────────────────────────────────

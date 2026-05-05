@@ -86,7 +86,7 @@ export function useSales(): UseSalesResult {
     queryKey: saleKeys.lists(),
     queryFn:  fetchSales,
     select:   (data) => data.data,
-    refetchInterval: 30_000,
+    refetchInterval: 5 * 60_000,
   });
 
   return {

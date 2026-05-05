@@ -1,54 +1,27 @@
-import { useEffect, useState } from "react";
-import { RefreshCw, ChevronDown, ChevronUp, CheckCircle2, Package } from "lucide-react";
+import { useState } from "react";
+import { RefreshCw, ChevronDown, ChevronUp, CheckCircle2, Package, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Sale, Product } from "@kwinna/contracts";
-import { fetchWebOrders, markAsAssembled } from "../services/sales";
-import { fetchProducts } from "../services/products";
+import { useWebOrders, useMarkAssembled } from "../hooks/use-orders";
+import { useProducts } from "../hooks/use-products";
 import { formatDate, formatPrice } from "../lib/utils";
 import { ApiError } from "../lib/api";
 
 type StatusFilter = "all" | "completed" | "assembled";
 
+const PAGE_SIZE = 20;
+
 export default function OrdersView() {
-  const [orders,    setOrders]    = useState<Sale[]>([]);
-  const [products,  setProducts]  = useState<Map<string, Product>>(new Map());
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState("");
-  const [filter,    setFilter]    = useState<StatusFilter>("all");
-  const [expanded,  setExpanded]  = useState<string | null>(null);
-  const [marking,   setMarking]   = useState<string | null>(null);
-  const [toastMsg,  setToastMsg]  = useState("");
+  const [filter,   setFilter]   = useState<StatusFilter>("all");
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState("");
+  const [page,     setPage]     = useState(0);
 
-  function load() {
-    setLoading(true);
-    setError("");
-    Promise.all([fetchWebOrders(), fetchProducts()])
-      .then(([orders, prods]) => {
-        setOrders(orders);
-        setProducts(new Map(prods.map((p) => [p.id, p])));
-      })
-      .catch(() => setError("No se pudieron cargar los pedidos."))
-      .finally(() => setLoading(false));
-  }
+  const { orders, isLoading, isError, isRefetching, refetch } = useWebOrders();
+  const { products } = useProducts();
+  const { mutateAsync: markAssembled, isPending: marking } = useMarkAssembled();
 
-  useEffect(() => { load(); }, []);
-
-  async function handleMarkAssembled(sale: Sale) {
-    setMarking(sale.id);
-    try {
-      const updated = await markAsAssembled(sale.id);
-      setOrders((prev) => prev.map((o) => o.id === updated.id ? updated : o));
-      showToast("Pedido marcado como armado");
-    } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "Error al actualizar el pedido.");
-    } finally {
-      setMarking(null);
-    }
-  }
-
-  function showToast(msg: string) {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(""), 4000);
-  }
+  // Build product map for O(1) lookup in order items
+  const productMap = new Map<string, Product>(products.map((p) => [p.id, p]));
 
   const displayed = orders.filter((o) => {
     if (filter === "completed") return o.status === "completed";
@@ -56,8 +29,30 @@ export default function OrdersView() {
     return true;
   });
 
-  const pendingCount  = orders.filter((o) => o.status === "completed").length;
+  const totalPages = Math.ceil(displayed.length / PAGE_SIZE);
+  const paginated  = displayed.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  function handleFilterChange(f: StatusFilter) {
+    setFilter(f);
+    setPage(0);
+  }
+
+  const pendingCount   = orders.filter((o) => o.status === "completed").length;
   const assembledCount = orders.filter((o) => o.status === "assembled").length;
+
+  async function handleMarkAssembled(sale: Sale) {
+    try {
+      await markAssembled(sale.id);
+      showToast("Pedido marcado como armado");
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : "Error al actualizar el pedido.");
+    }
+  }
+
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(""), 4000);
+  }
 
   return (
     <div className="p-6 h-full flex flex-col gap-5">
@@ -67,15 +62,20 @@ export default function OrdersView() {
           <h1 className="text-lg font-semibold text-white">Pedidos web</h1>
           <p className="text-xs text-zinc-500 mt-0.5">
             {pendingCount} para armar · {assembledCount} armados
+            {isRefetching && (
+              <span className="ml-2 inline-flex items-center gap-1 text-zinc-600">
+                <RefreshCw size={10} className="animate-spin" /> actualizando
+              </span>
+            )}
           </p>
         </div>
         <button
-          onClick={load}
-          disabled={loading}
+          onClick={() => void refetch()}
+          disabled={isLoading || isRefetching}
           className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white
                      transition-colors disabled:opacity-50"
         >
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          <RefreshCw size={14} className={(isLoading || isRefetching) ? "animate-spin" : ""} />
           Actualizar
         </button>
       </div>
@@ -85,7 +85,7 @@ export default function OrdersView() {
         {(["all", "completed", "assembled"] as StatusFilter[]).map((f) => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => handleFilterChange(f)}
             className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
               filter === f
                 ? "bg-white text-zinc-900"
@@ -97,37 +97,69 @@ export default function OrdersView() {
         ))}
       </div>
 
-      {error && (
+      {isError && (
         <div className="text-red-400 text-sm bg-red-950/30 border border-red-900/30 rounded-lg px-4 py-3">
-          {error}
+          No se pudieron cargar los pedidos.
         </div>
       )}
 
-      {loading && (
-        <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
-          Cargando pedidos...
-        </div>
-      )}
-
-      {!loading && !error && (
+      {/* Skeleton loading */}
+      {isLoading && (
         <div className="flex-1 overflow-auto flex flex-col gap-3">
-          {displayed.length === 0 && (
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-zinc-900 rounded-xl border border-zinc-800 h-20 animate-pulse" />
+          ))}
+        </div>
+      )}
+
+      {!isLoading && !isError && (
+        <div className="flex-1 overflow-auto flex flex-col gap-3">
+          {paginated.length === 0 ? (
             <div className="text-center text-zinc-600 text-sm py-20">
               <Package size={32} className="mx-auto mb-3 opacity-30" />
               No hay pedidos para mostrar.
             </div>
+          ) : (
+            paginated.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                productMap={productMap}
+                expanded={expanded === order.id}
+                onToggle={() => setExpanded(expanded === order.id ? null : order.id)}
+                onMarkAssembled={() => void handleMarkAssembled(order)}
+                marking={marking}
+              />
+            ))
           )}
-          {displayed.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              products={products}
-              expanded={expanded === order.id}
-              onToggle={() => setExpanded(expanded === order.id ? null : order.id)}
-              onMarkAssembled={() => handleMarkAssembled(order)}
-              marking={marking === order.id}
-            />
-          ))}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2 border-t border-zinc-800 mt-1">
+              <span className="text-xs text-zinc-500 tabular-nums">
+                {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, displayed.length)} de {displayed.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={page === 0}
+                  onClick={() => setPage(page - 1)}
+                  className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center
+                             disabled:opacity-30 transition-colors"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="text-xs text-zinc-400 px-2 tabular-nums">{page + 1} / {totalPages}</span>
+                <button
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage(page + 1)}
+                  className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center
+                             disabled:opacity-30 transition-colors"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -143,14 +175,14 @@ export default function OrdersView() {
 
 function OrderCard({
   order,
-  products,
+  productMap,
   expanded,
   onToggle,
   onMarkAssembled,
   marking,
 }: {
   order:           Sale;
-  products:        Map<string, Product>;
+  productMap:      Map<string, Product>;
   expanded:        boolean;
   onToggle:        () => void;
   onMarkAssembled: () => void;
@@ -164,14 +196,8 @@ function OrderCard({
     }`}>
       {/* Summary row */}
       <div className="flex items-center gap-4 px-5 py-4">
-        {/* Status dot */}
-        <span
-          className={`w-2 h-2 rounded-full flex-shrink-0 ${
-            isAssembled ? "bg-emerald-500" : "bg-amber-400"
-          }`}
-        />
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isAssembled ? "bg-emerald-500" : "bg-amber-400"}`} />
 
-        {/* Info */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-white truncate">{order.customerName}</p>
           <p className="text-xs text-zinc-500 truncate">
@@ -179,23 +205,16 @@ function OrderCard({
           </p>
         </div>
 
-        {/* Total */}
         <span className="text-sm font-semibold text-white flex-shrink-0">
           {formatPrice(order.total)}
         </span>
 
-        {/* Badge */}
-        <span
-          className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
-            isAssembled
-              ? "bg-emerald-900/60 text-emerald-400"
-              : "bg-amber-900/60 text-amber-300"
-          }`}
-        >
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
+          isAssembled ? "bg-emerald-900/60 text-emerald-400" : "bg-amber-900/60 text-amber-300"
+        }`}>
           {isAssembled ? "Armado" : "Para armar"}
         </span>
 
-        {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {!isAssembled && (
             <button
@@ -207,10 +226,7 @@ function OrderCard({
               {marking ? "..." : "Marcar armado"}
             </button>
           )}
-          <button
-            onClick={onToggle}
-            className="text-zinc-500 hover:text-white transition-colors"
-          >
+          <button onClick={onToggle} className="text-zinc-500 hover:text-white transition-colors">
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
         </div>
@@ -219,16 +235,14 @@ function OrderCard({
       {/* Expanded detail */}
       {expanded && (
         <div className="px-5 pb-5 border-t border-zinc-800 pt-4 flex flex-col gap-3">
-          {/* Items */}
           <div>
             <p className="text-[11px] text-zinc-500 uppercase tracking-wide mb-2">Artículos</p>
             <div className="flex flex-col gap-2">
               {order.items.map((item, i) => {
-                const product = products.get(item.productId);
+                const product = productMap.get(item.productId);
                 const thumb   = product?.images?.[0];
                 return (
                   <div key={i} className="flex items-center gap-3">
-                    {/* Miniatura */}
                     <div className="w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 flex-shrink-0">
                       {thumb ? (
                         <img src={thumb} alt={product?.name} className="w-full h-full object-cover" />
@@ -238,19 +252,14 @@ function OrderCard({
                         </div>
                       )}
                     </div>
-
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">
                         {product?.name ?? "Producto no encontrado"}
                       </p>
                       <p className="text-xs text-zinc-500">
-                        SKU: {product?.sku ?? "—"}
-                        {item.size ? ` · Talle ${item.size}` : ""}
+                        SKU: {product?.sku ?? "—"}{item.size ? ` · Talle ${item.size}` : ""}
                       </p>
                     </div>
-
-                    {/* Cantidad y precio */}
                     <div className="text-right flex-shrink-0">
                       <p className="text-sm text-white">{formatPrice(item.subtotal)}</p>
                       <p className="text-xs text-zinc-500">{item.quantity}× {formatPrice(item.unitPrice)}</p>
@@ -261,7 +270,6 @@ function OrderCard({
             </div>
           </div>
 
-          {/* Shipping */}
           <div>
             <p className="text-[11px] text-zinc-500 uppercase tracking-wide mb-1">Envío</p>
             <p className="text-sm text-zinc-300">
@@ -272,7 +280,6 @@ function OrderCard({
             </p>
           </div>
 
-          {/* Customer */}
           <div>
             <p className="text-[11px] text-zinc-500 uppercase tracking-wide mb-1">Cliente</p>
             <p className="text-sm text-zinc-300">{order.customerEmail}</p>

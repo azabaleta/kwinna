@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Users, Search, X } from "lucide-react";
+import { Suspense, useState, useMemo } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { Users, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -18,6 +20,8 @@ import { useSales } from "@/hooks/use-sale";
 import { cn } from "@/lib/utils";
 import { CustomerDetailSheet } from "@/components/admin/customer-detail-sheet";
 import type { CustomerMetrics } from "@kwinna/contracts";
+
+const PAGE_SIZE = 20;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,7 +38,7 @@ function fmtDate(iso: string): string {
 }
 
 function normalize(s: string): string {
-  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
 // ─── Skeleton row ─────────────────────────────────────────────────────────────
@@ -51,22 +55,52 @@ function SkeletonRow() {
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Content (necesita Suspense por useSearchParams) ──────────────────────────
 
-export default function CustomersPage() {
-  const [query, setQuery] = useState("");
+function CustomersContent() {
+  const router       = useRouter();
+  const pathname     = usePathname();
+  const searchParams = useSearchParams();
+
+  const query = searchParams.get("q") ?? "";
+  const page  = parseInt(searchParams.get("page") ?? "0", 10);
+
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerMetrics | null>(null);
 
   const { customers, isLoading, isError } = useCustomers();
   const { sales } = useSales();
 
-  const filtered = query
-    ? customers.filter((c) => {
-        const q = normalize(query);
-        return normalize(c.name).includes(q) || normalize(c.email).includes(q);
-      })
-    : customers;
+  function updateParams(updates: Record<string, string | null>) {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null || value === "" || value === "0") {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    }
+    const qs = params.toString();
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
+  }
 
+  function handleQueryChange(q: string) {
+    updateParams({ q, page: null });
+  }
+
+  function setPage(p: number) {
+    updateParams({ page: String(p) });
+  }
+
+  const filtered = useMemo(() => {
+    if (!query) return customers;
+    const q = normalize(query);
+    return customers.filter(
+      (c) => normalize(c.name).includes(q) || normalize(c.email).includes(q)
+    );
+  }, [customers, query]);
+
+  const paginated  = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const totalActive = customers.filter((c) => c.totalLifetime > 0).length;
 
   return (
@@ -138,12 +172,12 @@ export default function CustomersPage() {
               <Input
                 placeholder="Buscar por nombre o email…"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => handleQueryChange(e.target.value)}
                 className="pl-8 pr-7"
               />
               {query && (
                 <button
-                  onClick={() => setQuery("")}
+                  onClick={() => handleQueryChange("")}
                   className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -188,13 +222,12 @@ export default function CustomersPage() {
                         </TableCell>
                       </TableRow>
                     )
-                    : filtered.map((c) => (
+                    : paginated.map((c) => (
                       <TableRow
                         key={c.id}
                         className="cursor-pointer hover:bg-muted/50 transition-colors"
                         onClick={() => setSelectedCustomer(c)}
                       >
-                        {/* Nombre + estado */}
                         <TableCell className="pl-6">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-foreground">{c.name}</span>
@@ -206,17 +239,14 @@ export default function CustomersPage() {
                           </div>
                         </TableCell>
 
-                        {/* Email */}
                         <TableCell className="text-sm text-muted-foreground">
                           {c.email}
                         </TableCell>
 
-                        {/* Fecha de registro */}
                         <TableCell className="text-sm tabular-nums text-muted-foreground">
                           {fmtDate(c.createdAt)}
                         </TableCell>
 
-                        {/* Compras este mes */}
                         <TableCell className="text-right">
                           <span className={cn(
                             "text-sm tabular-nums font-medium",
@@ -226,7 +256,6 @@ export default function CustomersPage() {
                           </span>
                         </TableCell>
 
-                        {/* Compras semestre */}
                         <TableCell className="text-right">
                           <span className={cn(
                             "text-sm tabular-nums font-medium",
@@ -236,7 +265,6 @@ export default function CustomersPage() {
                           </span>
                         </TableCell>
 
-                        {/* Total histórico */}
                         <TableCell className="pr-6 text-right">
                           <span className={cn(
                             "text-sm tabular-nums font-semibold",
@@ -251,6 +279,24 @@ export default function CustomersPage() {
                 </TableBody>
               </Table>
             )}
+
+            {/* Paginación */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-border px-6 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} de {filtered.length}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="icon" className="h-7 w-7" disabled={page === 0} onClick={() => setPage(page - 1)}>
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="px-2 text-xs text-muted-foreground">{page + 1} / {totalPages}</span>
+                  <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)}>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -262,5 +308,22 @@ export default function CustomersPage() {
         sales={sales.filter((s) => s.userId === selectedCustomer?.id || s.customerEmail === selectedCustomer?.email)}
       />
     </main>
+  );
+}
+
+// ─── Page wrapper con Suspense ────────────────────────────────────────────────
+
+export default function CustomersPage() {
+  return (
+    <Suspense fallback={
+      <main className="px-4 py-8 md:px-8">
+        <div className="mx-auto max-w-6xl space-y-6">
+          <div className="h-8 w-48 animate-pulse rounded bg-muted" />
+          <div className="h-96 animate-pulse rounded-lg bg-muted" />
+        </div>
+      </main>
+    }>
+      <CustomersContent />
+    </Suspense>
   );
 }

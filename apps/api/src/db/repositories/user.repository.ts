@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
-import type { CustomerMetrics, User } from "@kwinna/contracts";
+import type { CustomerMetrics, Operator, User } from "@kwinna/contracts";
 import { db } from "../index";
 import { salesTable, usersTable } from "../schema";
 
@@ -19,6 +19,7 @@ function mapRow(row: typeof usersTable.$inferSelect): StoredUser {
     name:          row.name,
     role:          row.role,
     emailVerified: row.emailVerified,
+    isActive:      row.isActive,
     passwordHash:  row.passwordHash,
   };
 }
@@ -157,6 +158,79 @@ export async function updatePassword(
     .update(usersTable)
     .set({ passwordHash })
     .where(eq(usersTable.id, userId));
+}
+
+// ─── Operator queries ─────────────────────────────────────────────────────────
+
+function mapOperatorRow(row: typeof usersTable.$inferSelect): Operator {
+  return {
+    id:        row.id,
+    email:     row.email,
+    name:      row.name,
+    isActive:  row.isActive,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export async function findAllOperators(): Promise<Operator[]> {
+  const rows = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.role, "operator"))
+    .orderBy(desc(usersTable.createdAt));
+  return rows.map(mapOperatorRow);
+}
+
+export async function createOperator(input: {
+  email:        string;
+  name:         string;
+  passwordHash: string;
+}): Promise<Operator> {
+  const [row] = await db
+    .insert(usersTable)
+    .values({
+      email:         input.email.toLowerCase(),
+      name:          input.name,
+      passwordHash:  input.passwordHash,
+      role:          "operator",
+      emailVerified: true,
+      isActive:      true,
+      createdAt:     new Date(),
+    })
+    .returning();
+  return mapOperatorRow(row!);
+}
+
+export async function updateOperator(
+  id:    string,
+  input: { name?: string; passwordHash?: string },
+): Promise<Operator | undefined> {
+  const set: Record<string, unknown> = {};
+  if (input.name)         set["name"]         = input.name;
+  if (input.passwordHash) set["passwordHash"]  = input.passwordHash;
+  if (Object.keys(set).length === 0) return findOperatorById(id);
+
+  const [row] = await db
+    .update(usersTable)
+    .set(set)
+    .where(and(eq(usersTable.id, id), eq(usersTable.role, "operator")))
+    .returning();
+  return row ? mapOperatorRow(row) : undefined;
+}
+
+export async function setOperatorActive(id: string, active: boolean): Promise<void> {
+  await db
+    .update(usersTable)
+    .set({ isActive: active })
+    .where(and(eq(usersTable.id, id), eq(usersTable.role, "operator")));
+}
+
+export async function findOperatorById(id: string): Promise<Operator | undefined> {
+  const rows = await db
+    .select()
+    .from(usersTable)
+    .where(and(eq(usersTable.id, id), eq(usersTable.role, "operator")));
+  return rows[0] ? mapOperatorRow(rows[0]) : undefined;
 }
 
 export async function upsertAdminUser(

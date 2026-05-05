@@ -1,10 +1,12 @@
 "use client";
 
+"use client";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { BarChart3, CalendarCheck, LayoutDashboard, LogOut, Menu, Package2, RotateCcw, ShoppingBag, Users, X } from "lucide-react";
+import { BarChart3, CalendarCheck, LayoutDashboard, LogOut, Menu, Package2, RotateCcw, ShoppingBag, Users, UserCog, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { selectUser, useAuthStore } from "@/store/use-auth-store";
@@ -12,13 +14,14 @@ import { selectUser, useAuthStore } from "@/store/use-auth-store";
 // ─── Nav items ────────────────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
-  { href: "/admin/dashboard", label: "Dashboard",       icon: LayoutDashboard },
-  { href: "/admin/today",     label: "Pedidos del día", icon: CalendarCheck   },
-  { href: "/admin/inventory", label: "Inventario",      icon: Package2        },
-  { href: "/admin/orders",    label: "Pedidos",         icon: ShoppingBag     },
-  { href: "/admin/customers", label: "Clientes",        icon: Users           },
-  { href: "/admin/returns",   label: "Devoluciones",    icon: RotateCcw       },
-  { href: "/admin/reports",   label: "Reportes",        icon: BarChart3       },
+  { href: "/admin/dashboard",  label: "Dashboard",       icon: LayoutDashboard, adminOnly: false },
+  { href: "/admin/today",      label: "Pedidos del día", icon: CalendarCheck,   adminOnly: false },
+  { href: "/admin/inventory",  label: "Inventario",      icon: Package2,        adminOnly: false },
+  { href: "/admin/orders",     label: "Pedidos",         icon: ShoppingBag,     adminOnly: false },
+  { href: "/admin/customers",  label: "Clientes",        icon: Users,           adminOnly: false },
+  { href: "/admin/operators",  label: "Operadores",      icon: UserCog,         adminOnly: true  },
+  { href: "/admin/returns",    label: "Devoluciones",    icon: RotateCcw,       adminOnly: false },
+  { href: "/admin/reports",    label: "Reportes",        icon: BarChart3,       adminOnly: false },
 ] as const;
 
 // ─── Isotipo inline (no SVGR configured in next.config) ───────────────────────
@@ -151,7 +154,7 @@ export function Sidebar() {
 
         {/* ── Nav ── */}
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+          {NAV_ITEMS.filter(({ adminOnly }) => !adminOnly || user?.role === "admin").map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
               <Link

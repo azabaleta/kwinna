@@ -31,7 +31,8 @@ export function mapSaleRow(row: typeof salesTable.$inferSelect): Sale {
     paymentMethod: (row.paymentMethod as "mercadopago" | "transfer") ?? undefined,
     saleNotes:     row.saleNotes     ?? undefined,
 
-    userId: row.userId ?? undefined,
+    userId:   row.userId   ?? undefined,
+    vendorId: row.vendorId ?? undefined,
 
     isDismissed:   row.isDismissed,
     dismissReason: row.dismissReason ?? undefined,

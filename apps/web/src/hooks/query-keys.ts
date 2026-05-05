@@ -28,3 +28,8 @@ export const customerKeys = {
   all:   ["customers"] as const,
   lists: () => [...customerKeys.all, "list"] as const,
 };
+
+export const operatorKeys = {
+  all:   ["operators"] as const,
+  lists: () => [...operatorKeys.all, "list"] as const,
+};

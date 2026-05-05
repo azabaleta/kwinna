@@ -9,6 +9,7 @@ export const UserSchema = z.object({
   name:          z.string().min(1),
   role:          z.enum(["admin", "operator", "customer"]),
   emailVerified: z.boolean().default(false),
+  isActive:      z.boolean().default(true),
 });
 
 export type User = z.infer<typeof UserSchema>;
@@ -111,3 +112,37 @@ export const ResetPasswordInputSchema = z.object({
 });
 
 export type ResetPasswordInput = z.infer<typeof ResetPasswordInputSchema>;
+
+// ─── Operator ─────────────────────────────────────────────────────────────────
+// Perfil de operador expuesto al panel admin (sin passwordHash).
+
+export const OperatorSchema = z.object({
+  id:        z.string().uuid(),
+  email:     z.string().email(),
+  name:      z.string().min(1),
+  isActive:  z.boolean(),
+  createdAt: z.string().datetime(),
+});
+
+export type Operator = z.infer<typeof OperatorSchema>;
+
+export const OperatorCreateInputSchema = z.object({
+  name:     z.string().min(2).max(100).trim(),
+  email:    z.string().email(),
+  password: z.string().min(8).max(72),
+});
+
+export type OperatorCreateInput = z.infer<typeof OperatorCreateInputSchema>;
+
+export const OperatorUpdateInputSchema = z.object({
+  name:     z.string().min(2).max(100).trim().optional(),
+  password: z.string().min(8).max(72).optional(),
+});
+
+export type OperatorUpdateInput = z.infer<typeof OperatorUpdateInputSchema>;
+
+export const OperatorListResponseSchema = z.object({
+  data: z.array(OperatorSchema),
+});
+
+export type OperatorListResponse = z.infer<typeof OperatorListResponseSchema>;

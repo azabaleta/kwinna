@@ -96,6 +96,10 @@ export async function login(input: LoginInput): Promise<LoginResponse> {
     throw httpError("Email no verificado. Revisá tu casilla y confirmá tu cuenta.", 403);
   }
 
+  if (!stored.isActive) {
+    throw httpError("Tu cuenta está desactivada. Contactá al administrador.", 403);
+  }
+
   const { passwordHash: _, ...user } = stored;
   return { user, token: makeToken(user) };
 }

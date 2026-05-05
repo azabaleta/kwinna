@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { Search, X, Plus, Minus, ShoppingCart, AlertTriangle, CheckCircle2, Printer } from "lucide-react";
+import { useRef, useState } from "react";
+import { Search, X, Plus, Minus, ShoppingCart, AlertTriangle, CheckCircle2, Printer, RefreshCw } from "lucide-react";
 import type { Product, Stock, PriceTier } from "@kwinna/contracts";
 import { usePosStore } from "../store/use-pos-store";
-import { fetchProducts } from "../services/products";
-import { fetchAllStock } from "../services/stock";
+import { useProducts } from "../hooks/use-products";
+import { useStock, useInvalidateStock } from "../hooks/use-stock";
 import { createPosSale } from "../services/sales";
+import { useAuthStore } from "../store/use-auth-store";
 import { formatPrice, formatRoundedPrice, matchProduct, normalize } from "../lib/utils";
 import { ApiError } from "../lib/api";
 import ReceiptTicket from "../components/ReceiptTicket";
@@ -442,16 +443,19 @@ function Field({
 // ─── SellView ─────────────────────────────────────────────────────────────────
 
 export default function SellView() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [stock,    setStock]    = useState<Stock[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [modal,    setModal]    = useState(false);
+  const [modal,      setModal]      = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saleError,  setSaleError]  = useState("");
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
 
+  const { products, isLoading: productsLoading } = useProducts();
+  const { stock, isLoading: stockLoading, isRefetching } = useStock();
+  const invalidateStock = useInvalidateStock();
+  const loading = productsLoading || stockLoading;
+
   const { cart, addToCart, removeFromCart, updateQty, clearCart, priceTier, setPriceTier } = usePosStore();
+  const vendorId = useAuthStore((s) => s.user?.id);
 
   const subtotal = cart.reduce((sum, i) => {
     let p = i.product.price;
@@ -459,12 +463,6 @@ export default function SellView() {
     else if (priceTier === "mayorista") p = Math.round((p * 0.65) / 100) * 100;
     return sum + p * i.quantity;
   }, 0);
-
-  useEffect(() => {
-    Promise.all([fetchProducts(), fetchAllStock()])
-      .then(([p, s]) => { setProducts(p); setStock(s); })
-      .finally(() => setLoading(false));
-  }, []);
 
   interface ConfirmData {
     customerName: string; customerEmail: string; customerPhone: string;
@@ -493,6 +491,7 @@ export default function SellView() {
         paymentMethod:    data.paymentMethod || undefined,
         priceTier:        priceTier,
         saleNotes:        data.saleNotes     || undefined,
+        vendorId:         vendorId,
       });
 
       // Snapshot receipt data BEFORE clearing the cart
@@ -520,6 +519,8 @@ export default function SellView() {
         date:          new Date(),
       });
 
+      // Invalidar stock inmediatamente para que el siguiente operador vea disponibilidad real
+      invalidateStock();
       clearCart();
       setModal(false);
     } catch (err) {
@@ -535,9 +536,19 @@ export default function SellView() {
     <div className="flex h-full">
       {/* Left: SKU lookup */}
       <div className="flex-1 p-6 overflow-auto border-r border-zinc-800">
-        <h2 className="text-sm font-semibold text-white mb-4">Agregar artículos</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-white">Agregar artículos</h2>
+          {isRefetching && (
+            <span className="flex items-center gap-1 text-[10px] text-zinc-500">
+              <RefreshCw size={10} className="animate-spin" /> Actualizando stock…
+            </span>
+          )}
+        </div>
         {loading ? (
-          <p className="text-zinc-500 text-sm">Cargando...</p>
+          <div className="flex flex-col gap-3">
+            <div className="h-10 bg-zinc-800 animate-pulse rounded-lg" />
+            <div className="h-4 bg-zinc-800 animate-pulse rounded w-1/3" />
+          </div>
         ) : (
           <SkuBar products={products} stock={stock} onAdd={addToCart} />
         )}

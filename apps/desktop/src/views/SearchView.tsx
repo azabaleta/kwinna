@@ -1,29 +1,36 @@
-import { useEffect, useState } from "react";
-import { Search, Plus } from "lucide-react";
+import { useState } from "react";
+import { Search, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { Product } from "@kwinna/contracts";
 import { SEASON_LABELS } from "@kwinna/contracts";
-import { fetchProducts } from "../services/products";
+import { useProducts } from "../hooks/use-products";
+import { useDebounce } from "../lib/use-debounce";
 import { formatRoundedPrice, matchProduct } from "../lib/utils";
 import { usePosStore } from "../store/use-pos-store";
 
-export default function SearchView() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [query,    setQuery]    = useState("");
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState("");
+const PAGE_SIZE = 24;
 
+export default function SearchView() {
+  const [query, setQuery] = useState("");
+  const [page,  setPage]  = useState(0);
+
+  const { products, isLoading, isError } = useProducts();
   const addToCart = usePosStore((s) => s.addToCart);
   const navigate  = useNavigate();
 
-  useEffect(() => {
-    fetchProducts()
-      .then(setProducts)
-      .catch(() => setError("No se pudieron cargar los productos."))
-      .finally(() => setLoading(false));
-  }, []);
+  const debouncedQuery = useDebounce(query, 180);
 
-  const filtered = products.filter((p) => matchProduct(p.name, p.sku, query));
+  const filtered = debouncedQuery
+    ? products.filter((p) => matchProduct(p.name, p.sku, debouncedQuery))
+    : products;
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated  = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  function handleQueryChange(q: string) {
+    setQuery(q);
+    setPage(0);
+  }
 
   function handleAddToCart(product: Product) {
     addToCart(product);
@@ -32,45 +39,89 @@ export default function SearchView() {
 
   return (
     <div className="p-6 h-full flex flex-col gap-5">
+      {/* Search bar */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-md">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
           <input
             autoFocus
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleQueryChange(e.target.value)}
             placeholder="Buscar por nombre o SKU..."
             className="w-full bg-zinc-900 text-white rounded-lg pl-9 pr-4 py-2.5 text-sm
                        border border-zinc-800 focus:border-zinc-600 outline-none transition-colors"
           />
         </div>
-        <span className="text-xs text-zinc-500">{filtered.length} productos</span>
+        <span className="text-xs text-zinc-500 tabular-nums">
+          {isLoading ? "Cargando…" : `${filtered.length} productos`}
+        </span>
       </div>
 
-      {loading && (
-        <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
-          Cargando productos...
-        </div>
-      )}
-
-      {error && (
-        <div className="text-red-400 text-sm bg-red-950/30 border border-red-900/30 rounded-lg px-4 py-3">
-          {error}
-        </div>
-      )}
-
-      {!loading && !error && (
+      {/* Loading skeletons */}
+      {isLoading && (
         <div className="flex-1 overflow-auto">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filtered.map((product) => (
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+                <div className="aspect-square bg-zinc-800 animate-pulse" />
+                <div className="p-3 flex flex-col gap-2">
+                  <div className="h-4 bg-zinc-800 animate-pulse rounded" />
+                  <div className="h-3 bg-zinc-800 animate-pulse rounded w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Error */}
+      {isError && (
+        <div className="text-red-400 text-sm bg-red-950/30 border border-red-900/30 rounded-lg px-4 py-3">
+          No se pudieron cargar los productos.
+        </div>
+      )}
+
+      {/* Product grid */}
+      {!isLoading && !isError && (
+        <div className="flex-1 overflow-auto flex flex-col gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {paginated.map((product) => (
               <ProductCard key={product.id} product={product} onAdd={handleAddToCart} />
             ))}
             {filtered.length === 0 && (
               <div className="col-span-full text-center text-zinc-500 text-sm py-16">
-                No se encontraron productos para "{query}"
+                No se encontraron productos para &ldquo;{query}&rdquo;
               </div>
             )}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2 border-t border-zinc-800 mt-1">
+              <span className="text-xs text-zinc-500 tabular-nums">
+                {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} de {filtered.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={page === 0}
+                  onClick={() => setPage(page - 1)}
+                  className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center
+                             disabled:opacity-30 transition-colors"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="text-xs text-zinc-400 px-2 tabular-nums">{page + 1} / {totalPages}</span>
+                <button
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage(page + 1)}
+                  className="w-7 h-7 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center
+                             disabled:opacity-30 transition-colors"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -101,13 +152,11 @@ function ProductCard({
             Sin foto
           </div>
         )}
-        {/* Season badge */}
         {product.season && (
           <span className="absolute top-2 left-2 text-[10px] bg-black/70 text-zinc-300 px-1.5 py-0.5 rounded">
             {SEASON_LABELS[product.season]}
           </span>
         )}
-        {/* Exclusivo tienda badge */}
         {product.showInShop === false && (
           <span className="absolute top-2 right-2 text-[10px] bg-violet-600/90 text-white px-1.5 py-0.5 rounded font-medium">
             Exclusivo tienda
@@ -122,7 +171,6 @@ function ProductCard({
           <p className="text-[11px] text-zinc-500 mt-0.5">{product.sku}</p>
         </div>
 
-        {/* Pricing */}
         <div className="flex flex-col gap-1 border-t border-zinc-800 pt-2 pb-1">
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-zinc-400">Lista</span>

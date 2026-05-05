@@ -77,6 +77,7 @@ export const usersTable = pgTable("users", {
   role:          userRoleEnum("role").notNull().default("customer"),
   passwordHash:  text("password_hash").notNull(),
   emailVerified: boolean("email_verified").notNull().default(true),
+  isActive:      boolean("is_active").notNull().default(true),
   createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -205,6 +206,9 @@ export const salesTable = pgTable("sales", {
 
   // ── Opcional: cliente registrado ───────────────────────────────────────────
   userId: uuid("user_id"),
+
+  // ── Opcional: operador que procesó la venta (POS) ─────────────────────────
+  vendorId: uuid("vendor_id"),
 
   // ── Método de envío ─────────────────────────────────────────────────────────
   shippingMethod: varchar("shipping_method", { length: 20 }).notNull().default("delivery"),

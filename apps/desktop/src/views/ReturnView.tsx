@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Search, CheckCircle2 } from "lucide-react";
 import type { Product } from "@kwinna/contracts";
 import { RETURN_REASON_LABELS, type ReturnReason } from "@kwinna/contracts";
-import { fetchProducts } from "../services/products";
+import { useProducts } from "../hooks/use-products";
 import { createReturn } from "../services/returns";
 import { formatPrice, normalize } from "../lib/utils";
 import { ApiError } from "../lib/api";
@@ -10,10 +10,8 @@ import { ApiError } from "../lib/api";
 const REASONS = Object.entries(RETURN_REASON_LABELS) as [ReturnReason, string][];
 
 export default function ReturnView() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading,  setLoading]  = useState(true);
+  const { products, isLoading } = useProducts();
 
-  // Form state
   const [skuQuery, setSkuQuery]  = useState("");
   const [selected, setSelected]  = useState<Product | null>(null);
   const [size,     setSize]      = useState("");
@@ -26,12 +24,6 @@ export default function ReturnView() {
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState("");
   const [success,    setSuccess]    = useState(false);
-
-  useEffect(() => {
-    fetchProducts()
-      .then(setProducts)
-      .finally(() => setLoading(false));
-  }, []);
 
   function handleProductSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -60,7 +52,6 @@ export default function ReturnView() {
         restock,
         saleId:    saleId || undefined,
       });
-      // Reset
       setSelected(null);
       setSkuQuery("");
       setSize(""); setQty(1); setReason(""); setNotes(""); setRestock(true); setSaleId("");
@@ -91,18 +82,26 @@ export default function ReturnView() {
             <input
               value={skuQuery}
               onChange={(e) => setSkuQuery(e.target.value)}
-              placeholder="SKU del producto..."
+              placeholder={isLoading ? "Cargando productos…" : "SKU del producto..."}
+              disabled={isLoading}
               className="w-full bg-zinc-900 text-white rounded-lg pl-9 pr-4 py-2.5 text-sm
-                         border border-zinc-800 focus:border-zinc-600 outline-none transition-colors"
+                         border border-zinc-800 focus:border-zinc-600 outline-none transition-colors
+                         disabled:opacity-40 disabled:cursor-not-allowed"
             />
           </div>
           <button
             type="submit"
-            className="bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg px-4 text-sm font-medium transition-colors"
+            disabled={isLoading}
+            className="bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg px-4 text-sm font-medium
+                       transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Buscar
           </button>
         </form>
+
+        {isLoading && (
+          <p className="text-xs text-zinc-500 mt-2">Cargando catálogo de productos…</p>
+        )}
 
         {selected && (
           <div className="mt-3 bg-zinc-900 border border-zinc-700 rounded-xl p-3 flex items-center gap-3">
@@ -188,15 +187,9 @@ export default function ReturnView() {
                 <button
                   type="button"
                   onClick={() => setRestock((v) => !v)}
-                  className={`w-10 h-5 rounded-full transition-colors ${
-                    restock ? "bg-emerald-600" : "bg-zinc-700"
-                  }`}
+                  className={`w-10 h-5 rounded-full transition-colors ${restock ? "bg-emerald-600" : "bg-zinc-700"}`}
                 >
-                  <span
-                    className={`block w-4 h-4 bg-white rounded-full mx-0.5 transition-transform ${
-                      restock ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
+                  <span className={`block w-4 h-4 bg-white rounded-full mx-0.5 transition-transform ${restock ? "translate-x-5" : "translate-x-0"}`} />
                 </button>
                 <span className="text-sm text-zinc-300">
                   Devolver al stock {restock ? "(artículo en buen estado)" : "(artículo dañado / baja)"}
@@ -222,9 +215,15 @@ export default function ReturnView() {
         </form>
       )}
 
-      {!loading && !selected && !skuQuery && (
+      {!isLoading && !selected && !skuQuery && (
         <p className="text-zinc-600 text-sm text-center py-12">
           Ingresá el SKU del producto para comenzar.
+        </p>
+      )}
+
+      {error && !selected && (
+        <p className="text-red-400 text-sm bg-red-950/30 border border-red-900/30 rounded-lg px-3 py-2 mt-3">
+          {error}
         </p>
       )}
 

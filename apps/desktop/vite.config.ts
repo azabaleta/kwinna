@@ -12,6 +12,9 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_API_URL": JSON.stringify(
         env["VITE_API_URL"] ?? "http://localhost:3001"
       ),
+      "import.meta.env.TAURI_PLATFORM": JSON.stringify(
+        process.env["TAURI_ENV_PLATFORM"] ?? "desktop"
+      ),
     },
 
     clearScreen: false,
