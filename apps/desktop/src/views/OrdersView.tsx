@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { RefreshCw, ChevronDown, ChevronUp, CheckCircle2, Package } from "lucide-react";
-import type { Sale } from "@kwinna/contracts";
+import type { Sale, Product } from "@kwinna/contracts";
 import { fetchWebOrders, markAsAssembled } from "../services/sales";
+import { fetchProducts } from "../services/products";
 import { formatDate, formatPrice } from "../lib/utils";
 import { ApiError } from "../lib/api";
 
@@ -9,6 +10,7 @@ type StatusFilter = "all" | "completed" | "assembled";
 
 export default function OrdersView() {
   const [orders,    setOrders]    = useState<Sale[]>([]);
+  const [products,  setProducts]  = useState<Map<string, Product>>(new Map());
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState("");
   const [filter,    setFilter]    = useState<StatusFilter>("all");
@@ -19,8 +21,11 @@ export default function OrdersView() {
   function load() {
     setLoading(true);
     setError("");
-    fetchWebOrders()
-      .then(setOrders)
+    Promise.all([fetchWebOrders(), fetchProducts()])
+      .then(([orders, prods]) => {
+        setOrders(orders);
+        setProducts(new Map(prods.map((p) => [p.id, p])));
+      })
       .catch(() => setError("No se pudieron cargar los pedidos."))
       .finally(() => setLoading(false));
   }
@@ -116,6 +121,7 @@ export default function OrdersView() {
             <OrderCard
               key={order.id}
               order={order}
+              products={products}
               expanded={expanded === order.id}
               onToggle={() => setExpanded(expanded === order.id ? null : order.id)}
               onMarkAssembled={() => handleMarkAssembled(order)}
@@ -137,12 +143,14 @@ export default function OrdersView() {
 
 function OrderCard({
   order,
+  products,
   expanded,
   onToggle,
   onMarkAssembled,
   marking,
 }: {
   order:           Sale;
+  products:        Map<string, Product>;
   expanded:        boolean;
   onToggle:        () => void;
   onMarkAssembled: () => void;
@@ -214,16 +222,42 @@ function OrderCard({
           {/* Items */}
           <div>
             <p className="text-[11px] text-zinc-500 uppercase tracking-wide mb-2">Artículos</p>
-            <div className="flex flex-col gap-1.5">
-              {order.items.map((item, i) => (
-                <div key={i} className="flex items-center justify-between text-sm">
-                  <span className="text-zinc-300">
-                    {item.quantity}× {item.productId.slice(0, 8)}…
-                    {item.size ? ` (T.${item.size})` : ""}
-                  </span>
-                  <span className="text-zinc-400">{formatPrice(item.subtotal)}</span>
-                </div>
-              ))}
+            <div className="flex flex-col gap-2">
+              {order.items.map((item, i) => {
+                const product = products.get(item.productId);
+                const thumb   = product?.images?.[0];
+                return (
+                  <div key={i} className="flex items-center gap-3">
+                    {/* Miniatura */}
+                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 flex-shrink-0">
+                      {thumb ? (
+                        <img src={thumb} alt={product?.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package size={16} className="text-zinc-600" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">
+                        {product?.name ?? "Producto no encontrado"}
+                      </p>
+                      <p className="text-xs text-zinc-500">
+                        SKU: {product?.sku ?? "—"}
+                        {item.size ? ` · Talle ${item.size}` : ""}
+                      </p>
+                    </div>
+
+                    {/* Cantidad y precio */}
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm text-white">{formatPrice(item.subtotal)}</p>
+                      <p className="text-xs text-zinc-500">{item.quantity}× {formatPrice(item.unitPrice)}</p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
