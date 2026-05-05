@@ -1,20 +1,26 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
-  plugins: [react()],
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
 
-  // Vite options tailored for Tauri development and only client-side rendering.
-  // 1. prevent vite from obscuring rust errors
-  clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
-  server: {
-    port: 1420,
-    strictPort: true,
-    watch: {
-      // 3. tell vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+  return {
+    plugins: [react()],
+
+    define: {
+      "import.meta.env.VITE_API_URL": JSON.stringify(
+        env["VITE_API_URL"] ?? "http://localhost:3001"
+      ),
     },
-  },
-}));
+
+    clearScreen: false,
+    server: {
+      port: 1420,
+      strictPort: true,
+      watch: {
+        ignored: ["**/src-tauri/**"],
+      },
+    },
+  };
+});
