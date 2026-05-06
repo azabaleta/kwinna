@@ -47,18 +47,19 @@ export async function searchPosCustomers(q: string): Promise<PosCustomer[]> {
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export async function createPosCustomer(input: PosCustomerCreateInput): Promise<PosCustomer> {
+  // Drizzle 0.45.x bug: passing `undefined` as an explicit object key causes the column
+  // to appear in the INSERT column list without a corresponding value, breaking the query.
+  // Only include optional fields when they actually have a value.
   const [row] = await db
     .insert(posCustomersTable)
     .values({
-      name:      input.name.trim(),
-      dni:       input.dni.trim(),
-      phone:     input.phone.trim(),
-      email:     input.email,
-      address:   input.address,
-      city:      input.city,
-      province:  input.province,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      name:  input.name.trim(),
+      dni:   input.dni.trim(),
+      phone: input.phone.trim(),
+      ...(input.email    !== undefined && { email:    input.email }),
+      ...(input.address  !== undefined && { address:  input.address }),
+      ...(input.city     !== undefined && { city:     input.city }),
+      ...(input.province !== undefined && { province: input.province }),
     })
     .returning();
   return mapRow(row!);

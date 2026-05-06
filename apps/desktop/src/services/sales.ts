@@ -1,5 +1,5 @@
 import { api } from "../lib/api";
-import type { Sale, SaleListResponse, SaleResponse, PriceTier } from "@kwinna/contracts";
+import type { Sale, CreditNote, SaleListResponse, SaleResponse, PriceTier } from "@kwinna/contracts";
 
 export interface PosSalePayload {
   items:            Array<{ productId: string; quantity: number; size?: string }>;
@@ -7,9 +7,9 @@ export interface PosSalePayload {
   customerEmail:    string;
   customerPhone?:   string;
   customerDni?:     string;
-  shippingAddress:  string;
-  shippingCity:     string;
-  shippingProvince: string;
+  shippingAddress?:  string;
+  shippingCity?:     string;
+  shippingProvince?: string;
   channel:          "pos";
   paymentMethod?:   string;
   priceTier?:       PriceTier;
@@ -17,11 +17,12 @@ export interface PosSalePayload {
   vendorId?:        string;
   userId?:          string;
   posCustomerId?:   string;
+  creditNoteId?:    string;
 }
 
-export async function createPosSale(payload: PosSalePayload): Promise<Sale> {
+export async function createPosSale(payload: PosSalePayload): Promise<{ sale: Sale; residualCreditNote?: CreditNote }> {
   const res = await api.post<SaleResponse>("/sales", payload);
-  return res.data;
+  return { sale: res.data, residualCreditNote: res.residualCreditNote };
 }
 
 export async function fetchWebOrders(): Promise<Sale[]> {

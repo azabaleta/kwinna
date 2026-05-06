@@ -58,7 +58,7 @@ export const ReturnCreateInputSchema = z.object({
   saleId:    z.string().uuid().optional(),
   productId: z.string().uuid(),
   size:      z.string().optional(),
-  quantity:  z.number().int().min(1),
+  quantity:  z.number().int().min(1).max(999),
   reason:    ReturnReasonSchema,
   notes:     z.string().max(500).optional(),
   restock:   z.boolean().default(false),
@@ -70,6 +70,14 @@ export type ReturnCreateInput = z.infer<typeof ReturnCreateInputSchema>;
 
 export const ReturnResponseSchema = z.object({ data: ReturnSchema });
 export type ReturnResponse = z.infer<typeof ReturnResponseSchema>;
+
+import { CreditNoteSchema } from "./credit-note";
+
+export const ReturnWithCreditNoteResponseSchema = z.object({
+  data:       ReturnSchema,
+  creditNote: CreditNoteSchema,
+});
+export type ReturnWithCreditNoteResponse = z.infer<typeof ReturnWithCreditNoteResponseSchema>;
 
 export const ReturnListResponseSchema = z.object({ data: z.array(ReturnSchema) });
 export type ReturnListResponse = z.infer<typeof ReturnListResponseSchema>;

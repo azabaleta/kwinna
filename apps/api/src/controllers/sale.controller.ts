@@ -18,12 +18,12 @@ export async function postSale(
 ): Promise<void> {
   try {
     const input = req.body as SaleOrderInput;
-    // El userId del body se ignora — siempre se usa el del JWT para evitar
-    // que un cliente anónimo vincule una venta a otro usuario del sistema.
-    const sale = await createSale({ ...input, userId: req.user?.sub });
-    res.status(201).json({ data: sale });
+    const { sale, residualCreditNote } = await createSale({ ...input, userId: req.user?.sub });
+    res.status(201).json({
+      data: sale,
+      ...(residualCreditNote && { residualCreditNote }),
+    });
 
-    // Fire-and-forget — no bloqueamos la respuesta ni tumbamos el servidor
     sendSaleConfirmationEmail(sale).catch((err: Error) =>
       console.error("[Email] Error enviando confirmación POS:", err.message)
     );

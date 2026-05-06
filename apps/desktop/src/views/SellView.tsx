@@ -362,10 +362,7 @@ function OrderModal({
       if (!newDni.trim())   errs.push("DNI del cliente obligatorio");
       if (!newPhone.trim()) errs.push("Teléfono del cliente obligatorio");
     }
-    if (!address.trim()) errs.push("Dirección obligatoria");
-    if (!city.trim())    errs.push("Ciudad obligatoria");
-    if (!province)       errs.push("Provincia obligatoria");
-    if (!payment)        errs.push("Medio de pago obligatorio");
+    if (!payment) errs.push("Medio de pago obligatorio");
     return errs;
   }
 
@@ -580,14 +577,15 @@ function OrderModal({
 
           {/* ── Shipping ─────────────────────────────────────────────────── */}
           <section>
-            <h3 className="text-xs text-zinc-400 uppercase tracking-wider mb-3">Entrega</h3>
+            <h3 className="text-xs text-zinc-400 uppercase tracking-wider mb-1">Entrega</h3>
+            <p className="text-[11px] text-zinc-600 mb-3">Opcional para ventas en mostrador</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <Field label="Dirección *" value={address} onChange={setAddress} />
+                <Field label="Dirección" value={address} onChange={setAddress} />
               </div>
-              <Field label="Ciudad *" value={city} onChange={setCity} />
+              <Field label="Ciudad" value={city} onChange={setCity} />
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-zinc-400">Provincia *</label>
+                <label className="text-xs text-zinc-400">Provincia</label>
                 <select
                   value={province}
                   onChange={(e) => setProvince(e.target.value)}
@@ -734,6 +732,8 @@ export default function SellView() {
     userId?: string; posCustomerId?: string;
     newPosCustomer?: { name: string; dni: string; phone: string; email?: string; address?: string; city?: string; province?: string };
   }
+  // shippingAddress / City / Province se pasan como string vacío cuando no se completan —
+  // el backend y el schema de contratos los aceptan opcionales para ventas POS.
 
   async function handleConfirm(data: ConfirmData) {
     setSubmitting(true);
@@ -749,7 +749,7 @@ export default function SellView() {
         posCustomerId  = created.id;
       }
 
-      await createPosSale({
+      const { residualCreditNote } = await createPosSale({
         items: cart.map((i) => ({
           productId: i.product.id,
           quantity:  i.quantity,
@@ -769,6 +769,7 @@ export default function SellView() {
         vendorId:         vendorId,
         userId:           data.userId,
         posCustomerId,
+        creditNoteId:     creditSnapshot?.creditNoteId,
       });
 
       // Snapshot receipt ANTES de limpiar el carrito
@@ -780,26 +781,29 @@ export default function SellView() {
       });
 
       setReceiptData({
-        items:         receiptItems,
-        total:         subtotal,
-        customerName:  data.customerName,
-        customerDni:   data.customerDni || undefined,
-        paymentMethod: data.paymentMethod,
-        priceTier:     priceTier,
-        saleNotes:     data.saleNotes || undefined,
-        date:          new Date(),
+        items:          receiptItems,
+        total:          subtotal,
+        customerName:   data.customerName,
+        customerDni:    data.customerDni || undefined,
+        paymentMethod:  data.paymentMethod,
+        priceTier:      priceTier,
+        saleNotes:      data.saleNotes || undefined,
+        date:           new Date(),
+        creditApplied:  creditApplied > 0 ? creditApplied : undefined,
+        creditNoteCode: creditSnapshot?.creditNoteCode,
       });
 
-      // Si hay crédito con saldo a favor, preparar nota de crédito
-      if (creditSnapshot && creditSnapshot.amount > subtotal) {
-        const remaining = creditSnapshot.amount - subtotal;
+      // Si hay saldo a favor, usar la nota de crédito residual devuelta por la API
+      if (residualCreditNote) {
+        const remaining = Number(residualCreditNote.amount);
         setCreditNoteData({
           customerName:   data.customerName || undefined,
-          originalCredit: creditSnapshot.amount,
+          originalCredit: creditSnapshot!.amount,
           usedInSale:     subtotal,
           remaining,
-          reason:         creditSnapshot.reason,
+          reason:         creditSnapshot?.reason,
           date:           new Date(),
+          code:           residualCreditNote.code,
         });
       }
 

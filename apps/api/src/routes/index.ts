@@ -1,5 +1,6 @@
 export { default as analyticsRoutes }    from "./analytics.routes";
 export { default as authRoutes }         from "./auth.routes";
+export { default as creditNotesRoutes }  from "./credit-notes.routes";
 export { default as posCustomersRoutes } from "./pos-customers.routes";
 export { default as productRoutes }      from "./product.routes";
 export { default as reportsRoutes }      from "./reports.routes";

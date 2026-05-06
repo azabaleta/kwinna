@@ -4,7 +4,7 @@ import express from "express";
 import morgan from "morgan";
 
 import { authGuard, errorHandler, optionalAuth, requestLogger } from "./middlewares";
-import { analyticsRoutes, authRoutes, posCustomersRoutes, productRoutes, reportsRoutes, returnsRoutes, saleRoutes, stockRoutes, usersRoutes } from "./routes";
+import { analyticsRoutes, authRoutes, creditNotesRoutes, posCustomersRoutes, productRoutes, reportsRoutes, returnsRoutes, saleRoutes, stockRoutes, usersRoutes } from "./routes";
 import { registerReportsJob } from "./jobs/reports.job";
 
 const app = express();
@@ -62,6 +62,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/auth",           authRoutes);
 app.use("/analytics",      analyticsRoutes);
+app.use("/credit-notes",   creditNotesRoutes);
 app.use("/returns",        returnsRoutes);
 app.use("/reports",        reportsRoutes);
 app.use("/users",          usersRoutes);

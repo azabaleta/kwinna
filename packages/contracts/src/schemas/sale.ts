@@ -106,10 +106,10 @@ export const SaleOrderInputSchema = z.object({
   customerName:     z.string().min(1).max(100),
   customerEmail:    z.string().email().max(255),
   customerPhone:    z.string().max(30).optional(),    // opcional: POS puede omitirlo
-  shippingAddress:  z.string().min(1).max(200),
-  shippingCity:     z.string().min(1).max(100),
-  shippingProvince: z.string().min(1).max(100),
-  shippingZipCode:  z.string().max(20).optional(),    // opcional: POS puede omitirlo
+  shippingAddress:  z.string().max(200).optional(),   // opcional: POS venta en mostrador
+  shippingCity:     z.string().max(100).optional(),   // opcional: POS venta en mostrador
+  shippingProvince: z.string().max(100).optional(),   // opcional: POS venta en mostrador
+  shippingZipCode:  z.string().max(20).optional(),
   userId:           z.string().uuid().optional(),
   posCustomerId:    z.string().uuid().optional(),
   vendorId:         z.string().uuid().optional(),
@@ -124,6 +124,7 @@ export const SaleOrderInputSchema = z.object({
   priceTier:     PriceTierSchema.optional(),
   saleNotes:     z.string().max(500).optional(),
   customerDni:   z.string().max(20).optional(),       // opcional: POS puede omitirlo
+  creditNoteId:  z.string().uuid().optional(),         // nota de crédito a canjear (por_devolucion)
 });
 
 export type SaleOrderInput = z.infer<typeof SaleOrderInputSchema>;
@@ -143,8 +144,11 @@ export type SaleCreateInput = z.infer<typeof SaleCreateInputSchema>;
 
 // ─── API Wrappers ─────────────────────────────────────────────────────────────
 
+import { CreditNoteSchema } from "./credit-note";
+
 export const SaleResponseSchema = z.object({
-  data: SaleSchema,
+  data:               SaleSchema,
+  residualCreditNote: CreditNoteSchema.optional(),
 });
 
 export type SaleResponse = z.infer<typeof SaleResponseSchema>;

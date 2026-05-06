@@ -66,6 +66,41 @@ export const snapshotPeriodEnum = pgEnum("snapshot_period", [
   "semestral",
 ]);
 
+// ─── credit_notes ─────────────────────────────────────────────────────────────
+// Notas de crédito emitidas al registrar una devolución.
+// Tienen un código único legible (NC-XXXXXX) que se imprime en el ticket 58mm.
+// Al usarse en una venta se marcan "redeemed". Si el crédito supera el total
+// de la nueva venta, se emite una nota residual vinculada por originCreditNoteId.
+
+export const creditNoteStatusEnum = pgEnum("credit_note_status", [
+  "active",
+  "redeemed",
+  "void",
+]);
+
+export const creditNotesTable = pgTable(
+  "credit_notes",
+  {
+    id:                 uuid("id").primaryKey().defaultRandom(),
+    code:               varchar("code", { length: 20 }).notNull().unique(),
+    amount:             numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    status:             creditNoteStatusEnum("status").notNull().default("active"),
+    customerName:       varchar("customer_name", { length: 255 }),
+    customerDni:        varchar("customer_dni",  { length: 20 }),
+    posCustomerId:      uuid("pos_customer_id"),
+    userId:             uuid("user_id"),
+    reason:             returnReasonEnum("reason"),
+    returnId:           uuid("return_id"),           // devolución que originó esta nota
+    originCreditNoteId: uuid("origin_credit_note_id"), // nota previa (si es residuo)
+    redeemedSaleId:     uuid("redeemed_sale_id"),    // venta en la que se canjeó
+    redeemedAt:         timestamp("redeemed_at", { withTimezone: true }),
+    createdAt:          timestamp("created_at",  { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    returnIdUniq: uniqueIndex("credit_notes_return_id_uniq").on(table.returnId),
+  })
+);
+
 // ─── pos_customers ────────────────────────────────────────────────────────────
 // Clientes del canal POS sin cuenta web. Identificados de forma única por DNI.
 // FK opcional en salesTable.posCustomerId; independiente de usersTable.

@@ -9,6 +9,7 @@ export interface CreditNoteData {
   remaining:      number;
   reason?:        ReturnReason;
   date:           Date;
+  code?:          string;
 }
 
 function fmtPrice(n: number): string {
@@ -49,6 +50,11 @@ const CreditNote = forwardRef<HTMLDivElement, { data: CreditNoteData }>(
         <p className="receipt-sep">{sep}</p>
 
         <div className="receipt-footer">
+          {data.code && (
+            <p style={{ fontWeight: "bold", letterSpacing: "0.1em" }}>
+              Cód: {data.code}
+            </p>
+          )}
           {data.customerName && <p>Cliente: {data.customerName}</p>}
           {data.reason && (
             <p>Motivo: {RETURN_REASON_LABELS[data.reason]}</p>
@@ -58,16 +64,20 @@ const CreditNote = forwardRef<HTMLDivElement, { data: CreditNoteData }>(
         <p className="receipt-sep">{sep}</p>
 
         <div className="receipt-totals">
-          <div className="receipt-total-line">
-            <span>Crédito original</span>
-            <span>{fmtPrice(data.originalCredit)}</span>
-          </div>
-          <div className="receipt-total-line">
-            <span>Aplicado en venta</span>
-            <span>-{fmtPrice(data.usedInSale)}</span>
-          </div>
+          {data.usedInSale > 0 && (
+            <>
+              <div className="receipt-total-line">
+                <span>Crédito original</span>
+                <span>{fmtPrice(data.originalCredit)}</span>
+              </div>
+              <div className="receipt-total-line">
+                <span>Aplicado en venta</span>
+                <span>-{fmtPrice(data.usedInSale)}</span>
+              </div>
+            </>
+          )}
           <div className="receipt-total-line receipt-grand-total">
-            <span>SALDO A FAVOR</span>
+            <span>{data.usedInSale > 0 ? "SALDO A FAVOR" : "CRÉDITO DISPONIBLE"}</span>
             <span>{fmtPrice(data.remaining)}</span>
           </div>
         </div>

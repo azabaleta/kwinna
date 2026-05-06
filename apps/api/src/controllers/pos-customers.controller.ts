@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import type { PosCustomerCreateInput } from "@kwinna/contracts";
+import { PosCustomerCreateInputSchema } from "@kwinna/contracts";
 import { createPosCustomer, searchPosCustomers } from "../db/repositories/pos-customer.repository";
 import { searchWebCustomers } from "../db/repositories/user.repository";
 
@@ -60,12 +60,16 @@ export async function postPosCustomer(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const input = req.body as PosCustomerCreateInput;
-    const customer = await createPosCustomer(input);
+    const parsed = PosCustomerCreateInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Datos inválidos" });
+      return;
+    }
+    const customer = await createPosCustomer(parsed.data);
     res.status(201).json({ data: customer });
   } catch (err: unknown) {
-    const pg = err as { code?: string };
-    if (pg?.code === "23505") {
+    const pgCode = (err as { code?: string })?.code;
+    if (pgCode === "23505") {
       res.status(409).json({ error: "Ya existe un cliente registrado con ese DNI." });
       return;
     }

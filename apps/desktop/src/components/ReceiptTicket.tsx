@@ -10,13 +10,15 @@ export interface ReceiptData {
     quantity: number;
     unitPrice: number;
   }[];
-  total:          number;
-  customerName:   string;
-  customerDni?:   string;
-  paymentMethod:  string;
-  priceTier:      PriceTier;
-  saleNotes?:     string;
-  date:           Date;
+  total:           number;
+  customerName:    string;
+  customerDni?:    string;
+  paymentMethod:   string;
+  priceTier:       PriceTier;
+  saleNotes?:      string;
+  date:            Date;
+  creditApplied?:  number;
+  creditNoteCode?: string;
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -97,9 +99,15 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData }>(
             <span>Precio:</span>
             <span>{PRICE_TIER_LABELS[data.priceTier]}</span>
           </div>
+          {data.creditApplied !== undefined && (
+            <div className="receipt-total-line">
+              <span>Crédito NC:</span>
+              <span>-{fmtPrice(data.creditApplied)}</span>
+            </div>
+          )}
           <div className="receipt-total-line receipt-grand-total">
             <span>TOTAL</span>
-            <span>{fmtPrice(data.total)}</span>
+            <span>{fmtPrice(data.total - (data.creditApplied ?? 0))}</span>
           </div>
         </div>
 
@@ -110,6 +118,7 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData }>(
           <p>Cliente: {data.customerName}</p>
           {data.customerDni && <p>DNI: {data.customerDni}</p>}
           <p>Pago: {PAYMENT_LABELS[data.paymentMethod] ?? data.paymentMethod}</p>
+          {data.creditNoteCode && <p>Nota de crédito: {data.creditNoteCode}</p>}
           {data.saleNotes && <p>Nota: {data.saleNotes}</p>}
         </div>
 

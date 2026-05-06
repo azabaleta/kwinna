@@ -1,4 +1,4 @@
-import { and, eq, gte, lt } from "drizzle-orm";
+import { and, eq, gte, lt, sql } from "drizzle-orm";
 import type { Stock, StockMovement } from "@kwinna/contracts";
 import { db } from "../index";
 import { stockMovementsTable, stockTable } from "../schema";
@@ -86,34 +86,18 @@ export interface AddStockInput {
 export async function addStock(input: AddStockInput): Promise<StockMovement> {
   const dbSize = sizeToDb(input.size);
 
-  const existing = await db
-    .select()
-    .from(stockTable)
-    .where(
-      and(
-        eq(stockTable.productId, input.productId),
-        eq(stockTable.size, dbSize),
-      ),
-    );
-
-  if (existing[0]) {
-    await db
-      .update(stockTable)
-      .set({ quantity: existing[0].quantity + input.quantity, updatedAt: new Date() })
-      .where(
-        and(
-          eq(stockTable.productId, input.productId),
-          eq(stockTable.size, dbSize),
-        ),
-      );
-  } else {
-    await db.insert(stockTable).values({
-      productId: input.productId,
-      size:      dbSize,
-      quantity:  input.quantity,
-      updatedAt: new Date(),
+  // Upsert atómico: evita la race condition TOCTOU (SELECT → UPDATE).
+  // El unique index en (productId, size) garantiza que ON CONFLICT es determinista.
+  await db
+    .insert(stockTable)
+    .values({ productId: input.productId, size: dbSize, quantity: input.quantity, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: [stockTable.productId, stockTable.size],
+      set: {
+        quantity:  sql`${stockTable.quantity} + ${input.quantity}`,
+        updatedAt: new Date(),
+      },
     });
-  }
 
   const [movement] = await db
     .insert(stockMovementsTable)

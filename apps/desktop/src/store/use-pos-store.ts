@@ -41,8 +41,20 @@ interface PosState {
   setPriceTier: (t: PriceTier) => void;
 
   // Crédito de devolución — se activa desde ReturnView y se consume en SellView
-  returnCredit: { amount: number; reason?: ReturnReason; customerName?: string } | null;
-  setReturnCredit: (credit: { amount: number; reason?: ReturnReason; customerName?: string } | null) => void;
+  returnCredit: {
+    amount:         number;
+    reason?:        ReturnReason;
+    customerName?:  string;
+    creditNoteId:   string;   // ID de la nota en la BD
+    creditNoteCode: string;   // Código legible, ej: "NC-A3X7K"
+  } | null;
+  setReturnCredit: (credit: {
+    amount:         number;
+    reason?:        ReturnReason;
+    customerName?:  string;
+    creditNoteId:   string;
+    creditNoteCode: string;
+  } | null) => void;
 }
 
 const emptyCustomer: CustomerForm = {

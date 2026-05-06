@@ -1,9 +1,10 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import type { Sale, SaleItem, SaleOrderInput } from "@kwinna/contracts";
+import type { CreditNote, Sale, SaleItem, SaleOrderInput } from "@kwinna/contracts";
 import { db } from "../db";
 import { mapSaleRow } from "../db/repositories";
+import { generateCreditNoteCode, mapCreditNoteRow } from "../db/repositories/credit-note.repository";
 import { findSaleById } from "../db/repositories/sale.repository";
-import { productsTable, salesTable, stockMovementsTable, stockTable } from "../db/schema";
+import { creditNotesTable, productsTable, salesTable, stockMovementsTable, stockTable } from "../db/schema";
 import { computeShippingCost } from "./shipping.service";
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -92,7 +93,11 @@ async function deductStockItem(
  *   3. Calcula shippingCost a partir de la ciudad (fuente: shipping.service).
  *   4. Inserta la venta con los valores computados.
  */
-export async function createSale(input: SaleOrderInput): Promise<Sale> {
+export async function createSale(
+  input: SaleOrderInput
+): Promise<{ sale: Sale; residualCreditNote?: CreditNote }> {
+  let residualCreditNote: CreditNote | undefined;
+
   const row = await db.transaction(async (tx) => {
 
     // 1 — Resolver precios reales desde la BD ─────────────────────────────
@@ -145,7 +150,7 @@ export async function createSale(input: SaleOrderInput): Promise<Sale> {
     // 3 — Calcular totales en el servidor ─────────────────────────────────
     // Pickup siempre tiene envío gratis, independientemente de la ciudad.
     const isPickup    = input.shippingMethod === "pickup";
-    const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity);
+    const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity ?? "");
 
     const itemsTotal = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
     // Descuento por transferencia solo para ventas web sin priceTier de POS.
@@ -163,11 +168,11 @@ export async function createSale(input: SaleOrderInput): Promise<Sale> {
         customerEmail:    input.customerEmail,
         customerPhone:    input.customerPhone,
         customerDni:      input.customerDni,
-        shippingAddress:  input.shippingAddress,
-        shippingCity:     input.shippingCity,
-        shippingProvince: input.shippingProvince,
-        shippingZipCode:  input.shippingZipCode ?? "",
-        shippingMethod:   input.shippingMethod ?? "delivery",
+        shippingAddress:  input.shippingAddress  ?? "",
+        shippingCity:     input.shippingCity     ?? "",
+        shippingProvince: input.shippingProvince ?? "",
+        shippingZipCode:  input.shippingZipCode  ?? "",
+        shippingMethod:   input.shippingMethod   ?? "delivery",
         shippingCost:     shippingCost.toString(),
         userId:           input.userId,
         posCustomerId:    input.posCustomerId,
@@ -180,10 +185,54 @@ export async function createSale(input: SaleOrderInput): Promise<Sale> {
       })
       .returning();
 
+    // ── Canje de nota de crédito ─────────────────────────────────────────────
+    // Solo para pagos "por_devolucion" con creditNoteId provisto.
+    // Atómico: dentro de la misma transacción → rollback si la nota no está activa.
+    if (input.creditNoteId) {
+      const [creditNoteRow] = await tx
+        .select()
+        .from(creditNotesTable)
+        .where(eq(creditNotesTable.id, input.creditNoteId))
+        .for("update")
+        .limit(1);
+
+      if (!creditNoteRow || creditNoteRow.status !== "active") {
+        throw Object.assign(
+          new Error("Nota de crédito inválida o ya utilizada"),
+          { statusCode: 409 }
+        );
+      }
+
+      await tx
+        .update(creditNotesTable)
+        .set({ status: "redeemed", redeemedSaleId: inserted!.id, redeemedAt: new Date() })
+        .where(eq(creditNotesTable.id, input.creditNoteId));
+
+      // Si el crédito supera el total de la venta → nota residual
+      const creditAmount = Number(creditNoteRow.amount);
+      if (creditAmount > itemsTotal) {
+        const remaining = creditAmount - itemsTotal;
+        const [residualRow] = await tx
+          .insert(creditNotesTable)
+          .values({
+            code:               generateCreditNoteCode(),
+            amount:             String(remaining),
+            originCreditNoteId: input.creditNoteId,
+            ...(creditNoteRow.customerName  !== null && creditNoteRow.customerName  && { customerName:  creditNoteRow.customerName  }),
+            ...(creditNoteRow.customerDni   !== null && creditNoteRow.customerDni   && { customerDni:   creditNoteRow.customerDni   }),
+            ...(creditNoteRow.posCustomerId !== null && creditNoteRow.posCustomerId && { posCustomerId: creditNoteRow.posCustomerId }),
+            ...(creditNoteRow.userId        !== null && creditNoteRow.userId        && { userId:        creditNoteRow.userId        }),
+            ...(creditNoteRow.reason        !== null && creditNoteRow.reason        && { reason:        creditNoteRow.reason        }),
+          })
+          .returning();
+        residualCreditNote = mapCreditNoteRow(residualRow!);
+      }
+    }
+
     return inserted!;
   });
 
-  return mapSaleRow(row);
+  return { sale: mapSaleRow(row), residualCreditNote };
 }
 
 // ─── createPendingSale ────────────────────────────────────────────────────────
@@ -251,7 +300,7 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
     // 3 — Calcular totales en el servidor ────────────────────────────────
     // Pickup siempre tiene envío gratis, independientemente de la ciudad.
     const isPickup     = input.shippingMethod === "pickup";
-    const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity);
+    const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity ?? "");
 
     const itemsTotal = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
     const discount   = (!effectiveTier && input.paymentMethod === "transfer") ? itemsTotal * 0.25 : 0;
@@ -268,11 +317,11 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
         customerEmail:    input.customerEmail,
         customerPhone:    input.customerPhone,
         customerDni:      input.customerDni,
-        shippingAddress:  input.shippingAddress,
-        shippingCity:     input.shippingCity,
-        shippingProvince: input.shippingProvince,
-        shippingZipCode:  input.shippingZipCode ?? "",
-        shippingMethod:   input.shippingMethod ?? "delivery",
+        shippingAddress:  input.shippingAddress  ?? "",
+        shippingCity:     input.shippingCity     ?? "",
+        shippingProvince: input.shippingProvince ?? "",
+        shippingZipCode:  input.shippingZipCode  ?? "",
+        shippingMethod:   input.shippingMethod   ?? "delivery",
         shippingCost:     shippingCost.toString(),
         userId:           input.userId,
         vendorId:         input.vendorId,

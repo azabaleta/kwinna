@@ -1,4 +1,5 @@
 export * from "./analytics.repository";
+export * from "./credit-note.repository";
 export * from "./pos-customer.repository";
 export * from "./product.repository";
 export * from "./reports.repository";

@@ -5,7 +5,7 @@ import { returnsTable } from "../schema";
 
 // ─── Mapper ───────────────────────────────────────────────────────────────────
 
-function mapReturnRow(row: typeof returnsTable.$inferSelect): Return {
+export function mapReturnRow(row: typeof returnsTable.$inferSelect): Return {
   return {
     id:        row.id,
     saleId:    row.saleId    ?? undefined,
