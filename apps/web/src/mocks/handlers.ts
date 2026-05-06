@@ -374,7 +374,7 @@ export const handlers = [
                        unitPrice: product.price, subtotal, size: item.size });
     }
 
-    const shippingCost = mockShippingCost(shippingCity);
+    const shippingCost = mockShippingCost(shippingCity ?? '');
     const total = productSubtotal + shippingCost;
 
     // Descontar stock + registrar movimientos
@@ -583,7 +583,7 @@ export const handlers = [
                        unitPrice: product.price, subtotal, size: item.size });
     }
 
-    const shippingCost = mockShippingCost(shippingCity);
+    const shippingCost = mockShippingCost(shippingCity ?? '');
     const total = productSubtotal + shippingCost;
 
     // Descontar stock
