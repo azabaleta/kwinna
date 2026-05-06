@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import type { CustomerMetrics, Operator, User } from "@kwinna/contracts";
 import { db } from "../index";
 import { salesTable, usersTable } from "../schema";
@@ -135,6 +135,26 @@ export async function findAllCustomers(): Promise<CustomerMetrics[]> {
       totalMonth,
     };
   });
+}
+
+export async function searchWebCustomers(
+  q: string,
+): Promise<Array<{ id: string; name: string; email: string }>> {
+  const rows = await db
+    .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+    .from(usersTable)
+    .where(
+      and(
+        eq(usersTable.role, "customer"),
+        eq(usersTable.isActive, true),
+        or(
+          ilike(usersTable.name,  `%${q}%`),
+          ilike(usersTable.email, `%${q}%`),
+        ),
+      )
+    )
+    .limit(10);
+  return rows;
 }
 
 export async function markEmailVerified(userId: string): Promise<void> {

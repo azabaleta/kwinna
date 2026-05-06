@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import type { PriceTier } from "@kwinna/contracts";
+import KwinnaLogo from "./KwinnaLogo";
 
 export interface ReceiptData {
   items: {
@@ -19,11 +20,12 @@ export interface ReceiptData {
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
-  efectivo:       "Efectivo",
-  transferencia:  "Transferencia",
-  debito:         "Débito",
-  credito:        "Crédito",
+  efectivo:        "Efectivo",
+  transferencia:   "Transferencia",
+  debito:          "Débito",
+  credito:         "Crédito",
   orden_de_compra: "Orden de compra",
+  por_devolucion:  "Por devolución",
 };
 
 const PRICE_TIER_LABELS: Record<PriceTier, string> = {
@@ -64,7 +66,7 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData }>(
       <div ref={ref} className="receipt-ticket">
         {/* Header */}
         <div className="receipt-header">
-          <p className="receipt-brand">KWINNA</p>
+          <KwinnaLogo className="receipt-logo" />
           <p className="receipt-sub">Comprobante de venta</p>
           <p className="receipt-date">{fmtDate(data.date)}</p>
         </div>

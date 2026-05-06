@@ -82,14 +82,16 @@ interface Metrics {
 
 function computeMetrics(sales: Sale[], from: Date, to: Date): Metrics {
   const inRange   = sales.filter((s) => { const d = new Date(s.createdAt); return d >= from && d < to; });
-  const completed = inRange.filter((s) => s.status === "completed");
-  const revenue   = completed.reduce((sum, s) => sum + s.total, 0);
-  const units     = completed.reduce((sum, s) => sum + s.items.reduce((si, i) => si + i.quantity, 0), 0);
+  const completed       = inRange.filter((s) => s.status === "completed");
+  // Ventas "por_devolucion" no generan ingreso real: el cliente usó crédito previo
+  const revenueOrders   = completed.filter((s) => s.paymentMethod !== "por_devolucion");
+  const revenue         = revenueOrders.reduce((sum, s) => sum + s.total, 0);
+  const units           = completed.reduce((sum, s) => sum + s.items.reduce((si, i) => si + i.quantity, 0), 0);
   return {
     revenue,
     orders:    completed.length,
     units,
-    avgTicket: completed.length > 0 ? revenue / completed.length : 0,
+    avgTicket: revenueOrders.length > 0 ? revenue / revenueOrders.length : 0,
     pending:   inRange.filter((s) => s.status === "pending").length,
     cancelled: inRange.filter((s) => s.status === "cancelled").length,
     webOrders: inRange.filter((s) => s.channel === "web" && s.status === "completed").length,

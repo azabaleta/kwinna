@@ -38,11 +38,16 @@ async function computeSnapshotData(from: Date, to: Date): Promise<SnapshotData> 
   const webSales = sales.filter((s) => s.channel === "web");
   const posSales = sales.filter((s) => s.channel === "pos");
 
-  const revenue        = sales.reduce((s, v) => s + v.total, 0);
-  const revenueWeb     = webSales.reduce((s, v) => s + v.total, 0);
-  const revenuePos     = posSales.reduce((s, v) => s + v.total, 0);
-  const shippingRev    = sales.reduce((s, v) => s + v.shippingCost, 0);
-  const avgOrderValue  = sales.length > 0 ? revenue / sales.length : 0;
+  // Excluir ventas "por_devolucion" de ingresos: no generan ingreso real
+  const revSales       = sales.filter((s) => s.paymentMethod !== "por_devolucion");
+  const revWebSales    = webSales.filter((s) => s.paymentMethod !== "por_devolucion");
+  const revPosSales    = posSales.filter((s) => s.paymentMethod !== "por_devolucion");
+
+  const revenue        = revSales.reduce((s, v) => s + v.total, 0);
+  const revenueWeb     = revWebSales.reduce((s, v) => s + v.total, 0);
+  const revenuePos     = revPosSales.reduce((s, v) => s + v.total, 0);
+  const shippingRev    = revSales.reduce((s, v) => s + v.shippingCost, 0);
+  const avgOrderValue  = revSales.length > 0 ? revenue / revSales.length : 0;
 
   // Aggregate units + revenue per product from JSONB items
   const unitsByProduct    = new Map<string, number>();

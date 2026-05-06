@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Product, PriceTier } from "@kwinna/contracts";
+import type { Product, PriceTier, ReturnReason } from "@kwinna/contracts";
 
 export interface CartItem {
   product:   Product;
@@ -39,6 +39,10 @@ interface PosState {
 
   priceTier:    PriceTier;
   setPriceTier: (t: PriceTier) => void;
+
+  // Crédito de devolución — se activa desde ReturnView y se consume en SellView
+  returnCredit: { amount: number; reason?: ReturnReason; customerName?: string } | null;
+  setReturnCredit: (credit: { amount: number; reason?: ReturnReason; customerName?: string } | null) => void;
 }
 
 const emptyCustomer: CustomerForm = {
@@ -91,7 +95,7 @@ export const usePosStore = create<PosState>((set) => ({
       return { cart: updated };
     }),
 
-  clearCart: () => set({ cart: [] }),
+  clearCart: () => set({ cart: [], returnCredit: null }),
 
   customer:      emptyCustomer,
   setCustomer:   (data) => set((s) => ({ customer: { ...s.customer, ...data } })),
@@ -104,4 +108,7 @@ export const usePosStore = create<PosState>((set) => ({
 
   priceTier:    "lista",
   setPriceTier: (t) => set({ priceTier: t }),
+
+  returnCredit:    null,
+  setReturnCredit: (credit) => set({ returnCredit: credit }),
 }));

@@ -1,29 +1,40 @@
 import { useState } from "react";
-import { Search, CheckCircle2 } from "lucide-react";
-import type { Product } from "@kwinna/contracts";
-import { RETURN_REASON_LABELS, type ReturnReason } from "@kwinna/contracts";
+import { useNavigate } from "react-router-dom";
+import { Search, CheckCircle2, ArrowRight, RotateCcw } from "lucide-react";
+import type { Product, Return, ReturnReason } from "@kwinna/contracts";
+import { RETURN_REASON_LABELS } from "@kwinna/contracts";
 import { useProducts } from "../hooks/use-products";
 import { createReturn } from "../services/returns";
+import { usePosStore } from "../store/use-pos-store";
 import { formatPrice, normalize } from "../lib/utils";
 import { ApiError } from "../lib/api";
 
 const REASONS = Object.entries(RETURN_REASON_LABELS) as [ReturnReason, string][];
 
+interface ReturnResult {
+  creditAmount: number;
+  reason:       ReturnReason;
+  productName:  string;
+  returnData:   Return;
+}
+
 export default function ReturnView() {
   const { products, isLoading } = useProducts();
+  const navigate                = useNavigate();
+  const { setReturnCredit }     = usePosStore();
 
-  const [skuQuery, setSkuQuery]  = useState("");
-  const [selected, setSelected]  = useState<Product | null>(null);
-  const [size,     setSize]      = useState("");
-  const [qty,      setQty]       = useState(1);
-  const [reason,   setReason]    = useState<ReturnReason | "">("");
-  const [notes,    setNotes]     = useState("");
-  const [restock,  setRestock]   = useState(true);
-  const [saleId,   setSaleId]    = useState("");
+  const [skuQuery, setSkuQuery] = useState("");
+  const [selected, setSelected] = useState<Product | null>(null);
+  const [size,     setSize]     = useState("");
+  const [qty,      setQty]      = useState(1);
+  const [reason,   setReason]   = useState<ReturnReason | "">("");
+  const [notes,    setNotes]    = useState("");
+  const [restock,  setRestock]  = useState(true);
+  const [saleId,   setSaleId]   = useState("");
 
-  const [submitting, setSubmitting] = useState(false);
-  const [error,      setError]      = useState("");
-  const [success,    setSuccess]    = useState(false);
+  const [submitting,   setSubmitting]   = useState(false);
+  const [error,        setError]        = useState("");
+  const [returnResult, setReturnResult] = useState<ReturnResult | null>(null);
 
   function handleProductSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -43,7 +54,7 @@ export default function ReturnView() {
     setSubmitting(true);
     setError("");
     try {
-      await createReturn({
+      const result = await createReturn({
         productId: selected.id,
         size:      size || undefined,
         quantity:  qty,
@@ -52,23 +63,96 @@ export default function ReturnView() {
         restock,
         saleId:    saleId || undefined,
       });
+
+      // Crédito = precio que devuelve el backend (precio real del producto × cantidad)
+      const creditAmount = result.unitPrice * result.quantity;
+
+      setReturnResult({
+        creditAmount,
+        reason:      reason as ReturnReason,
+        productName: selected.name,
+        returnData:  result,
+      });
+
+      // Reset form para la próxima devolución
       setSelected(null);
       setSkuQuery("");
       setSize(""); setQty(1); setReason(""); setNotes(""); setRestock(true); setSaleId("");
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 4000);
+
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Error al registrar la devolución.";
-      if (msg === "tiempo de cambio expirado") {
-        setError("Tiempo de cambio expirado. La transacción tiene más de 30 días.");
-      } else {
-        setError(msg);
-      }
+      setError(
+        msg === "tiempo de cambio expirado"
+          ? "Tiempo de cambio expirado. La transacción tiene más de 30 días."
+          : msg
+      );
     } finally {
       setSubmitting(false);
     }
   }
 
+  function handleUseCreditInSale() {
+    if (!returnResult) return;
+    setReturnCredit({
+      amount:       returnResult.creditAmount,
+      reason:       returnResult.reason,
+    });
+    navigate("/sell");
+  }
+
+  function handleNewReturn() {
+    setReturnResult(null);
+  }
+
+  // ── Panel de resultado post-devolución ────────────────────────────────────
+  if (returnResult) {
+    return (
+      <div className="p-6 max-w-xl">
+        <div className="bg-zinc-900 border border-emerald-800/50 rounded-2xl p-6 flex flex-col gap-5">
+          {/* Header */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-emerald-900/60 flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 size={20} className="text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-base font-semibold text-white">Devolución registrada</p>
+              <p className="text-sm text-zinc-400">{returnResult.productName}</p>
+            </div>
+          </div>
+
+          {/* Credit amount */}
+          <div className="bg-zinc-800 rounded-xl px-5 py-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Crédito generado</p>
+            <p className="text-3xl font-bold text-white">{formatPrice(returnResult.creditAmount)}</p>
+            <p className="text-xs text-zinc-500 mt-1">
+              Motivo: {RETURN_REASON_LABELS[returnResult.reason]}
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={handleUseCreditInSale}
+              className="w-full flex items-center justify-center gap-2 bg-white text-zinc-900
+                         rounded-xl py-3 text-sm font-semibold hover:bg-zinc-100 transition-colors"
+            >
+              Nueva venta con crédito ({formatPrice(returnResult.creditAmount)})
+              <ArrowRight size={15} />
+            </button>
+            <button
+              onClick={handleNewReturn}
+              className="w-full flex items-center justify-center gap-2 bg-zinc-800 text-zinc-300
+                         rounded-xl py-3 text-sm font-medium hover:bg-zinc-700 transition-colors"
+            >
+              <RotateCcw size={14} /> Registrar otra devolución
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Formulario de devolución ──────────────────────────────────────────────
   return (
     <div className="p-6 max-w-xl">
       <h1 className="text-lg font-semibold text-white mb-6">Registrar devolución</h1>
@@ -225,13 +309,6 @@ export default function ReturnView() {
         <p className="text-red-400 text-sm bg-red-950/30 border border-red-900/30 rounded-lg px-3 py-2 mt-3">
           {error}
         </p>
-      )}
-
-      {success && (
-        <div className="fixed bottom-6 right-6 flex items-center gap-2 bg-emerald-900 border
-                        border-emerald-700 text-emerald-200 text-sm rounded-xl px-4 py-3 shadow-xl">
-          <CheckCircle2 size={16} /> Devolución registrada correctamente
-        </div>
       )}
     </div>
   );

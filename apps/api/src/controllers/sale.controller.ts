@@ -18,7 +18,9 @@ export async function postSale(
 ): Promise<void> {
   try {
     const input = req.body as SaleOrderInput;
-    const sale = await createSale({ ...input, userId: input.userId ?? req.user?.sub });
+    // El userId del body se ignora — siempre se usa el del JWT para evitar
+    // que un cliente anónimo vincule una venta a otro usuario del sistema.
+    const sale = await createSale({ ...input, userId: req.user?.sub });
     res.status(201).json({ data: sale });
 
     // Fire-and-forget — no bloqueamos la respuesta ni tumbamos el servidor
@@ -96,21 +98,34 @@ async function cleanupAbandonedPendingOrders(customerEmail: string, currentSaleI
 
   for (const oldSale of oldSales) {
     try {
-      let approvedPayment = null;
-      if (oldSale.paymentMethod !== "transfer") {
-        approvedPayment = await searchApprovedPayment(oldSale.id);
+      // Re-verificar status fresco para evitar race condition si este job corre
+      // en paralelo con otro checkout del mismo usuario.
+      const freshSale = await findSaleById(oldSale.id);
+      if (!freshSale || freshSale.status !== "pending") {
+        console.log(`[Cleanup] Orden ${oldSale.id} ya no está pending — omitida.`);
+        continue;
       }
+
+      // Las órdenes de transferencia requieren aprobación manual del admin.
+      // Nunca se cancelan automáticamente: el cliente puede haber transferido
+      // el dinero antes de volver a crear una nueva orden.
+      if (freshSale.paymentMethod === "transfer") {
+        console.log(`[Cleanup] Orden ${oldSale.id} es por transferencia — omitida para revisión manual.`);
+        continue;
+      }
+
+      const approvedPayment = await searchApprovedPayment(oldSale.id);
 
       if (approvedPayment) {
         const completed = await updateSaleStatus(oldSale.id, "completed");
         if (completed) {
           sendSaleConfirmationEmail(completed).catch(() => {});
           insertAnalyticsEvent("sale_complete", "mp-reconcile-auto-" + oldSale.id, completed.userId).catch(() => {});
-          console.log(`[Cleanup] Orden ${oldSale.id} fue pagada en realidad. Actualizada a completed.`);
+          console.log(`[Cleanup] Orden ${oldSale.id} tenía pago aprobado. Actualizada a completed.`);
         }
       } else {
         await cancelSaleAndRestoreStock(oldSale.id);
-        console.log(`[Cleanup] Orden ${oldSale.id} no fue pagada. Cancelada y stock restaurado.`);
+        console.log(`[Cleanup] Orden ${oldSale.id} sin pago aprobado. Cancelada y stock restaurado.`);
       }
     } catch (err) {
       console.error(`[Cleanup] Error procesando orden antigua ${oldSale.id}:`, err);
@@ -285,7 +300,10 @@ export async function getWebOrders(
 }
 
 // ─── GET /sales/:id ───────────────────────────────────────────────────────────
-// Público. Usado para mostrar la pantalla de éxito / transferencias.
+// Público — usado en la success page del checkout.
+// Devuelve únicamente los campos necesarios para esa pantalla.
+// Los datos PII (email, teléfono, DNI, dirección) se omiten para evitar
+// que cualquier persona con un UUID pueda acceder a datos personales del comprador.
 export async function getSale(
   req: Request,
   res: Response,
@@ -298,7 +316,22 @@ export async function getSale(
       res.status(404).json({ error: "Venta no encontrada" });
       return;
     }
-    res.json({ data: sale });
+
+    res.json({
+      data: {
+        id:            sale.id,
+        status:        sale.status,
+        total:         sale.total,
+        shippingCost:  sale.shippingCost,
+        shippingMethod: sale.shippingMethod,
+        paymentMethod: sale.paymentMethod,
+        channel:       sale.channel,
+        items:         sale.items,
+        customerName:  sale.customerName,
+        createdAt:     sale.createdAt,
+        isDismissed:   sale.isDismissed,
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -307,6 +340,13 @@ export async function getSale(
 // ─── PATCH /sales/:id/status ──────────────────────────────────────────────────
 // Actualiza el status de una venta (ej: completed → assembled desde el POS).
 // Solo admin/operator.
+
+// Transiciones de estado permitidas. Solo las listadas aquí son válidas.
+// Previene cambios imposibles como cancelled → completed que dejarían el stock inconsistente.
+const VALID_TRANSITIONS: Partial<Record<SaleStatus, SaleStatus[]>> = {
+  pending:   ["completed", "cancelled"],
+  completed: ["assembled"],
+};
 
 export async function patchSaleStatus(
   req:  Request,
@@ -323,12 +363,21 @@ export async function patchSaleStatus(
       return;
     }
 
-    const sale = await updateSaleStatus(id, parsed.data);
-    if (!sale) {
+    const existing = await findSaleById(id);
+    if (!existing) {
       res.status(404).json({ error: "Venta no encontrada" });
       return;
     }
 
+    const allowed = VALID_TRANSITIONS[existing.status] ?? [];
+    if (!allowed.includes(parsed.data)) {
+      res.status(422).json({
+        error: `Transición de estado inválida: ${existing.status} → ${parsed.data}`,
+      });
+      return;
+    }
+
+    const sale = await updateSaleStatus(id, parsed.data);
     res.json({ data: sale });
   } catch (err) {
     next(err);

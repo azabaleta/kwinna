@@ -1,4 +1,5 @@
 export * from "./schemas/auth";
+export * from "./schemas/pos-customer";
 export * from "./schemas/product";
 export * from "./schemas/report";
 export * from "./schemas/return";

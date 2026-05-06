@@ -59,6 +59,43 @@ function CheckoutSuccessContent() {
     );
   }
 
+  // Una orden cancelada (por timeout, por el admin, o por el job de cleanup)
+  // no debe mostrar datos bancarios — el cliente ya no tiene nada que pagar.
+  if (sale.status === "cancelled") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="flex max-w-md flex-col items-center gap-6 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+            <span className="text-2xl font-bold text-muted-foreground">×</span>
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-xl font-semibold tracking-wide uppercase text-foreground">
+              Esta orden fue cancelada
+            </h1>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
+              La orden <span className="font-medium text-foreground">#{sale.id.slice(0, 8).toUpperCase()}</span> ya
+              no está activa. Si creés que es un error, escribinos por WhatsApp antes de volver a comprar.
+            </p>
+          </div>
+          <div className="flex flex-col items-center gap-3">
+            <Button asChild className="rounded-none px-8 tracking-wide">
+              <Link href="/shop">Volver a la tienda</Link>
+            </Button>
+            <Button asChild variant="link" className="text-xs text-muted-foreground tracking-widest uppercase">
+              <a
+                href={`https://wa.me/5492993294998?text=${encodeURIComponent("Hola, tuve un problema con mi orden #" + sale.id.slice(0, 8).toUpperCase())}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Contactar por WhatsApp
+              </a>
+            </Button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   // Generar link de WhatsApp
   const wsMessage = encodeURIComponent(`Hola! Realicé una compra en la web y acá te dejo el comprobante de transferencia.\nMi orden es: #${sale.id.slice(0, 8).toUpperCase()}`);
   const wsLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${wsMessage}`;

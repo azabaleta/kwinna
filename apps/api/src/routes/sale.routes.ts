@@ -4,31 +4,42 @@ import { SaleOrderInputSchema } from "@kwinna/contracts";
 import { cancelSale, getSales, getWebOrders, patchSaleStatus, postCheckout, postSale, postWebhook, patchSaleDismiss, postReconcile, postApproveTransfer, getSale } from "../controllers/sale.controller";
 import { authGuard, optionalAuth, requireRole, validate } from "../middlewares";
 
-// 10 checkouts por IP por hora — previene reserva masiva de stock con ventas pending
+// 10 checkouts por hora — previene reserva masiva de stock con ventas pending.
+// Prioriza el user ID del JWT sobre la IP para no penalizar redes compartidas
+// (oficinas, 4G). La IP es el fallback para usuarios no autenticados.
+// NOTA: optionalAuth debe correr ANTES de este limiter para que req.user esté disponible.
 const checkoutLimiter = rateLimit({
   windowMs:        60 * 60 * 1000,
   max:             10,
   standardHeaders: true,
   legacyHeaders:   false,
+  keyGenerator:    (req) => {
+    const user = (req as { user?: { sub: string } }).user;
+    return user?.sub ?? req.ip ?? "unknown";
+  },
   message:         { error: "Demasiados intentos de compra. Intentá de nuevo en una hora.", code: 429 },
 });
 
 const router = Router();
 
 // POST /sales — POS / venta directa (completed inmediato, sin MP)
+// Requiere autenticación: solo operadores y admins pueden crear ventas POS.
+// Esto previene que un cliente anónimo drene stock o spoofe un vendorId.
 router.post(
   "/",
-  optionalAuth,
+  authGuard,
+  requireRole(["admin", "operator"]),
   validate(SaleOrderInputSchema),
   postSale
 );
 
 // POST /sales/checkout — Checkout Pro con MercadoPago
 // Crea la venta como pending + genera Preference MP → devuelve { sale, initPoint }
+// optionalAuth va antes del limiter: el keyGenerator necesita req.user para limitar por ID.
 router.post(
   "/checkout",
-  checkoutLimiter,
   optionalAuth,
+  checkoutLimiter,
   validate(SaleOrderInputSchema),
   postCheckout
 );

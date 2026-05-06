@@ -47,10 +47,12 @@
   margin-bottom: 2mm;
 }
 
-.receipt-brand {
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 2px;
+.receipt-logo {
+  width: 32mm;
+  height: auto;
+  display: block;
+  margin: 0 auto 1.5mm;
+  color: #000;
 }
 
 .receipt-sub {
@@ -124,7 +126,7 @@
   letter-spacing: 0.5px;
 }
 
-/* ─── Print media: strip everything except the receipt ────────────────────── */
+/* ─── Print media: receipt or credit note (controlled via data-print-mode) ── */
 
 @media print {
   /* Hide the entire app */
@@ -132,13 +134,14 @@
     display: none !important;
   }
 
-  /* Show only the print container */
-  #receipt-print-area {
+  /* Default: receipt (no data-print-mode, or data-print-mode="receipt") */
+  body:not([data-print-mode="credit-note"]) #receipt-print-area {
     display: block !important;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
+  }
+
+  /* Credit note mode */
+  body[data-print-mode="credit-note"] #credit-note-print-area {
+    display: block !important;
   }
 
   @page {
@@ -148,6 +151,10 @@
 
   .receipt-ticket {
     width: 100%;
-    padding: 2mm;
+    padding: 5mm 4mm;
+  }
+
+  .receipt-logo {
+    width: 30mm;
   }
 }

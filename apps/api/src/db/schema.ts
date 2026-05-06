@@ -66,6 +66,29 @@ export const snapshotPeriodEnum = pgEnum("snapshot_period", [
   "semestral",
 ]);
 
+// ─── pos_customers ────────────────────────────────────────────────────────────
+// Clientes del canal POS sin cuenta web. Identificados de forma única por DNI.
+// FK opcional en salesTable.posCustomerId; independiente de usersTable.
+
+export const posCustomersTable = pgTable(
+  "pos_customers",
+  {
+    id:        uuid("id").primaryKey().defaultRandom(),
+    name:      varchar("name", { length: 255 }).notNull(),
+    dni:       varchar("dni", { length: 20 }).notNull(),
+    phone:     varchar("phone", { length: 50 }).notNull(),
+    email:     varchar("email", { length: 255 }),
+    address:   text("address"),
+    city:      varchar("city", { length: 100 }),
+    province:  varchar("province", { length: 100 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    dniUniq: uniqueIndex("pos_customers_dni_uniq").on(table.dni),
+  })
+);
+
 // ─── users ────────────────────────────────────────────────────────────────────
 // Contrato: UserSchema (packages/contracts/src/schemas/auth.ts)
 // Admin y operadores se crean via seed-admin; clientes via POST /auth/register.
@@ -204,8 +227,11 @@ export const salesTable = pgTable("sales", {
   shippingZipCode:  varchar("shipping_zip_code", { length: 20 }).notNull().default(""),
   shippingCost:     numeric("shipping_cost", { precision: 12, scale: 2 }).notNull().default("0"),
 
-  // ── Opcional: cliente registrado ───────────────────────────────────────────
+  // ── Opcional: cliente registrado (web) ────────────────────────────────────
   userId: uuid("user_id"),
+
+  // ── Opcional: cliente POS (sin cuenta web) ────────────────────────────────
+  posCustomerId: uuid("pos_customer_id"),
 
   // ── Opcional: operador que procesó la venta (POS) ─────────────────────────
   vendorId: uuid("vendor_id"),

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Search, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import type { Product } from "@kwinna/contracts";
+import type { Product, Stock } from "@kwinna/contracts";
 import { SEASON_LABELS } from "@kwinna/contracts";
 import { useProducts } from "../hooks/use-products";
+import { useStock } from "../hooks/use-stock";
 import { useDebounce } from "../lib/use-debounce";
 import { formatRoundedPrice, matchProduct } from "../lib/utils";
 import { usePosStore } from "../store/use-pos-store";
@@ -15,8 +16,9 @@ export default function SearchView() {
   const [page,  setPage]  = useState(0);
 
   const { products, isLoading, isError } = useProducts();
-  const addToCart = usePosStore((s) => s.addToCart);
-  const navigate  = useNavigate();
+  const { stock }  = useStock();
+  const addToCart  = usePosStore((s) => s.addToCart);
+  const navigate   = useNavigate();
 
   const debouncedQuery = useDebounce(query, 180);
 
@@ -86,7 +88,7 @@ export default function SearchView() {
         <div className="flex-1 overflow-auto flex flex-col gap-4">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {paginated.map((product) => (
-              <ProductCard key={product.id} product={product} onAdd={handleAddToCart} />
+              <ProductCard key={product.id} product={product} stock={stock} onAdd={handleAddToCart} />
             ))}
             {filtered.length === 0 && (
               <div className="col-span-full text-center text-zinc-500 text-sm py-16">
@@ -128,14 +130,26 @@ export default function SearchView() {
   );
 }
 
+function StockBadge({ qty }: { qty: number }) {
+  if (qty === 0) return <span className="text-[10px] text-zinc-600">0</span>;
+  if (qty <= 3)  return <span className="text-[10px] font-semibold text-amber-400 tabular-nums">{qty}</span>;
+  return <span className="text-[10px] text-zinc-400 tabular-nums">{qty}</span>;
+}
+
 function ProductCard({
   product,
+  stock,
   onAdd,
 }: {
   product: Product;
+  stock:   Stock[];
   onAdd:   (p: Product) => void;
 }) {
-  const thumb = product.images[0];
+  const thumb     = product.images[0];
+  const sizeRows  = stock.filter((s) => s.productId === product.id && s.size);
+  const totalStock = sizeRows.length > 0
+    ? sizeRows.reduce((n, s) => n + s.quantity, 0)
+    : (stock.find((s) => s.productId === product.id && !s.size)?.quantity ?? 0);
 
   return (
     <div className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 hover:border-zinc-600 transition-colors group">
@@ -186,11 +200,41 @@ function ProductCard({
           </div>
         </div>
 
+        {/* Stock por talle */}
+        <div className="flex flex-wrap gap-1 pt-1 border-t border-zinc-800">
+          {sizeRows.length > 0 ? (
+            sizeRows.map((s) => (
+              <span
+                key={s.size}
+                className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                  s.quantity === 0 ? "bg-zinc-800/40 text-zinc-600"
+                  : s.quantity <= 3 ? "bg-amber-950/60 text-amber-400 ring-1 ring-amber-800/50"
+                  : "bg-zinc-800 text-zinc-300"
+                }`}
+              >
+                {s.size}
+                <span className="opacity-70">·</span>
+                <StockBadge qty={s.quantity} />
+              </span>
+            ))
+          ) : (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+              totalStock === 0 ? "bg-zinc-800/40 text-zinc-600"
+              : totalStock <= 3 ? "bg-amber-950/60 text-amber-400"
+              : "bg-zinc-800 text-zinc-300"
+            }`}>
+              Stock · <StockBadge qty={totalStock} />
+            </span>
+          )}
+        </div>
+
         <div className="flex items-center justify-end mt-1">
           <button
             onClick={() => onAdd(product)}
+            disabled={totalStock === 0}
             className="flex items-center gap-1 text-xs bg-white text-zinc-900 rounded-lg px-2.5 py-1.5
-                       hover:bg-zinc-100 transition-colors font-medium w-full justify-center"
+                       hover:bg-zinc-100 transition-colors font-medium w-full justify-center
+                       disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Plus size={13} /> Agregar
           </button>

@@ -26,12 +26,13 @@ export const ShippingMethodSchema = z.enum(["delivery", "pickup"]);
 export type ShippingMethod = z.infer<typeof ShippingMethodSchema>;
 
 export const PaymentMethodSchema = z.enum([
-  "mercadopago", 
+  "mercadopago",
   "transfer",
   "efectivo",
   "debito",
   "credito",
-  "orden_de_compra"
+  "orden_de_compra",
+  "por_devolucion",   // crédito de devolución — excluido de métricas de ingresos
 ]);
 export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
 
@@ -65,11 +66,14 @@ export const SaleSchema = z.object({
   paymentMethod: PaymentMethodSchema.optional(),
   saleNotes:     z.string().optional(),
 
-  // ── Opcional: cliente registrado ───────────────────────────────────────────
-  userId:   z.string().uuid().optional(),
+  // ── Opcional: cliente registrado (web) ────────────────────────────────────
+  userId:         z.string().uuid().optional(),
+
+  // ── Opcional: cliente POS (sin cuenta web) ────────────────────────────────
+  posCustomerId:  z.string().uuid().optional(),
 
   // ── Opcional: operador que procesó la venta (POS) ─────────────────────────
-  vendorId: z.string().uuid().optional(),
+  vendorId:       z.string().uuid().optional(),
 
   // ── Dismissal ───────────────────────────────────────────────────────────────
   isDismissed:   z.boolean().default(false),
@@ -107,6 +111,7 @@ export const SaleOrderInputSchema = z.object({
   shippingProvince: z.string().min(1).max(100),
   shippingZipCode:  z.string().max(20).optional(),    // opcional: POS puede omitirlo
   userId:           z.string().uuid().optional(),
+  posCustomerId:    z.string().uuid().optional(),
   vendorId:         z.string().uuid().optional(),
   // total y shippingCost son calculados exclusivamente por el backend
 

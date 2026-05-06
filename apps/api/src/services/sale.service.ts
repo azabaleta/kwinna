@@ -117,14 +117,19 @@ export async function createSale(input: SaleOrderInput): Promise<Sale> {
     // 2 — Deducir stock y construir SaleItems con precios verificados ──────
     const saleItems: SaleItem[] = [];
 
+    // priceTier solo aplica en ventas POS (indicado por presencia de vendorId).
+    // Ignorarlo si llega desde un cliente web sin vendorId evita que un cliente
+    // anónimo obtenga descuentos de mayorista/efectivo manipulando el payload.
+    const effectiveTier = input.vendorId ? input.priceTier : undefined;
+
     for (const item of input.items) {
       await deductStockItem(tx, item);
 
       let unitPrice = priceMap.get(item.productId)!;
-      
-      if (input.priceTier === "efectivo") {
+
+      if (effectiveTier === "efectivo") {
         unitPrice = Math.round((unitPrice * 0.8) / 100) * 100;
-      } else if (input.priceTier === "mayorista") {
+      } else if (effectiveTier === "mayorista") {
         unitPrice = Math.round((unitPrice * 0.65) / 100) * 100;
       }
 
@@ -141,11 +146,10 @@ export async function createSale(input: SaleOrderInput): Promise<Sale> {
     // Pickup siempre tiene envío gratis, independientemente de la ciudad.
     const isPickup    = input.shippingMethod === "pickup";
     const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity);
-    
+
     const itemsTotal = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
-    // Si la venta usa priceTier del POS, el descuento ya está aplicado en el precio unitario.
-    // Si es una venta de la web sin priceTier, se aplica el 25% de transferencia globalmente.
-    const discount   = (!input.priceTier && input.paymentMethod === "transfer") ? itemsTotal * 0.25 : 0;
+    // Descuento por transferencia solo para ventas web sin priceTier de POS.
+    const discount   = (!effectiveTier && input.paymentMethod === "transfer") ? itemsTotal * 0.25 : 0;
     const total      = itemsTotal - discount + shippingCost;
 
     // 4 — Insertar venta ───────────────────────────────────────────────────
@@ -166,6 +170,7 @@ export async function createSale(input: SaleOrderInput): Promise<Sale> {
         shippingMethod:   input.shippingMethod ?? "delivery",
         shippingCost:     shippingCost.toString(),
         userId:           input.userId,
+        posCustomerId:    input.posCustomerId,
         vendorId:         input.vendorId,
         channel:          input.channel ?? "pos",
         paymentMethod:    input.paymentMethod,
@@ -220,14 +225,17 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
     // 2 — Deducir stock y construir SaleItems con precios verificados ──────
     const saleItems: SaleItem[] = [];
 
+    // priceTier solo aplica en ventas POS (indicado por presencia de vendorId).
+    const effectiveTier = input.vendorId ? input.priceTier : undefined;
+
     for (const item of input.items) {
       await deductStockItem(tx, item);
 
       let unitPrice = priceMap.get(item.productId)!;
 
-      if (input.priceTier === "efectivo") {
+      if (effectiveTier === "efectivo") {
         unitPrice = Math.round((unitPrice * 0.8) / 100) * 100;
-      } else if (input.priceTier === "mayorista") {
+      } else if (effectiveTier === "mayorista") {
         unitPrice = Math.round((unitPrice * 0.65) / 100) * 100;
       }
 
@@ -240,13 +248,13 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
       });
     }
 
-    // 3 — Calcular totales en el servidor ─────────────────────────────────
+    // 3 — Calcular totales en el servidor ────────────────────────────────
     // Pickup siempre tiene envío gratis, independientemente de la ciudad.
     const isPickup     = input.shippingMethod === "pickup";
     const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity);
 
     const itemsTotal = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
-    const discount   = (!input.priceTier && input.paymentMethod === "transfer") ? itemsTotal * 0.25 : 0;
+    const discount   = (!effectiveTier && input.paymentMethod === "transfer") ? itemsTotal * 0.25 : 0;
     const total      = itemsTotal - discount + shippingCost;
 
     // 4 — Insertar venta pending ───────────────────────────────────────────
@@ -382,6 +390,10 @@ export async function dismissSale(id: string, reason: string, restoreStock: bool
 
   if (!sale) {
     throw Object.assign(new Error("Venta no encontrada"), { statusCode: 404 });
+  }
+
+  if (sale.isDismissed) {
+    throw Object.assign(new Error("La venta ya fue desestimada"), { statusCode: 422 });
   }
 
   const row = await db.transaction(async (tx) => {

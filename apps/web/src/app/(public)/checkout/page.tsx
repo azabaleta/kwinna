@@ -84,9 +84,14 @@ function normalize(s: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+// Debe mantenerse en sincronía con shipping.service.ts del backend.
+// El backend es la fuente de verdad del costo real; este mapa solo alimenta
+// el preview al usuario antes de confirmar. Ciudades y valores deben coincidir.
 const SHIPPING_COSTS: Record<string, number> = {
-  neuquen:  3500,
-  plottier: 5000,
+  neuquen:    3500,
+  plottier:   3500,
+  cipolletti: 3500,
+  centenario: 3500,
 };
 
 interface ShippingInfo {

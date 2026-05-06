@@ -15,6 +15,8 @@ export interface PosSalePayload {
   priceTier?:       PriceTier;
   saleNotes?:       string;
   vendorId?:        string;
+  userId?:          string;
+  posCustomerId?:   string;
 }
 
 export async function createPosSale(payload: PosSalePayload): Promise<Sale> {
