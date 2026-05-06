@@ -401,7 +401,7 @@ export const handlers = [
     const sale: Sale = {
       id: uuid(), items: saleItems, total, status: "completed", channel: "web",
       customerName, customerEmail, customerPhone,
-      shippingAddress, shippingCity, shippingProvince, shippingZipCode: "", shippingMethod: "delivery" as const, shippingCost, userId,
+      shippingAddress: shippingAddress ?? '', shippingCity: shippingCity ?? '', shippingProvince: shippingProvince ?? '', shippingZipCode: "", shippingMethod: "delivery" as const, shippingCost, userId,
       isDismissed: false,
       createdAt: now(), updatedAt: now(),
     };
@@ -611,7 +611,7 @@ export const handlers = [
       id: uuid(), items: saleItems, total,
       status: "pending", channel: "web",
       customerName, customerEmail, customerPhone,
-      shippingAddress, shippingCity, shippingProvince, shippingZipCode: "", shippingMethod: "delivery" as const, shippingCost, userId,
+      shippingAddress: shippingAddress ?? '', shippingCity: shippingCity ?? '', shippingProvince: shippingProvince ?? '', shippingZipCode: "", shippingMethod: "delivery" as const, shippingCost, userId,
       isDismissed: false,
       createdAt: now(), updatedAt: now(),
     };
