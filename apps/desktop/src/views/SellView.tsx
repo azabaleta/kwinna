@@ -693,6 +693,7 @@ export default function SellView() {
   const [modal,          setModal]          = useState(false);
   const [submitting,     setSubmitting]     = useState(false);
   const [saleError,      setSaleError]      = useState("");
+  const [cartOpen,       setCartOpen]       = useState(false);
   const [receiptData,    setReceiptData]    = useState<ReceiptData | null>(null);
   const [creditNoteData, setCreditNoteData] = useState<CreditNoteData | null>(null);
   const receiptRef    = useRef<HTMLDivElement>(null);
@@ -822,14 +823,27 @@ export default function SellView() {
   return (
     <div className="flex h-full">
       {/* Left: SKU lookup */}
-      <div className="flex-1 p-6 overflow-auto border-r border-zinc-800">
+      <div className="flex-1 p-6 overflow-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-white">Agregar artículos</h2>
-          {isRefetching && (
-            <span className="flex items-center gap-1 text-[10px] text-zinc-500">
-              <RefreshCw size={10} className="animate-spin" /> Actualizando stock…
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {isRefetching && (
+              <span className="flex items-center gap-1 text-[10px] text-zinc-500">
+                <RefreshCw size={10} className="animate-spin" /> Actualizando stock…
+              </span>
+            )}
+            <button
+              onClick={() => setCartOpen(true)}
+              className="relative flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 transition-colors rounded-lg px-3 py-1.5"
+            >
+              <ShoppingCart size={14} className="text-zinc-300" />
+              {cart.length > 0 && (
+                <span className="bg-white text-zinc-900 text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                  {cart.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
         {loading ? (
           <div className="flex flex-col gap-3">
@@ -841,13 +855,27 @@ export default function SellView() {
         )}
       </div>
 
-      {/* Right: Cart */}
-      <div className="w-80 flex flex-col bg-zinc-900">
-        <div className="px-5 py-4 border-b border-zinc-800 flex items-center gap-2">
-          <ShoppingCart size={15} className="text-zinc-400" />
-          <span className="text-sm font-semibold text-white">
-            Orden ({cart.length} {cart.length === 1 ? "artículo" : "artículos"})
-          </span>
+      {/* Right: Cart Drawer */}
+      {cartOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60"
+          onClick={() => setCartOpen(false)}
+        />
+      )}
+      <div className={`fixed top-0 right-0 h-full w-80 flex flex-col bg-zinc-900 z-50 transform transition-transform duration-200 ease-in-out ${cartOpen ? "translate-x-0" : "translate-x-full"}`}>
+        <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShoppingCart size={15} className="text-zinc-400" />
+            <span className="text-sm font-semibold text-white">
+              Orden ({cart.length} {cart.length === 1 ? "artículo" : "artículos"})
+            </span>
+          </div>
+          <button
+            onClick={() => setCartOpen(false)}
+            className="text-zinc-500 hover:text-white transition-colors"
+          >
+            <X size={16} />
+          </button>
         </div>
 
         {/* Banner de crédito activo */}
