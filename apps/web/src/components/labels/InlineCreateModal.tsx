@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -20,9 +21,12 @@ export function InlineCreateModal({ title, codeLength, usedCodes, onConfirm, onC
   const [name, setName]     = useState("");
   const [error, setError]   = useState("");
   const [saving, setSaving] = useState(false);
-  const codeInputRef        = useRef<HTMLInputElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const codeInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { codeInputRef.current?.focus(); }, []);
+  // Esperar a que el DOM esté disponible antes de portalizar
+  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { if (mounted) codeInputRef.current?.focus(); }, [mounted]);
 
   const totalSlots = codeLength === 1 ? 10 : 100;
   const available  = totalSlots - usedCodes.length;
@@ -34,8 +38,7 @@ export function InlineCreateModal({ title, codeLength, usedCodes, onConfirm, onC
     return null;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleConfirm() {
     setError("");
     const validationError = validateCode(code);
     if (validationError) { setError(validationError); return; }
@@ -51,15 +54,27 @@ export function InlineCreateModal({ title, codeLength, usedCodes, onConfirm, onC
     }
   }
 
-  return (
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") { e.preventDefault(); void handleConfirm(); }
+    if (e.key === "Escape") onClose();
+  }
+
+  if (!mounted) return null;
+
+  // createPortal saca el modal del árbol DOM del <form> padre, evitando el
+  // problema de forms anidados que hace que el submit cierre el dialog exterior.
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-sm rounded-xl border border-gray-700 bg-gray-900 shadow-2xl p-5 space-y-4">
+      <div
+        className="w-full max-w-sm rounded-xl border border-gray-700 bg-gray-900 shadow-2xl p-5 space-y-4"
+        onKeyDown={handleKeyDown}
+      >
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-100">{title}</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-200 transition-colors">
+          <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-200 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -84,7 +99,8 @@ export function InlineCreateModal({ title, codeLength, usedCodes, onConfirm, onC
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        {/* div en lugar de form — el portal ya lo saca del form exterior */}
+        <div className="space-y-3">
           <div className="flex gap-2">
             <div className="space-y-1 w-20 shrink-0">
               <Label className="text-xs text-gray-400">Código</Label>
@@ -118,11 +134,16 @@ export function InlineCreateModal({ title, codeLength, usedCodes, onConfirm, onC
           )}
 
           <div className="flex gap-2 pt-1">
-            <Button type="button" variant="ghost" size="sm" className="flex-1" onClick={onClose}>Cancelar</Button>
-            <Button type="submit" size="sm" className="flex-1" disabled={saving}>{saving ? "Guardando…" : "Crear"}</Button>
+            <Button type="button" variant="ghost" size="sm" className="flex-1" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="button" size="sm" className="flex-1" disabled={saving} onClick={() => void handleConfirm()}>
+              {saving ? "Guardando…" : "Crear"}
+            </Button>
           </div>
-        </form>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
