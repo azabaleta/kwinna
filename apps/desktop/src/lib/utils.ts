@@ -8,9 +8,9 @@ export function formatPrice(value: number): string {
   }).format(value);
 }
 
-/** Round a number to the nearest 100 and format as ARS */
+/** Round a number up to the nearest 500 and format as ARS */
 export function formatRoundedPrice(value: number): string {
-  const rounded = Math.round(value / 100) * 100;
+  const rounded = Math.ceil(value / 500) * 500;
   return formatPrice(rounded);
 }
 

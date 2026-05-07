@@ -232,9 +232,12 @@ export default function CheckoutPage() {
   const discount       = paymentMethod === "transfer" ? cartTotal * 0.25 : 0;
   const grandTotal     = cartTotal - discount + shipping.cost;
   
-  // MP Cuotas: Minimo 10.000 para 2 cuotas, 20.000 para 3 cuotas (aplicado sobre total MP)
-  const mpTotal = cartTotal + shipping.cost;
-  const maxInstallments = mpTotal >= 20000 ? 3 : mpTotal >= 10000 ? 2 : 1;
+  // MP Cuotas: el máximo disponible entre los productos del carrito.
+  // Si algún producto califica para 3 cuotas, todo el carrito puede pagarse en 3.
+  const maxInstallments = items.reduce((max, { product }) => {
+    const q = product.price >= 20000 ? 3 : product.price >= 10000 ? 2 : 1;
+    return Math.max(max, q);
+  }, 1);
 
   // ── Submit ────────────────────────────────────────────────────────────────
 

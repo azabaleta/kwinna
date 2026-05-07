@@ -236,8 +236,8 @@ function CartRow({
   availableStock: number;
 }) {
   let unitPrice = item.product.price;
-  if (priceTier === "efectivo") unitPrice = Math.round((unitPrice * 0.8) / 100) * 100;
-  if (priceTier === "mayorista") unitPrice = Math.round((unitPrice * 0.65) / 100) * 100;
+  if (priceTier === "efectivo") unitPrice = Math.ceil((unitPrice * 0.8) / 500) * 500;
+  if (priceTier === "mayorista") unitPrice = Math.ceil((unitPrice * 0.65) / 500) * 500;
 
   const atMax = item.quantity >= availableStock;
 
@@ -709,8 +709,8 @@ export default function SellView() {
 
   const subtotal = cart.reduce((sum, i) => {
     let p = i.product.price;
-    if (priceTier === "efectivo") p = Math.round((p * 0.8) / 100) * 100;
-    else if (priceTier === "mayorista") p = Math.round((p * 0.65) / 100) * 100;
+    if (priceTier === "efectivo") p = Math.ceil((p * 0.8) / 500) * 500;
+    else if (priceTier === "mayorista") p = Math.ceil((p * 0.65) / 500) * 500;
     return sum + p * i.quantity;
   }, 0);
 
@@ -776,8 +776,8 @@ export default function SellView() {
       // Snapshot receipt ANTES de limpiar el carrito
       const receiptItems = cart.map((i) => {
         let p = i.product.price;
-        if (priceTier === "efectivo") p = Math.round((p * 0.8) / 100) * 100;
-        else if (priceTier === "mayorista") p = Math.round((p * 0.65) / 100) * 100;
+        if (priceTier === "efectivo") p = Math.ceil((p * 0.8) / 500) * 500;
+        else if (priceTier === "mayorista") p = Math.ceil((p * 0.65) / 500) * 500;
         return { name: i.product.name, sku: i.product.sku, size: i.size, quantity: i.quantity, unitPrice: p };
       });
 

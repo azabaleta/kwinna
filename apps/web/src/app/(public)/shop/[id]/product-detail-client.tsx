@@ -311,14 +311,22 @@ export function ProductDetailClient({ id }: { id: string }) {
               <h1 className="text-xl font-normal uppercase tracking-[0.05em] leading-tight text-foreground">
                 {product.name}
               </h1>
+              {product.price >= 10000 && (
+                <p className="text-[11px] font-medium tracking-widest uppercase text-primary/75">
+                  Hasta {product.price >= 20000 ? "3" : "2"} cuotas sin interés
+                </p>
+              )}
               <p className="text-2xl font-light tabular-nums text-foreground">
                 ${product.price.toLocaleString("es-AR")}
               </p>
-              {product.price >= 10000 && (
-                <p className="text-[11px] font-medium tracking-widest uppercase text-emerald-600 mt-1">
-                  {product.price >= 20000 ? "Hasta 3 cuotas sin interés" : "Hasta 2 cuotas sin interés"}
-                </p>
-              )}
+              <p className="tabular-nums text-emerald-600 mt-0.5">
+                <span className="text-sm font-semibold">
+                  ${Math.round(product.price * 0.75).toLocaleString("es-AR")}
+                </span>
+                <span className="ml-1.5 text-[10px] font-medium tracking-widest uppercase text-emerald-600/70">
+                  pagando con transferencia
+                </span>
+              </p>
             </div>
 
             {product.tags.length > 0 && (
