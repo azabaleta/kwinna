@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 import { X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -21,12 +20,9 @@ export function InlineCreateModal({ title, codeLength, usedCodes, onConfirm, onC
   const [name, setName]     = useState("");
   const [error, setError]   = useState("");
   const [saving, setSaving] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const codeInputRef = useRef<HTMLInputElement>(null);
+  const codeInputRef        = useRef<HTMLInputElement>(null);
 
-  // Esperar a que el DOM esté disponible antes de portalizar
-  useEffect(() => { setMounted(true); }, []);
-  useEffect(() => { if (mounted) codeInputRef.current?.focus(); }, [mounted]);
+  useEffect(() => { codeInputRef.current?.focus(); }, []);
 
   const totalSlots = codeLength === 1 ? 10 : 100;
   const available  = totalSlots - usedCodes.length;
@@ -54,23 +50,30 @@ export function InlineCreateModal({ title, codeLength, usedCodes, onConfirm, onC
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") { e.preventDefault(); void handleConfirm(); }
-    if (e.key === "Escape") onClose();
+  // Captura Enter en los inputs antes de que burbujee al <form> padre,
+  // y Escape para cerrar el modal sin disparar nada.
+  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      void handleConfirm();
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    }
   }
 
-  if (!mounted) return null;
-
-  // createPortal saca el modal del árbol DOM del <form> padre, evitando el
-  // problema de forms anidados que hace que el submit cierre el dialog exterior.
-  return createPortal(
+  return (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
+      {/* stopPropagation en el contenedor evita que clicks dentro cierren el backdrop */}
       <div
         className="w-full max-w-sm rounded-xl border border-gray-700 bg-gray-900 shadow-2xl p-5 space-y-4"
-        onKeyDown={handleKeyDown}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-100">{title}</h3>
@@ -99,7 +102,7 @@ export function InlineCreateModal({ title, codeLength, usedCodes, onConfirm, onC
           </div>
         )}
 
-        {/* div en lugar de form — el portal ya lo saca del form exterior */}
+        {/* div en lugar de <form> — elimina el problema de forms anidados */}
         <div className="space-y-3">
           <div className="flex gap-2">
             <div className="space-y-1 w-20 shrink-0">
@@ -110,6 +113,7 @@ export function InlineCreateModal({ title, codeLength, usedCodes, onConfirm, onC
                 maxLength={codeLength}
                 value={code}
                 onChange={(e) => { setCode(e.target.value.replace(/\D/g, "")); setError(""); }}
+                onKeyDown={handleInputKeyDown}
                 placeholder={"0".repeat(codeLength)}
                 className="flex h-9 w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-1 text-sm text-gray-100 tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-600"
               />
@@ -120,6 +124,7 @@ export function InlineCreateModal({ title, codeLength, usedCodes, onConfirm, onC
                 type="text"
                 value={name}
                 onChange={(e) => { setName(e.target.value); setError(""); }}
+                onKeyDown={handleInputKeyDown}
                 placeholder="ej. Camisa Oxford"
                 className="flex h-9 w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-1 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
               />
@@ -143,7 +148,6 @@ export function InlineCreateModal({ title, codeLength, usedCodes, onConfirm, onC
           </div>
         </div>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }
