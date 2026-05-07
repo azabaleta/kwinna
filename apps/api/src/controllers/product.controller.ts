@@ -60,6 +60,10 @@ export async function postProduct(
     const product = await createProduct(input);
     res.status(201).json({ data: product });
   } catch (err) {
+    if ((err as { code?: string }).code === "23505") {
+      res.status(409).json({ error: "El código SKU ya está en uso", code: 409 });
+      return;
+    }
     next(err);
   }
 }
@@ -75,11 +79,10 @@ export async function patchProduct(
     const product = await updateProductData(id, input);
     res.json({ data: product });
   } catch (err) {
-    const status =
-      err instanceof Error && "statusCode" in err
-        ? (err as Error & { statusCode: number }).statusCode
-        : 500;
-    res.status(status);
+    if ((err as { code?: string }).code === "23505") {
+      res.status(409).json({ error: "El código SKU ya está en uso", code: 409 });
+      return;
+    }
     next(err);
   }
 }
