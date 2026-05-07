@@ -237,28 +237,119 @@ function GlossaryTab() {
     setVariantId(v.id);
   }
 
+  const selectorBtnBase = "flex items-center justify-center w-7 h-7 rounded border transition-colors shrink-0";
+  const selectorBtnActive = "border-gray-700 text-gray-400 hover:text-gray-100 hover:bg-gray-800";
+  const selectorBtnDisabled = "border-gray-800 text-gray-700 cursor-not-allowed";
+
   return (
     <div className="flex flex-col min-h-0 overflow-auto bg-gray-950 text-gray-100">
-      {/* Selector de categoría */}
-      <div className="flex items-center gap-3 p-4 border-b border-gray-800 bg-gray-900">
-        <Label className="text-gray-400 text-sm shrink-0">Categoría:</Label>
-        <NativeSelect
-          value={categoryId === "" ? "" : String(categoryId)}
-          onChange={(e) => setCategoryId(e.target.value === "" ? "" : Number(e.target.value))}
-          placeholder="Selecciona una categoría…"
-          className="max-w-xs"
-        >
-          {categories.map((c) => (
-            <option key={c.id} value={String(c.id)}>{c.code} — {c.name}</option>
-          ))}
-        </NativeSelect>
-        <button
-          onClick={() => setModal("category")}
-          title="Nueva categoría"
-          className="flex items-center justify-center w-7 h-7 rounded border border-gray-700 text-gray-400 hover:text-gray-100 hover:bg-gray-800 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
+      {/* Selectores en cascada */}
+      <div className="flex items-center gap-4 p-4 border-b border-gray-800 bg-gray-900 overflow-x-auto">
+
+        {/* Categoría */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Label className="text-gray-400 text-sm shrink-0">Categoría:</Label>
+          <NativeSelect
+            value={categoryId === "" ? "" : String(categoryId)}
+            onChange={(e) => setCategoryId(e.target.value === "" ? "" : Number(e.target.value))}
+            placeholder="Selecciona…"
+            className="w-44"
+          >
+            {categories.map((c) => (
+              <option key={c.id} value={String(c.id)}>{c.code} — {c.name}</option>
+            ))}
+          </NativeSelect>
+          <button
+            type="button"
+            onClick={() => setModal("category")}
+            title="Nueva categoría"
+            className={cn(selectorBtnBase, selectorBtnActive)}
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="h-6 w-px bg-gray-800 shrink-0" />
+
+        {/* Tipo de prenda */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Label className={cn("text-sm shrink-0", categoryId ? "text-gray-400" : "text-gray-700")}>Tipo:</Label>
+          <NativeSelect
+            value={itemTypeId === "" ? "" : String(itemTypeId)}
+            onChange={(e) => setItemTypeId(e.target.value === "" ? "" : Number(e.target.value))}
+            placeholder={categoryId ? "Selecciona…" : "— primero categoría —"}
+            disabled={!categoryId}
+            className="w-44"
+          >
+            {itemTypes.map((t) => (
+              <option key={t.id} value={String(t.id)}>{t.code} — {t.name}</option>
+            ))}
+          </NativeSelect>
+          <button
+            type="button"
+            onClick={() => setModal("itemType")}
+            title="Nuevo tipo de prenda"
+            disabled={!categoryId}
+            className={cn(selectorBtnBase, categoryId ? selectorBtnActive : selectorBtnDisabled)}
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="h-6 w-px bg-gray-800 shrink-0" />
+
+        {/* Calidad */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Label className={cn("text-sm shrink-0", itemTypeId ? "text-gray-400" : "text-gray-700")}>Calidad:</Label>
+          <NativeSelect
+            value={qualityId === "" ? "" : String(qualityId)}
+            onChange={(e) => setQualityId(e.target.value === "" ? "" : Number(e.target.value))}
+            placeholder={itemTypeId ? "Selecciona…" : "— primero tipo —"}
+            disabled={!itemTypeId}
+            className="w-44"
+          >
+            {qualities.map((q) => (
+              <option key={q.id} value={String(q.id)}>{q.code} — {q.name}</option>
+            ))}
+          </NativeSelect>
+          <button
+            type="button"
+            onClick={() => setModal("quality")}
+            title="Nueva calidad"
+            disabled={!itemTypeId}
+            className={cn(selectorBtnBase, itemTypeId ? selectorBtnActive : selectorBtnDisabled)}
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="h-6 w-px bg-gray-800 shrink-0" />
+
+        {/* Variante */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Label className={cn("text-sm shrink-0", qualityId ? "text-gray-400" : "text-gray-700")}>Variante:</Label>
+          <NativeSelect
+            value={variantId === "" ? "" : String(variantId)}
+            onChange={(e) => setVariantId(e.target.value === "" ? "" : Number(e.target.value))}
+            placeholder={qualityId ? "Selecciona…" : "— primero calidad —"}
+            disabled={!qualityId}
+            className="w-44"
+          >
+            {variants.map((v) => (
+              <option key={v.id} value={String(v.id)}>{v.code} — {v.name}</option>
+            ))}
+          </NativeSelect>
+          <button
+            type="button"
+            onClick={() => setModal("variant")}
+            title="Nueva variante / color"
+            disabled={!qualityId}
+            className={cn(selectorBtnBase, qualityId ? selectorBtnActive : selectorBtnDisabled)}
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+
       </div>
 
       {/* Lista del glosario */}
