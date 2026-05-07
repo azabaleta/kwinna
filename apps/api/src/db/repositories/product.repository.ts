@@ -1,7 +1,7 @@
 import { eq, ilike, inArray, or, and } from "drizzle-orm";
 import type { Product, ProductBulkItem, ProductCreateInput, ProductQuery, ProductSeason, ProductUpdateInput } from "@kwinna/contracts";
 import { db } from "../index";
-import { productsTable, stockMovementsTable, stockTable } from "../schema";
+import { productsTable, stockMovementsTable, stockTable, returnsTable } from "../schema";
 
 // ─── Mapper ───────────────────────────────────────────────────────────────────
 // Convierte la fila cruda de Drizzle al tipo del contrato Zod.
@@ -116,6 +116,7 @@ export async function deleteProductById(id: string): Promise<boolean> {
   if (!existing) return false;
 
   await db.transaction(async (tx) => {
+    await tx.delete(returnsTable).where(eq(returnsTable.productId, id));
     await tx.delete(stockMovementsTable).where(eq(stockMovementsTable.productId, id));
     await tx.delete(stockTable).where(eq(stockTable.productId, id));
     await tx.delete(productsTable).where(eq(productsTable.id, id));
