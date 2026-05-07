@@ -4,7 +4,7 @@ import express from "express";
 import morgan from "morgan";
 
 import { authGuard, errorHandler, optionalAuth, requestLogger } from "./middlewares";
-import { analyticsRoutes, authRoutes, creditNotesRoutes, posCustomersRoutes, productRoutes, reportsRoutes, returnsRoutes, saleRoutes, stockRoutes, usersRoutes } from "./routes";
+import { analyticsRoutes, authRoutes, creditNotesRoutes, glossaryRoutes, posCustomersRoutes, productRoutes, reportsRoutes, returnsRoutes, saleRoutes, stockRoutes, usersRoutes } from "./routes";
 import { registerReportsJob } from "./jobs/reports.job";
 
 const app = express();
@@ -67,6 +67,7 @@ app.use("/returns",        returnsRoutes);
 app.use("/reports",        reportsRoutes);
 app.use("/users",          usersRoutes);
 app.use("/pos-customers",  posCustomersRoutes);
+app.use("/glossary",       glossaryRoutes);
 
 // ─── Semi-protected Routes ────────────────────────────────────────────────────
 // /products y /stock usan optionalAuth: los GETs son públicos (catálogo/stock

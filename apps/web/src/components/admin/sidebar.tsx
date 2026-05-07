@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { BarChart3, CalendarCheck, LayoutDashboard, LogOut, Menu, Package2, RotateCcw, ShoppingBag, Users, UserCog, X } from "lucide-react";
+import { BarChart3, CalendarCheck, LayoutDashboard, LogOut, Menu, Package2, RotateCcw, ShoppingBag, Tag, Users, UserCog, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { selectUser, useAuthStore } from "@/store/use-auth-store";
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/admin/customers",  label: "Clientes",        icon: Users,           adminOnly: false },
   { href: "/admin/operators",  label: "Operadores",      icon: UserCog,         adminOnly: true  },
   { href: "/admin/returns",    label: "Devoluciones",    icon: RotateCcw,       adminOnly: false },
+  { href: "/admin/labels",     label: "Etiquetas",       icon: Tag,             adminOnly: true  },
   { href: "/admin/reports",    label: "Reportes",        icon: BarChart3,       adminOnly: false },
 ] as const;
 

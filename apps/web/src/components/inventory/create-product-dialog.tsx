@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2, PlusCircle } from "lucide-react";
+import { Loader2, PlusCircle, Barcode } from "lucide-react";
+import { EAN8Picker } from "@/components/inventory/EAN8Picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,8 +43,9 @@ import { SEASON_LABELS, type ProductSeason } from "@kwinna/contracts";
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function CreateProductDialog() {
-  const [open, setOpen]           = useState(false);
+  const [open, setOpen]               = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [showPicker, setShowPicker]   = useState(false);
 
   const { mutateAsync, isPending } = useCreateProduct();
 
@@ -83,6 +85,7 @@ export function CreateProductDialog() {
     if (!next) {
       form.reset();
       setIsUploading(false);
+      setShowPicker(false);
     }
   }
 
@@ -177,9 +180,19 @@ export function CreateProductDialog() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>SKU *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="VES-MI-LIN-001" className="font-mono" {...field} />
-                      </FormControl>
+                      <div className="flex gap-1.5">
+                        <FormControl>
+                          <Input placeholder="VES-MI-LIN-001" className="font-mono" {...field} />
+                        </FormControl>
+                        <button
+                          type="button"
+                          title="Generar EAN-8"
+                          onClick={() => setShowPicker((v) => !v)}
+                          className="flex items-center justify-center h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-muted transition-colors"
+                        >
+                          <Barcode className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -206,6 +219,17 @@ export function CreateProductDialog() {
                   )}
                 />
               </div>
+
+              {/* ── EAN8Picker ── */}
+              {showPicker && (
+                <EAN8Picker
+                  onCodeReady={(code) => {
+                    form.setValue("sku", code, { shouldValidate: true });
+                    setShowPicker(false);
+                  }}
+                  onClose={() => setShowPicker(false)}
+                />
+              )}
 
               {/* ── Categoría ── */}
               <FormField

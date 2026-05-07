@@ -124,6 +124,20 @@ export async function deleteProductById(id: string): Promise<boolean> {
   return true;
 }
 
+// ─── SKU prefix lookup (para el impresor de etiquetas de autoTags) ────────────
+// Devuelve { fullCode, description }[] mapeando sku → fullCode, name → description.
+
+export async function findProductsBySkuPrefix(
+  prefix: string
+): Promise<{ fullCode: string; description: string }[]> {
+  const rows = await db
+    .select({ sku: productsTable.sku, name: productsTable.name })
+    .from(productsTable)
+    .where(ilike(productsTable.sku, `${prefix}%`));
+
+  return rows.map((r) => ({ fullCode: r.sku, description: r.name }));
+}
+
 // ─── Bulk insert ──────────────────────────────────────────────────────────────
 // Runs inside a single Drizzle transaction.
 // SKUs that already exist in the DB are silently skipped (idempotent import).

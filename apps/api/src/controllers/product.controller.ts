@@ -9,6 +9,7 @@ import {
   getProductById,
   updateProductData,
 } from "../services/product.service";
+import { findProductsBySkuPrefix } from "../db/repositories/product.repository";
 
 export async function listProducts(
   req: Request,
@@ -105,6 +106,17 @@ export async function deleteProductHandler(
         ? (err as Error & { statusCode: number }).statusCode
         : 500;
     res.status(status);
+    next(err);
+  }
+}
+
+// GET /products/sku-lookup?prefix= — usado por el impresor de etiquetas (autoTags)
+export async function skuLookup(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const prefix = (req.query["prefix"] as string | undefined) ?? "";
+    const rows = await findProductsBySkuPrefix(prefix);
+    res.json({ data: rows });
+  } catch (err) {
     next(err);
   }
 }

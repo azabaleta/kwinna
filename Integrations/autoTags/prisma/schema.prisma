@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id        Int        @id @default(autoincrement())
+  code      String     @unique
+  name      String
+  itemTypes ItemType[]
+}
+
+model Quality {
+  id         Int       @id @default(autoincrement())
+  itemTypeId Int
+  code       String
+  name       String
+  itemType   ItemType  @relation(fields: [itemTypeId], references: [id])
+  variants   Variant[]
+
+  @@unique([itemTypeId, code])
+}
+
+model ItemType {
+  id         Int       @id @default(autoincrement())
+  categoryId Int
+  code       String
+  name       String
+  category   Category  @relation(fields: [categoryId], references: [id])
+  qualities  Quality[]
+
+  @@unique([categoryId, code])
+}
+
+model Variant {
+  id        Int     @id @default(autoincrement())
+  qualityId Int
+  code      String
+  name      String
+  quality   Quality @relation(fields: [qualityId], references: [id])
+
+  @@unique([qualityId, code])
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  fullCode    String   @unique
+  description String
+  createdAt   DateTime @default(now())
+}

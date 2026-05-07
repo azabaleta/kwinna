@@ -127,6 +127,13 @@
       "when": 1746576000000,
       "tag": "0017_add_deportivo_season",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1778181494261,
+      "tag": "0018_deep_mikhail_rasputin",
+      "breakpoints": true
     }
   ]
 }

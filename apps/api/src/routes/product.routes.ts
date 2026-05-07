@@ -15,6 +15,7 @@ import {
   listProducts,
   patchProduct,
   postProduct,
+  skuLookup,
 } from "../controllers/product.controller";
 import { authGuard } from "../middlewares/auth-guard";
 import { optionalAuth } from "../middlewares/optional-auth";
@@ -43,9 +44,11 @@ function validateUuidParam(req: Request, res: Response, next: NextFunction): voi
 }
 
 // GET /products — público (catálogo de tienda), con optionalAuth para detectar admins
-router.get("/",    productReadLimiter, optionalAuth, listProducts);
-// GET /products/:id — público
-router.get("/:id", productReadLimiter, validateUuidParam, getProduct);
+router.get("/",            productReadLimiter, optionalAuth, listProducts);
+// GET /products/sku-lookup?prefix= — admin only, para el impresor de etiquetas
+router.get("/sku-lookup",  authGuard, requireRole(["admin"]), skuLookup);
+// GET /products/:id — público (debe ir después de /sku-lookup para no capturarlo como UUID)
+router.get("/:id",         productReadLimiter, validateUuidParam, getProduct);
 
 // POST /products — solo admin/operator
 router.post(

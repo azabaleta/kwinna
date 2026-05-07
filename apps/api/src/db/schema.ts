@@ -302,6 +302,59 @@ export const metricSnapshotsTable = pgTable("metric_snapshots", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── glossary ─────────────────────────────────────────────────────────────────
+// Tablas de codificación EAN-8 usadas por autoTags.
+// Jerarquía: Category → ItemType → Quality → Variant.
+// Los códigos se concatenan para formar los 7 dígitos base del EAN-8.
+
+export const glossaryCategoriesTable = pgTable(
+  "glossary_categories",
+  {
+    id:   integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    code: varchar("code", { length: 2 }).notNull().unique(),  // 2 dígitos, ej. "01"
+    name: varchar("name", { length: 255 }).notNull(),
+  }
+);
+
+export const glossaryItemTypesTable = pgTable(
+  "glossary_item_types",
+  {
+    id:         integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    categoryId: integer("category_id").notNull().references(() => glossaryCategoriesTable.id, { onDelete: "cascade" }),
+    code:       varchar("code", { length: 2 }).notNull(),     // 2 dígitos, ej. "05"
+    name:       varchar("name", { length: 255 }).notNull(),
+  },
+  (table) => ({
+    categoryCodeUniq: uniqueIndex("glossary_item_types_category_code_uniq").on(table.categoryId, table.code),
+  })
+);
+
+export const glossaryQualitiesTable = pgTable(
+  "glossary_qualities",
+  {
+    id:         integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    itemTypeId: integer("item_type_id").notNull().references(() => glossaryItemTypesTable.id, { onDelete: "cascade" }),
+    code:       varchar("code", { length: 1 }).notNull(),     // 1 dígito, ej. "2"
+    name:       varchar("name", { length: 255 }).notNull(),
+  },
+  (table) => ({
+    itemTypeCodeUniq: uniqueIndex("glossary_qualities_item_type_code_uniq").on(table.itemTypeId, table.code),
+  })
+);
+
+export const glossaryVariantsTable = pgTable(
+  "glossary_variants",
+  {
+    id:        integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    qualityId: integer("quality_id").notNull().references(() => glossaryQualitiesTable.id, { onDelete: "cascade" }),
+    code:      varchar("code", { length: 2 }).notNull(),      // 2 dígitos, ej. "03"
+    name:      varchar("name", { length: 255 }).notNull(),
+  },
+  (table) => ({
+    qualityCodeUniq: uniqueIndex("glossary_variants_quality_code_uniq").on(table.qualityId, table.code),
+  })
+);
+
 // ─── returns ──────────────────────────────────────────────────────────────────
 // Devoluciones y cambios registrados por admin/operator.
 // size usa '' como centinela (igual que stockTable) para "sin talle".
