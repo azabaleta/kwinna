@@ -188,11 +188,13 @@ export async function resendVerification(email: string): Promise<void> {
   // Respuesta genérica aunque no exista el email — evita enumeración
   if (!stored || stored.emailVerified) return;
 
-  // Cooldown: si ya hay un token reciente, no reenviar
+  // Cooldown: solo aplica si el último token todavía está vigente Y fue emitido hace menos de 60s.
+  // Si el token ya expiró, siempre se permite reenviar sin espera.
   const last = await findLastTokenForUser(stored.id);
   if (last) {
-    const elapsed = Date.now() - last.createdAt.getTime();
-    if (elapsed < RESEND_COOLDOWN_MS) return;
+    const isExpired = last.expiresAt < new Date();
+    const elapsed   = Date.now() - last.createdAt.getTime();
+    if (!isExpired && elapsed < RESEND_COOLDOWN_MS) return;
   }
 
   await sendEmailVerificationToken(stored.id, { name: stored.name, email: stored.email });

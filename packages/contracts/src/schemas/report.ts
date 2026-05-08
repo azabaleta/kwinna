@@ -24,15 +24,17 @@ export const CriticalStockItemSchema = z.object({
 
 export const SnapshotDataSchema = z.object({
   sales: z.object({
-    count:           z.number().int(),
-    countWeb:        z.number().int(),
-    countPos:        z.number().int(),
-    revenue:         z.number(),
-    revenueWeb:      z.number(),
-    revenuePos:      z.number(),
-    shippingRevenue: z.number(),
-    avgOrderValue:   z.number(),
-    topProducts:     z.array(TopProductSchema),
+    count:              z.number().int(),
+    countWeb:           z.number().int(),
+    countPos:           z.number().int(),
+    revenue:            z.number(),
+    revenueWeb:         z.number(),
+    revenuePos:         z.number(),
+    shippingRevenue:    z.number(),
+    avgOrderValue:      z.number(),
+    avgOrderValueWeb:   z.number(),
+    avgOrderValuePos:   z.number(),
+    topProducts:        z.array(TopProductSchema),
   }),
   returns: z.object({
     count:        z.number().int(),

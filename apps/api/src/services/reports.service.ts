@@ -43,11 +43,13 @@ async function computeSnapshotData(from: Date, to: Date): Promise<SnapshotData> 
   const revWebSales    = webSales.filter((s) => s.paymentMethod !== "por_devolucion");
   const revPosSales    = posSales.filter((s) => s.paymentMethod !== "por_devolucion");
 
-  const revenue        = revSales.reduce((s, v) => s + v.total, 0);
-  const revenueWeb     = revWebSales.reduce((s, v) => s + v.total, 0);
-  const revenuePos     = revPosSales.reduce((s, v) => s + v.total, 0);
-  const shippingRev    = revSales.reduce((s, v) => s + v.shippingCost, 0);
-  const avgOrderValue  = revSales.length > 0 ? revenue / revSales.length : 0;
+  const revenue           = revSales.reduce((s, v) => s + v.total, 0);
+  const revenueWeb        = revWebSales.reduce((s, v) => s + v.total, 0);
+  const revenuePos        = revPosSales.reduce((s, v) => s + v.total, 0);
+  const shippingRev       = revSales.reduce((s, v) => s + v.shippingCost, 0);
+  const avgOrderValue     = revSales.length    > 0 ? revenue    / revSales.length    : 0;
+  const avgOrderValueWeb  = revWebSales.length > 0 ? revenueWeb / revWebSales.length : 0;
+  const avgOrderValuePos  = revPosSales.length > 0 ? revenuePos / revPosSales.length : 0;
 
   // Aggregate units + revenue per product from JSONB items
   const unitsByProduct    = new Map<string, number>();
@@ -82,10 +84,12 @@ async function computeSnapshotData(from: Date, to: Date): Promise<SnapshotData> 
   }
 
   // ── 5. Conversion metrics ─────────────────────────────────────────────────
-  const { shopViews, cartAdds, checkoutStarts, saleCompletes } = analytics;
+  // salesCompleted usa webSales (DB confirmada), no el evento de analytics,
+  // que puede duplicarse o perderse. Es la misma fuente que sales.countWeb.
+  const { shopViews, cartAdds, checkoutStarts } = analytics;
 
   const conversionRate      = checkoutStarts > 0
-    ? Math.round((saleCompletes / checkoutStarts) * 1000) / 10
+    ? Math.round((webSales.length / checkoutStarts) * 1000) / 10
     : 0;
   const cartAbandonmentRate = cartAdds > 0
     ? Math.round(((cartAdds - checkoutStarts) / cartAdds) * 1000) / 10
@@ -112,7 +116,9 @@ async function computeSnapshotData(from: Date, to: Date): Promise<SnapshotData> 
       revenueWeb:     Math.round(revenueWeb * 100) / 100,
       revenuePos:     Math.round(revenuePos * 100) / 100,
       shippingRevenue: Math.round(shippingRev * 100) / 100,
-      avgOrderValue:  Math.round(avgOrderValue * 100) / 100,
+      avgOrderValue:     Math.round(avgOrderValue    * 100) / 100,
+      avgOrderValueWeb:  Math.round(avgOrderValueWeb * 100) / 100,
+      avgOrderValuePos:  Math.round(avgOrderValuePos * 100) / 100,
       topProducts,
     },
     returns: {
@@ -125,7 +131,7 @@ async function computeSnapshotData(from: Date, to: Date): Promise<SnapshotData> 
       shopViews,
       cartAdds,
       checkoutStarts,
-      salesCompleted: saleCompletes,
+      salesCompleted: webSales.length,
       conversionRate,
       cartAbandonmentRate,
     },

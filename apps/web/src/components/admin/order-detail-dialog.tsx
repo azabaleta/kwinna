@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   AlertTriangle,
   ClipboardList,
@@ -8,6 +8,7 @@ import {
   MapPin,
   PackageCheck,
   Phone,
+  Printer,
   RefreshCw,
   Truck,
   User,
@@ -15,6 +16,7 @@ import {
   EyeOff,
   RotateCcw,
 } from "lucide-react";
+import WebReceiptTicket from "./web-receipt-ticket";
 import type { Product, Sale } from "@kwinna/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -99,6 +101,11 @@ export function OrderDetailDialog({
   const [showDismiss, setShowDismiss] = useState(false);
   const [dismissReason, setDismissReason] = useState("");
   const [restoreStock, setRestoreStock] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+
+  function handleReprint() {
+    window.print();
+  }
 
   function handleOpenChange(open: boolean) {
     if (!open) {
@@ -111,6 +118,7 @@ export function OrderDetailDialog({
   }
 
   return (
+    <>
     <Dialog open={!!sale} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[520px]">
         {sale && (
@@ -462,8 +470,17 @@ export function OrderDetailDialog({
             </div>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={onClose}>
+            <DialogFooter className="flex-row gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-muted-foreground hover:text-foreground"
+                onClick={handleReprint}
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Reimprimir ticket
+              </Button>
+              <Button variant="outline" onClick={onClose} className="ml-auto">
                 Cerrar
               </Button>
             </DialogFooter>
@@ -471,5 +488,13 @@ export function OrderDetailDialog({
         )}
       </DialogContent>
     </Dialog>
+
+    {/* Hidden print area — visible only during window.print() */}
+    {sale && productMap && (
+      <div id="web-receipt-print-area" style={{ display: "none" }}>
+        <WebReceiptTicket ref={printRef} sale={sale} productMap={productMap} reprint />
+      </div>
+    )}
+    </>
   );
 }

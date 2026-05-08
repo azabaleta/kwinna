@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Search, X, Plus, Minus, ShoppingCart, AlertTriangle, CheckCircle2, Printer, RefreshCw, UserRound, UserPlus, ChevronDown, Banknote, FileText } from "lucide-react";
+import { Search, X, Plus, Minus, ShoppingCart, AlertTriangle, CheckCircle2, Printer, RefreshCw, UserRound, UserPlus, ChevronDown, Banknote, FileText, Gift } from "lucide-react";
 import type { Product, Stock, PriceTier, CustomerSearchResult } from "@kwinna/contracts";
 import type { CartItem } from "../store/use-pos-store";
 import { usePosStore } from "../store/use-pos-store";
@@ -697,6 +697,7 @@ export default function SellView() {
   const [receiptData,    setReceiptData]    = useState<ReceiptData | null>(null);
   const [creditNoteData, setCreditNoteData] = useState<CreditNoteData | null>(null);
   const receiptRef    = useRef<HTMLDivElement>(null);
+  const giftRef       = useRef<HTMLDivElement>(null);
   const creditNoteRef = useRef<HTMLDivElement>(null);
 
   const { products, isLoading: productsLoading } = useProducts();
@@ -726,6 +727,12 @@ export default function SellView() {
     document.body.removeAttribute("data-print-mode");
   }
 
+  function handlePrintGiftTicket() {
+    document.body.setAttribute("data-print-mode", "gift-ticket");
+    window.print();
+    document.body.removeAttribute("data-print-mode");
+  }
+
   interface ConfirmData {
     customerName: string; customerEmail: string; customerPhone: string;
     customerDni: string; shippingAddress: string; shippingCity: string;
@@ -750,7 +757,7 @@ export default function SellView() {
         posCustomerId  = created.id;
       }
 
-      const { residualCreditNote } = await createPosSale({
+      const { sale, residualCreditNote } = await createPosSale({
         items: cart.map((i) => ({
           productId: i.product.id,
           quantity:  i.quantity,
@@ -792,6 +799,7 @@ export default function SellView() {
         date:           new Date(),
         creditApplied:  creditApplied > 0 ? creditApplied : undefined,
         creditNoteCode: creditSnapshot?.creditNoteCode,
+        transactionId:  sale.id,
       });
 
       // Si hay saldo a favor, usar la nota de crédito residual devuelta por la API
@@ -1057,6 +1065,13 @@ export default function SellView() {
               >
                 <Printer size={15} /> Ticket
               </button>
+              <button
+                onClick={handlePrintGiftTicket}
+                className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white rounded-xl py-2.5 text-sm
+                           font-semibold transition-colors flex items-center justify-center gap-2"
+              >
+                <Gift size={15} /> Regalo
+              </button>
               {creditNoteData && (
                 <button
                   onClick={handlePrintCreditNote}
@@ -1075,6 +1090,11 @@ export default function SellView() {
       {receiptData && (
         <div id="receipt-print-area" style={{ display: "none" }}>
           <ReceiptTicket ref={receiptRef} data={receiptData} />
+        </div>
+      )}
+      {receiptData && (
+        <div id="gift-ticket-print-area" style={{ display: "none" }}>
+          <ReceiptTicket ref={giftRef} data={receiptData} hidePrice />
         </div>
       )}
       {creditNoteData && (

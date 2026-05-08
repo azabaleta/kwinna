@@ -50,3 +50,94 @@
     @apply border-border;
   }
 }
+
+/* ─── Receipt ticket (reimpresión desde admin web) ──────────────────────────── */
+
+.receipt-ticket {
+  width: 48mm;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #000;
+  background: #fff;
+  padding: 4mm 2mm;
+  position: relative;
+}
+
+.receipt-header { text-align: center; margin-bottom: 2mm; }
+
+.receipt-logo {
+  width: 32mm;
+  height: auto;
+  display: block;
+  margin: 0 auto 1.5mm;
+  color: #000;
+}
+
+.receipt-sub { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; }
+.receipt-date { font-size: 10px; margin-top: 1mm; }
+
+.receipt-sep {
+  text-align: center;
+  font-size: 10px;
+  color: #999;
+  margin: 1.5mm 0;
+  overflow: hidden;
+}
+
+.receipt-items { display: flex; flex-direction: column; gap: 2mm; }
+
+.receipt-item-name { font-size: 10px; font-weight: 600; word-wrap: break-word; }
+
+.receipt-item-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+}
+
+.receipt-totals { display: flex; flex-direction: column; gap: 1mm; }
+
+.receipt-total-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+}
+
+.receipt-grand-total { font-size: 14px; font-weight: 800; }
+
+.receipt-footer p { font-size: 10px; word-wrap: break-word; }
+
+.receipt-thanks { text-align: center; font-size: 10px; margin-top: 1mm; }
+.receipt-url { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; }
+
+.receipt-reprint-mark {
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #aaa;
+  margin-bottom: 1.5mm;
+}
+
+/* ─── Print: solo mostrar el área del ticket ─────────────────────────────────── */
+
+@media print {
+  body * { visibility: hidden !important; }
+
+  #web-receipt-print-area {
+    display: block !important;
+    visibility: visible !important;
+    position: fixed;
+    inset: 0;
+  }
+
+  #web-receipt-print-area * { visibility: visible !important; }
+
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
+
+  .receipt-ticket { width: 100%; padding: 5mm 4mm; }
+  .receipt-logo { width: 30mm; }
+}

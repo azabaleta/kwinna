@@ -4,10 +4,10 @@ import KwinnaLogo from "./KwinnaLogo";
 
 export interface ReceiptData {
   items: {
-    name:     string;
-    sku:      string;
-    size?:    string;
-    quantity: number;
+    name:      string;
+    sku:       string;
+    size?:     string;
+    quantity:  number;
     unitPrice: number;
   }[];
   total:           number;
@@ -19,6 +19,7 @@ export interface ReceiptData {
   date:            Date;
   creditApplied?:  number;
   creditNoteCode?: string;
+  transactionId?:  string;
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -59,17 +60,24 @@ function fmtDate(d: Date): string {
  * Receipt component optimized for 58mm thermal printers.
  * Printable width: ~48mm ≈ 32 chars at 12px monospace.
  * Uses forwardRef so the parent can grab the DOM node for printing.
+ *
+ * hidePrice=true → ticket de regalo: sin precios, sin totales.
  */
-const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData }>(
-  ({ data }, ref) => {
+const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?: boolean }>(
+  ({ data, hidePrice = false }, ref) => {
     const separator = "─".repeat(32);
+    const txCode    = data.transactionId
+      ? data.transactionId.replace(/-/g, "").slice(0, 10).toUpperCase()
+      : null;
 
     return (
       <div ref={ref} className="receipt-ticket">
         {/* Header */}
         <div className="receipt-header">
           <KwinnaLogo className="receipt-logo" />
-          <p className="receipt-sub">Comprobante de venta</p>
+          <p className="receipt-sub">
+            {hidePrice ? "Ticket de regalo" : "Comprobante de venta"}
+          </p>
           <p className="receipt-date">{fmtDate(data.date)}</p>
         </div>
 
@@ -83,43 +91,65 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData }>(
                 {item.name}
                 {item.size ? ` (${item.size})` : ""}
               </p>
-              <div className="receipt-item-line">
-                <span>{item.quantity} x {fmtPrice(item.unitPrice)}</span>
-                <span>{fmtPrice(item.unitPrice * item.quantity)}</span>
-              </div>
+              {hidePrice ? (
+                <div className="receipt-item-line">
+                  <span>Cantidad: {item.quantity}</span>
+                </div>
+              ) : (
+                <div className="receipt-item-line">
+                  <span>{item.quantity} x {fmtPrice(item.unitPrice)}</span>
+                  <span>{fmtPrice(item.unitPrice * item.quantity)}</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
 
         <p className="receipt-sep">{separator}</p>
 
-        {/* Totals */}
-        <div className="receipt-totals">
-          <div className="receipt-total-line">
-            <span>Precio:</span>
-            <span>{PRICE_TIER_LABELS[data.priceTier]}</span>
-          </div>
-          {data.creditApplied !== undefined && (
+        {/* Totals — ocultos en ticket de regalo */}
+        {!hidePrice && (
+          <div className="receipt-totals">
             <div className="receipt-total-line">
-              <span>Crédito NC:</span>
-              <span>-{fmtPrice(data.creditApplied)}</span>
+              <span>Precio:</span>
+              <span>{PRICE_TIER_LABELS[data.priceTier]}</span>
             </div>
-          )}
-          <div className="receipt-total-line receipt-grand-total">
-            <span>TOTAL</span>
-            <span>{fmtPrice(data.total - (data.creditApplied ?? 0))}</span>
+            {data.creditApplied !== undefined && (
+              <div className="receipt-total-line">
+                <span>Crédito NC:</span>
+                <span>-{fmtPrice(data.creditApplied)}</span>
+              </div>
+            )}
+            <div className="receipt-total-line receipt-grand-total">
+              <span>TOTAL</span>
+              <span>{fmtPrice(data.total - (data.creditApplied ?? 0))}</span>
+            </div>
           </div>
-        </div>
+        )}
 
-        <p className="receipt-sep">{separator}</p>
+        {!hidePrice && <p className="receipt-sep">{separator}</p>}
 
         {/* Customer & payment */}
         <div className="receipt-footer">
           <p>Cliente: {data.customerName}</p>
           {data.customerDni && <p>DNI: {data.customerDni}</p>}
-          <p>Pago: {PAYMENT_LABELS[data.paymentMethod] ?? data.paymentMethod}</p>
-          {data.creditNoteCode && <p>Nota de crédito: {data.creditNoteCode}</p>}
+          {!hidePrice && (
+            <p>Pago: {PAYMENT_LABELS[data.paymentMethod] ?? data.paymentMethod}</p>
+          )}
+          {!hidePrice && data.creditNoteCode && (
+            <p>Nota de crédito: {data.creditNoteCode}</p>
+          )}
           {data.saleNotes && <p>Nota: {data.saleNotes}</p>}
+          {txCode && (
+            <p style={{ marginTop: "4px" }}>
+              N° transacción: <strong>{txCode}</strong>
+            </p>
+          )}
+          {hidePrice && (
+            <p style={{ marginTop: "6px", fontSize: "9px", opacity: 0.6 }}>
+              Presentá este comprobante para cambios.
+            </p>
+          )}
         </div>
 
         <p className="receipt-sep">{separator}</p>

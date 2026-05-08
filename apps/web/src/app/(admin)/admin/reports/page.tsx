@@ -398,13 +398,15 @@ function SnapshotCard({ snapshot }: { snapshot: MetricSnapshot }) {
               Ventas
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <KpiBox label="Total" value={String(d.sales.count)} />
-              <KpiBox label="Web" value={String(d.sales.countWeb)} />
-              <KpiBox label="POS" value={String(d.sales.countPos)} />
-              <KpiBox label="Ticket promedio" value={fmtARS(d.sales.avgOrderValue)} />
+              <KpiBox label="Total"            value={String(d.sales.count)} />
+              <KpiBox label="Web"              value={String(d.sales.countWeb)} />
+              <KpiBox label="POS"              value={String(d.sales.countPos)} />
+              <KpiBox label="Ticket prom. total" value={fmtARS(d.sales.avgOrderValue)} />
               <KpiBox label="Ingresos totales" value={fmtARS(d.sales.revenue)} accent="emerald" span={2} />
               <KpiBox label="Ingresos web"     value={fmtARS(d.sales.revenueWeb)} />
               <KpiBox label="Ingresos POS"     value={fmtARS(d.sales.revenuePos)} />
+              <KpiBox label="Ticket prom. web" value={fmtARS(d.sales.avgOrderValueWeb)} />
+              <KpiBox label="Ticket prom. POS" value={fmtARS(d.sales.avgOrderValuePos)} />
               <KpiBox label="Envíos"           value={fmtARS(d.sales.shippingRevenue)} />
             </div>
 
@@ -442,6 +444,7 @@ function SnapshotCard({ snapshot }: { snapshot: MetricSnapshot }) {
           <section>
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
               <TrendingUp className="h-3.5 w-3.5" /> Conversión web
+              <span className="font-normal normal-case tracking-normal text-[10px] text-muted-foreground/60">(embudo y tasa: solo canal web)</span>
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <KpiBox label="Vistas de tienda"    value={String(d.conversion.shopViews)} />

@@ -129,19 +129,46 @@
 /* ─── Print media: receipt or credit note (controlled via data-print-mode) ── */
 
 @media print {
-  /* Hide the entire app */
-  body > * {
-    display: none !important;
+  /*
+   * display:none en el padre (#root) hace invisibles todos sus hijos sin excepción,
+   * incluso con !important en el hijo. visibility:hidden sí permite que los hijos
+   * se sobreescriban con visibility:visible.
+   */
+  body * {
+    visibility: hidden !important;
   }
 
   /* Default: receipt (no data-print-mode, or data-print-mode="receipt") */
   body:not([data-print-mode="credit-note"]) #receipt-print-area {
     display: block !important;
+    visibility: visible !important;
+    position: fixed;
+    inset: 0;
+  }
+  body:not([data-print-mode="credit-note"]) #receipt-print-area * {
+    visibility: visible !important;
   }
 
   /* Credit note mode */
   body[data-print-mode="credit-note"] #credit-note-print-area {
     display: block !important;
+    visibility: visible !important;
+    position: fixed;
+    inset: 0;
+  }
+  body[data-print-mode="credit-note"] #credit-note-print-area * {
+    visibility: visible !important;
+  }
+
+  /* Gift ticket mode */
+  body[data-print-mode="gift-ticket"] #gift-ticket-print-area {
+    display: block !important;
+    visibility: visible !important;
+    position: fixed;
+    inset: 0;
+  }
+  body[data-print-mode="gift-ticket"] #gift-ticket-print-area * {
+    visibility: visible !important;
   }
 
   @page {
