@@ -226,6 +226,11 @@ export function ProductCard({ product, stockQty, cartQty, onAdd }: ProductCardPr
               transferencia
             </span>
           </p>
+          {Math.round(product.price * 0.25) >= 2000 && (
+            <p className="text-[8.5px] font-medium tabular-nums text-emerald-500/85">
+              Ahorrás ${Math.round(product.price * 0.25).toLocaleString("es-AR")}
+            </p>
+          )}
         </div>
       </Link>
     </article>
