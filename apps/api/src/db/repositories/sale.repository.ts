@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import type { Sale } from "@kwinna/contracts";
+import type { PaymentMethod, Sale } from "@kwinna/contracts";
 import { db } from "../index";
 import { salesTable } from "../schema";
 
@@ -28,7 +28,7 @@ export function mapSaleRow(row: typeof salesTable.$inferSelect): Sale {
 
     // Channel + POS metadata
     channel:       row.channel,
-    paymentMethod: (row.paymentMethod as "mercadopago" | "transfer") ?? undefined,
+    paymentMethod: (row.paymentMethod as PaymentMethod) ?? undefined,
     saleNotes:     row.saleNotes     ?? undefined,
 
     userId:        row.userId        ?? undefined,

@@ -28,6 +28,7 @@ export type ShippingMethod = z.infer<typeof ShippingMethodSchema>;
 export const PaymentMethodSchema = z.enum([
   "mercadopago",
   "transfer",
+  "transferencia",    // alias usado por el POS de escritorio
   "efectivo",
   "debito",
   "credito",
@@ -63,7 +64,7 @@ export const SaleSchema = z.object({
 
   // ── Canal y metadata POS ───────────────────────────────────────────────────
   channel:       SaleChannelSchema.default("web"),
-  paymentMethod: PaymentMethodSchema.optional(),
+  paymentMethod: PaymentMethodSchema.optional().catch(undefined),
   saleNotes:     z.string().optional(),
 
   // ── Opcional: cliente registrado (web) ────────────────────────────────────
