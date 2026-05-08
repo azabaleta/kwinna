@@ -209,11 +209,12 @@ export function ProductCard({ product, stockQty, cartQty, onAdd }: ProductCardPr
         ) : (
           <div className="h-3.5" />
         )}
-        {product.price >= 10000 && (
-          <p className="text-[9px] font-medium tracking-widest uppercase text-blue-400 mt-0.5">
-            hasta {product.price >= 20000 ? "3" : "2"} cuotas sin interés
-          </p>
-        )}
+        <p className={cn(
+          "text-[9px] font-medium tracking-widest uppercase mt-0.5",
+          product.price >= 10000 ? "text-blue-400" : "invisible",
+        )}>
+          hasta {product.price >= 20000 ? "3" : "2"} cuotas sin interés
+        </p>
         <div>
           <p className="text-[13px] font-normal tracking-wide tabular-nums text-foreground">
             ${product.price.toLocaleString("es-AR")}
@@ -226,11 +227,12 @@ export function ProductCard({ product, stockQty, cartQty, onAdd }: ProductCardPr
               transferencia
             </span>
           </p>
-          {Math.round(product.price * 0.25) >= 2000 && (
-            <p className="text-[8.5px] font-medium tabular-nums text-emerald-500/85">
-              Ahorrás ${Math.round(product.price * 0.25).toLocaleString("es-AR")}
-            </p>
-          )}
+          <p className={cn(
+            "text-[8.5px] font-medium tabular-nums",
+            Math.round(product.price * 0.25) >= 2000 ? "text-emerald-500/85" : "invisible",
+          )}>
+            Ahorrás ${Math.round(product.price * 0.25).toLocaleString("es-AR")}
+          </p>
         </div>
       </Link>
     </article>
