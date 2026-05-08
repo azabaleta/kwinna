@@ -6,17 +6,25 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
+  Loader2,
+  Package,
   PackageX,
   Plus,
+  Receipt,
   RefreshCw,
   RotateCcw,
+  X,
 } from "lucide-react";
 import {
   RETURN_REASON_LABELS,
   RETURN_REASON_RESALABLE,
   ReturnCreateInputSchema,
   type ReturnReason,
+  type Sale,
+  type SaleItem,
 } from "@kwinna/contracts";
+import { fetchSaleByCode } from "@/services/sale";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -92,6 +100,24 @@ function ReasonBadge({ reason }: { reason: ReturnReason }) {
   );
 }
 
+const PAYMENT_LABELS: Record<string, string> = {
+  efectivo:        "Efectivo",
+  transferencia:   "Transferencia",
+  transfer:        "Transferencia",
+  debito:          "Débito",
+  credito:         "Crédito",
+  orden_de_compra: "Orden de compra",
+  por_devolucion:  "Por devolución",
+  mercadopago:     "MercadoPago",
+};
+
+function fmtPrice(n: number) {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency", currency: "ARS",
+    minimumFractionDigits: 0, maximumFractionDigits: 0,
+  }).format(n);
+}
+
 // ─── Register Dialog ──────────────────────────────────────────────────────────
 
 function RegisterReturnDialog({
@@ -103,6 +129,17 @@ function RegisterReturnDialog({
 }) {
   const { products } = useProducts();
   const { mutateAsync, isPending } = useCreateReturn();
+
+  // ── Modo ────────────────────────────────────────────────────────────────
+  type ReturnMode = "product" | "transaction";
+  const [mode, setMode] = useState<ReturnMode>("product");
+
+  // ── Estado modo transacción ──────────────────────────────────────────────
+  const [txCode,      setTxCode]      = useState("");
+  const [txSale,      setTxSale]      = useState<Sale | null>(null);
+  const [txSearching, setTxSearching] = useState(false);
+  const [txError,     setTxError]     = useState("");
+  const [txItem,      setTxItem]      = useState<SaleItem | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
@@ -120,7 +157,6 @@ function RegisterReturnDialog({
   const selectedReason = form.watch("reason");
   const restock        = form.watch("restock");
 
-  // When the reason changes, update the restock toggle to the smart default
   function handleReasonChange(value: ReturnReason) {
     form.setValue("reason", value);
     form.setValue("restock", RETURN_REASON_RESALABLE[value]);
@@ -128,7 +164,46 @@ function RegisterReturnDialog({
 
   function handleClose() {
     form.reset();
+    setMode("product");
+    setTxCode(""); setTxSale(null); setTxError(""); setTxItem(null);
     onClose();
+  }
+
+  function switchMode(m: ReturnMode) {
+    setMode(m);
+    form.reset();
+    setTxCode(""); setTxSale(null); setTxError(""); setTxItem(null);
+  }
+
+  // ── Búsqueda por código de transacción ──────────────────────────────────
+  async function handleTxSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const code = txCode.trim().replace(/\s/g, "");
+    if (!code) return;
+    setTxError(""); setTxSale(null); setTxItem(null);
+    form.reset();
+    setTxSearching(true);
+    try {
+      const sale = await fetchSaleByCode(code);
+      setTxSale(sale);
+    } catch {
+      setTxError(`No se encontró ninguna venta con el código "${code.toUpperCase()}".`);
+    } finally {
+      setTxSearching(false);
+    }
+  }
+
+  function selectTxItem(item: SaleItem) {
+    setTxItem(item);
+    form.setValue("productId", item.productId);
+    form.setValue("size", item.size ?? "");
+    form.setValue("quantity", item.quantity);
+    form.setValue("saleId", txSale!.id);
+  }
+
+  function clearTxItem() {
+    setTxItem(null);
+    form.reset();
   }
 
   async function onSubmit(values: FormValues) {
@@ -141,9 +216,7 @@ function RegisterReturnDialog({
       });
 
       const action = result.restocked ? "repuesta al stock" : "registrada como pérdida";
-      toast.success("Devolución registrada", {
-        description: `Prenda ${action}`,
-      });
+      toast.success("Devolución registrada", { description: `Prenda ${action}` });
       handleClose();
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
@@ -157,9 +230,11 @@ function RegisterReturnDialog({
     }
   }
 
+  const maxQty = txItem ? txItem.quantity : 999;
+
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <RotateCcw className="h-4 w-4" />
@@ -167,189 +242,353 @@ function RegisterReturnDialog({
           </DialogTitle>
         </DialogHeader>
 
+        {/* Toggle de modo */}
+        <div className="flex rounded-lg border border-border p-1 gap-1">
+          <button
+            type="button"
+            onClick={() => switchMode("transaction")}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-colors",
+              mode === "transaction"
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Receipt className="h-3.5 w-3.5" />
+            Por transacción
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode("product")}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-colors",
+              mode === "product"
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Package className="h-3.5 w-3.5" />
+            Por producto
+          </button>
+        </div>
+
+        {/* ── MODO TRANSACCIÓN ── */}
+        {mode === "transaction" && (
+          <div className="space-y-3">
+            <form onSubmit={handleTxSearch} className="flex gap-2">
+              <Input
+                value={txCode}
+                onChange={(e) => {
+                  setTxCode(e.target.value.toUpperCase());
+                  setTxSale(null); setTxItem(null); setTxError("");
+                  form.reset();
+                }}
+                placeholder="Código del ticket (ej: A3F7B2D910)"
+                className="font-mono text-sm uppercase"
+                maxLength={10}
+              />
+              <Button
+                type="submit"
+                variant="secondary"
+                size="sm"
+                disabled={txSearching || txCode.trim().length < 6}
+                className="shrink-0"
+              >
+                {txSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Buscar"}
+              </Button>
+            </form>
+
+            {txError && (
+              <div className="flex items-center gap-2 rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {txError}
+              </div>
+            )}
+
+            {/* Venta encontrada — lista de ítems */}
+            {txSale && !txItem && (
+              <div className="rounded-lg border border-border overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2.5 bg-muted/50 border-b border-border">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{txSale.customerName}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {new Date(txSale.createdAt).toLocaleDateString("es-AR", {
+                        day: "2-digit", month: "long", year: "numeric",
+                      })}
+                      {txSale.paymentMethod && (
+                        <> · {PAYMENT_LABELS[txSale.paymentMethod] ?? txSale.paymentMethod}</>
+                      )}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-foreground">{fmtPrice(txSale.total)}</p>
+                </div>
+                <div className="p-1.5">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground px-2 py-1">
+                    Seleccioná la prenda a devolver
+                  </p>
+                  {txSale.items.map((item, i) => {
+                    const prod = products.find((p) => p.id === item.productId);
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => selectTxItem(item)}
+                        className="w-full flex items-center gap-3 rounded-md px-2.5 py-2 text-left
+                                   hover:bg-muted transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {prod?.name ?? item.productId.slice(0, 8) + "…"}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {item.size ? `Talle ${item.size} · ` : ""}
+                            {item.quantity} u. · {fmtPrice(item.unitPrice)} c/u
+                          </p>
+                        </div>
+                        <p className="text-sm font-semibold text-foreground shrink-0">
+                          {fmtPrice(item.subtotal)}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Ítem seleccionado */}
+            {txSale && txItem && (
+              <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {products.find((p) => p.id === txItem.productId)?.name ?? txItem.productId.slice(0, 8) + "…"}
+                  </p>
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">
+                    Precio pagado: {fmtPrice(txItem.unitPrice)}
+                    {txItem.size ? ` · Talle ${txItem.size}` : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearTxItem}
+                  className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
 
-            {/* Producto */}
-            <FormField
-              control={form.control}
-              name="productId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Producto <span className="text-destructive">*</span></FormLabel>
-                  <FormControl>
-                    <ProductCombobox
-                      products={products}
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      error={!!form.formState.errors.productId}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Talle */}
+            {/* Producto — solo en modo producto */}
+            {mode === "product" && (
               <FormField
                 control={form.control}
-                name="size"
+                name="productId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      Talle{" "}
-                      <span className="text-[11px] font-normal text-muted-foreground">(opcional)</span>
-                    </FormLabel>
+                    <FormLabel>Producto <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Input placeholder="XS / S / M…" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Cantidad */}
-              <FormField
-                control={form.control}
-                name="quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cantidad <span className="text-destructive">*</span></FormLabel>
-                    <FormControl>
-                      <Input type="number" min={1} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Motivo */}
-            <FormField
-              control={form.control}
-              name="reason"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Motivo <span className="text-destructive">*</span></FormLabel>
-                  <Select
-                    onValueChange={(v) => handleReasonChange(v as ReturnReason)}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccioná un motivo" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {(Object.entries(RETURN_REASON_LABELS) as [ReturnReason, string][]).map(
-                        ([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            <span className="flex items-center gap-2">
-                              {label}
-                              {!RETURN_REASON_RESALABLE[value] && (
-                                <span className="text-[10px] text-destructive/70">(daño)</span>
-                              )}
-                            </span>
-                          </SelectItem>
-                        )
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Restock toggle — solo visible cuando hay un motivo seleccionado */}
-            {selectedReason && (
-              <FormField
-                control={form.control}
-                name="restock"
-                render={({ field }) => (
-                  <FormItem className={cn(
-                    "flex items-center justify-between rounded-lg border p-3 transition-colors",
-                    restock
-                      ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
-                      : "border-destructive/30 bg-destructive/5",
-                  )}>
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-sm font-medium">
-                        {restock ? "Reponer al inventario" : "Registrar como pérdida"}
-                      </FormLabel>
-                      <FormDescription className="text-[11px]">
-                        {restock
-                          ? "La prenda vuelve al stock y se puede volver a vender."
-                          : "La prenda está dañada o no es apta para la venta. Se registrará la pérdida económica."}
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
+                      <ProductCombobox
+                        products={products}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        error={!!form.formState.errors.productId}
                       />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
             )}
 
-            {/* N° de transacción (opcional) */}
-            <FormField
-              control={form.control}
-              name="saleId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    N° de transacción{" "}
-                    <span className="text-[11px] font-normal text-muted-foreground">(opcional)</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="ID de la venta original"
-                      {...field}
-                      value={field.value ?? ""}
+            {/* Formulario de detalle — solo visible cuando hay producto/ítem seleccionado */}
+            {(mode === "product" || txItem) && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Talle — solo editable en modo producto */}
+                  {mode === "product" && (
+                    <FormField
+                      control={form.control}
+                      name="size"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Talle{" "}
+                            <span className="text-[11px] font-normal text-muted-foreground">(opcional)</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input placeholder="XS / S / M…" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </FormControl>
-                  <FormDescription className="text-[11px]">
-                    Si la transacción tiene más de 30 días no se podrá procesar el cambio.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                  )}
 
-            {/* Notas */}
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Notas{" "}
-                    <span className="text-[11px] font-normal text-muted-foreground">(opcional)</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Estado de la prenda, descripción del problema…"
-                      className="resize-none"
-                      rows={3}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                  {/* Cantidad */}
+                  <FormField
+                    control={form.control}
+                    name="quantity"
+                    render={({ field }) => (
+                      <FormItem className={mode === "transaction" ? "col-span-2" : ""}>
+                        <FormLabel>Cantidad <span className="text-destructive">*</span></FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={maxQty}
+                            {...field}
+                            onChange={(e) => field.onChange(Math.max(1, Math.min(maxQty, Number(e.target.value))))}
+                          />
+                        </FormControl>
+                        {mode === "transaction" && txItem && (
+                          <FormDescription className="text-[11px]">
+                            Máximo: {txItem.quantity} (cantidad comprada)
+                          </FormDescription>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={handleClose}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? "Registrando…" : "Registrar"}
-              </Button>
-            </div>
+                {/* Motivo */}
+                <FormField
+                  control={form.control}
+                  name="reason"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Motivo <span className="text-destructive">*</span></FormLabel>
+                      <Select
+                        onValueChange={(v) => handleReasonChange(v as ReturnReason)}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccioná un motivo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {(Object.entries(RETURN_REASON_LABELS) as [ReturnReason, string][]).map(
+                            ([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                <span className="flex items-center gap-2">
+                                  {label}
+                                  {!RETURN_REASON_RESALABLE[value] && (
+                                    <span className="text-[10px] text-destructive/70">(daño)</span>
+                                  )}
+                                </span>
+                              </SelectItem>
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Restock toggle */}
+                {selectedReason && (
+                  <FormField
+                    control={form.control}
+                    name="restock"
+                    render={({ field }) => (
+                      <FormItem className={cn(
+                        "flex items-center justify-between rounded-lg border p-3 transition-colors",
+                        restock
+                          ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
+                          : "border-destructive/30 bg-destructive/5",
+                      )}>
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm font-medium">
+                            {restock ? "Reponer al inventario" : "Registrar como pérdida"}
+                          </FormLabel>
+                          <FormDescription className="text-[11px]">
+                            {restock
+                              ? "La prenda vuelve al stock y se puede volver a vender."
+                              : "La prenda está dañada o no es apta para la venta. Se registrará la pérdida económica."}
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* N° de transacción — solo en modo producto */}
+                {mode === "product" && (
+                  <FormField
+                    control={form.control}
+                    name="saleId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          N° de transacción{" "}
+                          <span className="text-[11px] font-normal text-muted-foreground">(opcional)</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="ID de la venta original"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-[11px]">
+                          Si la transacción tiene más de 30 días no se podrá procesar el cambio.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* Notas */}
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Notas{" "}
+                        <span className="text-[11px] font-normal text-muted-foreground">(opcional)</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Estado de la prenda, descripción del problema…"
+                          className="resize-none"
+                          rows={3}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={handleClose}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={isPending}>
+                    {isPending ? "Registrando…" : "Registrar"}
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {/* En modo transacción sin ítem seleccionado, solo el botón cancelar */}
+            {mode === "transaction" && !txItem && (
+              <div className="flex justify-end pt-2">
+                <Button type="button" variant="outline" onClick={handleClose}>
+                  Cancelar
+                </Button>
+              </div>
+            )}
 
           </form>
         </Form>

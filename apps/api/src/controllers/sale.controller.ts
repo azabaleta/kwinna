@@ -3,7 +3,7 @@ import type { SaleOrderInput, SaleStatus } from "@kwinna/contracts";
 import { SaleStatusSchema } from "@kwinna/contracts";
 import { cancelSaleAndRestoreStock, createSale, createPendingSale, dismissSale } from "../services/sale.service";
 import { createMPPreference, getMPPayment, verifyMPSignature, searchApprovedPayment } from "../services/mp.service";
-import { findAllSales, findSaleById, findWebOrdersToProcess, updateSaleStatus, findPendingSalesByEmail } from "../db/repositories/sale.repository";
+import { findAllSales, findSaleById, findSaleByTxCode, findWebOrdersToProcess, updateSaleStatus, findPendingSalesByEmail } from "../db/repositories/sale.repository";
 import { sendSaleConfirmationEmail } from "../services/email.service";
 import { insertAnalyticsEvent } from "../db/repositories/analytics.repository";
 
@@ -261,6 +261,32 @@ export async function postWebhook(
 
   } catch (err) {
     console.error("[Webhook] Error inesperado procesando notificación:", err);
+    next(err);
+  }
+}
+
+// ─── GET /sales/by-code/:txCode ───────────────────────────────────────────────
+// Busca una venta por el código corto del ticket (10 chars hex del UUID).
+// Solo admin/operator — contiene PII completa.
+
+export async function getSaleByCode(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { txCode } = req.params as { txCode: string };
+    if (!txCode || !/^[0-9a-fA-F]{10}$/.test(txCode)) {
+      res.status(400).json({ error: "Código de transacción inválido. Debe tener 10 caracteres hexadecimales." });
+      return;
+    }
+    const sale = await findSaleByTxCode(txCode);
+    if (!sale) {
+      res.status(404).json({ error: "Venta no encontrada" });
+      return;
+    }
+    res.json({ data: sale });
+  } catch (err) {
     next(err);
   }
 }

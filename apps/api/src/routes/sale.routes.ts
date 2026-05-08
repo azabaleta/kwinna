@@ -1,7 +1,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { SaleOrderInputSchema } from "@kwinna/contracts";
-import { cancelSale, getSales, getWebOrders, patchSaleStatus, postCheckout, postSale, postWebhook, patchSaleDismiss, postReconcile, postApproveTransfer, getSale } from "../controllers/sale.controller";
+import { cancelSale, getSaleByCode, getSales, getWebOrders, patchSaleStatus, postCheckout, postSale, postWebhook, patchSaleDismiss, postReconcile, postApproveTransfer, getSale } from "../controllers/sale.controller";
 import { authGuard, optionalAuth, requireRole, validate } from "../middlewares";
 
 // 10 checkouts por hora — previene reserva masiva de stock con ventas pending.
@@ -64,6 +64,15 @@ router.get(
   authGuard,
   requireRole(["admin", "operator"]),
   getWebOrders
+);
+
+// GET /sales/by-code/:txCode — busca venta por código corto de ticket (devoluciones)
+// IMPORTANTE: antes de /:id
+router.get(
+  "/by-code/:txCode",
+  authGuard,
+  requireRole(["admin", "operator"]),
+  getSaleByCode
 );
 
 // GET /sales/:id — detalle público de venta (para success page)

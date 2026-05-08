@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import type { CreditNote, Return, ReturnReason } from "@kwinna/contracts";
 import { db } from "../db";
-import { creditNotesTable, productsTable, returnsTable, stockMovementsTable, stockTable } from "../db/schema";
+import { creditNotesTable, productsTable, returnsTable, salesTable, stockMovementsTable, stockTable } from "../db/schema";
 import { mapCreditNoteRow, generateCreditNoteCode } from "../db/repositories/credit-note.repository";
 import { mapReturnRow } from "../db/repositories/returns.repository";
 import { findSaleById } from "../db/repositories/sale.repository";
@@ -66,7 +66,24 @@ export async function createReturn(
           throw Object.assign(new Error("Producto no encontrado"), { statusCode: 404 });
         }
 
-        const unitPrice = Number(productRow.price);
+        // Precio base: de lista. Si hay saleId, se intenta usar el precio pagado en esa venta
+        // (respeta tier aplicado: efectivo, mayorista, etc.) — el match es por productId + size.
+        let unitPrice = Number(productRow.price);
+
+        if (input.saleId) {
+          const [saleRow] = await tx
+            .select({ items: salesTable.items })
+            .from(salesTable)
+            .where(eq(salesTable.id, input.saleId))
+            .limit(1);
+
+          if (saleRow) {
+            const saleItem = saleRow.items.find(
+              (i) => i.productId === input.productId && (i.size ?? "") === dbSize,
+            );
+            if (saleItem) unitPrice = saleItem.unitPrice;
+          }
+        }
 
         // 3 — Insertar devolución ─────────────────────────────────────────
         const [returnRow] = await tx

@@ -2,6 +2,8 @@ import {
   SaleCheckoutResponseSchema,
   SaleListResponseSchema,
   SaleResponseSchema,
+  SaleSchema,
+  type Sale,
   type SaleCheckoutResponse,
   type SaleListResponse,
   type SaleOrderInput,
@@ -77,3 +79,11 @@ export async function postApproveTransfer(id: string): Promise<SaleResponse> {
   const res = await apiClient.post(`/sales/${id}/approve-transfer`);
   return SaleResponseSchema.parse(res.data);
 }
+
+/** GET /sales/by-code/:txCode — busca venta por código corto del ticket (para devoluciones). */
+export async function fetchSaleByCode(txCode: string): Promise<Sale> {
+  const res = await apiClient.get(`/sales/by-code/${encodeURIComponent(txCode.toUpperCase())}`);
+  return SaleSchema.parse(res.data.data);
+}
+
+export type { Sale };
