@@ -202,27 +202,31 @@ export function ProductCard({ product, stockQty, cartQty, onAdd }: ProductCardPr
         <h3 className="line-clamp-1 text-[11px] font-normal uppercase tracking-[0.05em] leading-snug text-foreground">
           {product.name}
         </h3>
-        {product.description && (
+        {product.description ? (
           <p className="line-clamp-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">
             {product.description}
           </p>
+        ) : (
+          <div className="h-3.5" />
         )}
         {product.price >= 10000 && (
-          <p className="text-[9px] font-medium tracking-widest uppercase text-primary/75 mt-0.5">
+          <p className="text-[9px] font-medium tracking-widest uppercase text-muted-foreground/70 mt-0.5">
             hasta {product.price >= 20000 ? "3" : "2"} cuotas sin interés
           </p>
         )}
-        <p className="text-xs font-normal tracking-wide tabular-nums text-foreground">
-          ${product.price.toLocaleString("es-AR")}
-        </p>
-        <p className="mt-0.5 tabular-nums text-emerald-600">
-          <span className="text-[10px] font-semibold">
-            ${Math.round(product.price * 0.75).toLocaleString("es-AR")}
-          </span>
-          <span className="ml-1 text-[8.5px] font-medium tracking-widest uppercase text-emerald-600/70">
-            transferencia
-          </span>
-        </p>
+        <div>
+          <p className="text-[13px] font-normal tracking-wide tabular-nums text-foreground">
+            ${product.price.toLocaleString("es-AR")}
+          </p>
+          <p className="tabular-nums text-emerald-600">
+            <span className="text-[10px] font-semibold">
+              ${Math.round(product.price * 0.75).toLocaleString("es-AR")}
+            </span>
+            <span className="ml-1 text-[8.5px] font-medium tracking-widest uppercase text-emerald-600/70">
+              transferencia
+            </span>
+          </p>
+        </div>
       </Link>
     </article>
   );

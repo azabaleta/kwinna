@@ -312,7 +312,7 @@ export function ProductDetailClient({ id }: { id: string }) {
                 {product.name}
               </h1>
               {product.price >= 10000 && (
-                <p className="text-[11px] font-medium tracking-widest uppercase text-primary/75">
+                <p className="text-[11px] font-medium tracking-widest uppercase text-muted-foreground/70">
                   Hasta {product.price >= 20000 ? "3" : "2"} cuotas sin interés
                 </p>
               )}
