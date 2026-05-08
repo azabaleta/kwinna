@@ -53,9 +53,9 @@ export const SaleSchema = z.object({
   customerDni:   z.string().optional(),  // opcional en entidad — puede ser vacío en ventas históricas
 
   // ── Shipping ───────────────────────────────────────────────────────────────
-  shippingAddress:  z.string().min(1),
-  shippingCity:     z.string().min(1),
-  shippingProvince: z.string().min(1),
+  shippingAddress:  z.string(),   // POS sales store "" — no min(1) on entity schema
+  shippingCity:     z.string(),
+  shippingProvince: z.string(),
   shippingZipCode:  z.string().default(""),  // default "" para ventas históricas sin CP
   shippingCost:     z.number().nonnegative(),
 
