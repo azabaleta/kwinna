@@ -210,7 +210,7 @@ export function ProductCard({ product, stockQty, cartQty, onAdd }: ProductCardPr
           <div className="h-3.5" />
         )}
         {product.price >= 10000 && (
-          <p className="text-[9px] font-medium tracking-widest uppercase text-muted-foreground/70 mt-0.5">
+          <p className="text-[9px] font-medium tracking-widest uppercase text-blue-400 mt-0.5">
             hasta {product.price >= 20000 ? "3" : "2"} cuotas sin interés
           </p>
         )}
@@ -219,7 +219,7 @@ export function ProductCard({ product, stockQty, cartQty, onAdd }: ProductCardPr
             ${product.price.toLocaleString("es-AR")}
           </p>
           <p className="tabular-nums text-emerald-600">
-            <span className="text-[10px] font-semibold">
+            <span className="text-[12px] font-semibold">
               ${Math.round(product.price * 0.75).toLocaleString("es-AR")}
             </span>
             <span className="ml-1 text-[8.5px] font-medium tracking-widest uppercase text-emerald-600/70">
