@@ -15,11 +15,10 @@ const StockInBodySchema = StockMovementSchema.pick({
 });
 
 // GET /stock — público (product detail page necesita stock en tiempo real)
-router.get("/",            listStock);
-router.get("/:productId",  getStock);
+router.get("/", listStock);
 
 // GET /stock/movements — ingresos de mercadería por rango de fecha (admin/operator)
-// IMPORTANTE: debe ir antes de /:productId para que "/movements" no sea tratado como UUID
+// Debe ir antes de /:productId para que "movements" no sea capturado como UUID.
 router.get(
   "/movements",
   authGuard,
@@ -35,5 +34,7 @@ router.post(
   validate(StockInBodySchema),
   stockIn,
 );
+
+router.get("/:productId", getStock);
 
 export default router;
