@@ -15,6 +15,7 @@ import ReceiptTicket from "../components/ReceiptTicket";
 import type { ReceiptData } from "../components/ReceiptTicket";
 import CreditNote from "../components/CreditNote";
 import type { CreditNoteData } from "../components/CreditNote";
+import BarcodeScannerButton from "../components/BarcodeScannerButton";
 
 const PAYMENT_METHODS = [
   { label: "Efectivo",        value: "efectivo"        },
@@ -61,26 +62,30 @@ function SkuBar({
       .reduce((n, i) => n + i.quantity, 0);
   }
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (!sku.trim()) return;
+  function performSearch(query: string) {
+    if (!query.trim()) return;
 
-    const exact = products.find((p) => normalize(p.sku) === normalize(sku));
+    const exact = products.find((p) => normalize(p.sku) === normalize(query));
     if (exact) {
       setWarn("");
       setResults([exact]);
       return;
     }
 
-    const matches = products.filter((p) => matchProduct(p.name, p.sku, sku));
+    const matches = products.filter((p) => matchProduct(p.name, p.sku, query));
     if (matches.length === 0) {
       setResults([]);
-      setWarn(`No se encontró nada para "${sku}".`);
+      setWarn(`No se encontró nada para "${query}".`);
       return;
     }
 
     setWarn("");
     setResults(matches);
+  }
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    performSearch(sku);
   }
 
   function addProduct(product: Product, size?: string) {
@@ -121,6 +126,7 @@ function SkuBar({
                        border border-zinc-800 focus:border-zinc-600 outline-none transition-colors"
           />
         </div>
+        <BarcodeScannerButton onScan={(code) => { setSku(code); performSearch(code); inputRef.current?.focus(); }} />
         <button
           type="submit"
           className="bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg px-4 text-sm
@@ -449,6 +455,11 @@ function OrderModal({
                   <p className="text-xs text-zinc-500 truncate">
                     {[selectedCustomer.dni && `DNI ${selectedCustomer.dni}`, selectedCustomer.phone].filter(Boolean).join(" · ")}
                   </p>
+                  {selectedCustomer.isActive === false && (
+                    <p className="text-xs text-red-400 mt-1.5 font-medium bg-red-950/40 inline-flex px-1.5 py-0.5 rounded border border-red-900/50 items-center gap-1">
+                      <AlertTriangle size={12} /> Cliente web baneado (Revisar caso)
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={clearCustomer}
@@ -537,7 +548,14 @@ function OrderModal({
                       >
                         <UserRound size={14} className="text-zinc-500 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white truncate">{r.name}</p>
+                          <p className="text-sm text-white truncate flex items-center gap-2">
+                            {r.name}
+                            {r.isActive === false && (
+                              <span className="text-[10px] bg-red-950 text-red-400 px-1 py-0.5 rounded border border-red-900/50">
+                                BANEADO
+                              </span>
+                            )}
+                          </p>
                           <p className="text-xs text-zinc-500 truncate">
                             {[r.dni && `DNI ${r.dni}`, r.phone, r.email].filter(Boolean).join(" · ")}
                           </p>
@@ -707,6 +725,7 @@ export default function SellView() {
 
   const { cart, addToCart, removeFromCart, updateQty, clearCart, priceTier, setPriceTier, returnCredit, setReturnCredit } = usePosStore();
   const vendorId = useAuthStore((s) => s.user?.id);
+  const vendorName = useAuthStore((s) => s.user?.name);
 
   const subtotal = cart.reduce((sum, i) => {
     let p = i.product.price;
@@ -800,6 +819,7 @@ export default function SellView() {
         creditApplied:  creditApplied > 0 ? creditApplied : undefined,
         creditNoteCode: creditSnapshot?.creditNoteCode,
         transactionId:  sale.id,
+        vendorName:     vendorName,
       });
 
       // Si hay saldo a favor, usar la nota de crédito residual devuelta por la API

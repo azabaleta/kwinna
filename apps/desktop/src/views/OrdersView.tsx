@@ -43,7 +43,7 @@ export default function OrdersView() {
   async function handleMarkAssembled(sale: Sale) {
     try {
       await markAssembled(sale.id);
-      showToast("Pedido marcado como armado");
+      showToast("Pedido marcado como entregado");
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : "Error al actualizar el pedido.");
     }
@@ -216,14 +216,14 @@ function OrderCard({
         </span>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          {!isAssembled && (
+          {!isAssembled && order.shippingMethod === "pickup" && (
             <button
               onClick={onMarkAssembled}
               disabled={marking}
               className="text-xs bg-emerald-800 hover:bg-emerald-700 text-emerald-200
                          rounded-lg px-3 py-1.5 font-medium transition-colors disabled:opacity-50"
             >
-              {marking ? "..." : "Marcar armado"}
+              {marking ? "..." : "Marcar como entregado"}
             </button>
           )}
           <button onClick={onToggle} className="text-zinc-500 hover:text-white transition-colors">

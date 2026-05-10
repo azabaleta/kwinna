@@ -640,6 +640,24 @@ export default function DashboardPage() {
                   {isLoading ? <div className="mt-1 h-6 w-8 animate-pulse rounded bg-muted" /> : <p className={cn("mt-0.5 text-xl font-bold tabular-nums", criticalItems.length > 0 ? "text-amber-500" : "text-foreground")}>{criticalItems.length}</p>}
                 </Card>
               </div>
+              {!isLoading && outOfStockCount > 0 && (
+                <Card>
+                  <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-destructive">Agotados</p>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {products.filter((p) => stock.filter((s) => s.productId === p.id).reduce((sum, s) => sum + s.quantity, 0) === 0).map((p) => (
+                      <div key={p.id} className="flex items-center justify-between px-4 py-2">
+                        <p className="truncate text-xs text-foreground">{p.name}</p>
+                        <span className="shrink-0 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold text-destructive">
+                          AGOTADO
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
               {!isLoading && criticalItems.length > 0 && (
                 <Card>
                   <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
@@ -1011,25 +1029,6 @@ export default function DashboardPage() {
             </Card>
           )}
         </section>
-
-        {/* ═══════════════════════════════════════════════════════════════
-            AGOTADOS
-        ════════════════════════════════════════════════════════════════ */}
-        {!isLoading && outOfStockCount > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Sin stock</h2>
-            <Card>
-              <div className="divide-y divide-border">
-                {products.filter((p) => stock.filter((s) => s.productId === p.id).reduce((sum, s) => sum + s.quantity, 0) === 0).map((p) => (
-                  <div key={p.id} className="flex items-center justify-between px-4 py-2.5">
-                    <p className="text-sm text-foreground">{p.name}</p>
-                    <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold text-destructive">AGOTADO</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </section>
-        )}
 
         {/* ── Gráficos Interactivos Modal ── */}
         {activeChart && (

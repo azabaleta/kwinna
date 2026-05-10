@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Stock, StockListResponse, StockMovement, StockMovementResponse } from "@kwinna/contracts";
-import { fetchProductStock, fetchStock, fetchStockMovements, postStockIn, type StockInPayload } from "@/services/stock";
+import { fetchProductStock, fetchStock, fetchStockMovements, fetchAllStockMovements, postStockIn, postStockOut, type StockInPayload, type StockOutPayload } from "@/services/stock";
 import { stockKeys } from "./query-keys";
 
 // ─── useStock ─────────────────────────────────────────────────────────────────
@@ -75,6 +75,26 @@ export function useStockMovements(from: Date, to: Date): {
   };
 }
 
+// ─── useAllStockMovements (Kardex) ────────────────────────────────────────────
+
+export function useAllStockMovements(from: Date, to: Date, productId?: string): {
+  movements: StockMovement[];
+  isLoading: boolean;
+  isError:   boolean;
+} {
+  const query = useQuery({
+    queryKey:  [...stockKeys.all, "movements-all", from.toISOString(), to.toISOString(), productId ?? "all"],
+    queryFn:   () => fetchAllStockMovements(from, to, productId),
+    staleTime: 60_000,
+    retry:     false,
+  });
+  return {
+    movements: query.data ?? [],
+    isLoading: query.isLoading,
+    isError:   query.isError,
+  };
+}
+
 // ─── useStockIn ───────────────────────────────────────────────────────────────
 
 export interface UseStockInResult {
@@ -90,6 +110,35 @@ export function useStockIn(): UseStockInResult {
 
   const mutation = useMutation({
     mutationFn: postStockIn,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: stockKeys.all });
+    },
+  });
+
+  return {
+    mutate: mutation.mutate,
+    mutateAsync: mutation.mutateAsync,
+    isPending: mutation.isPending,
+    isError: mutation.isError,
+    error: mutation.error,
+  };
+}
+
+// ─── useStockOut ──────────────────────────────────────────────────────────────
+
+export interface UseStockOutResult {
+  mutate: (payload: StockOutPayload) => void;
+  mutateAsync: (payload: StockOutPayload) => Promise<StockMovementResponse>;
+  isPending: boolean;
+  isError: boolean;
+  error: Error | null;
+}
+
+export function useStockOutMutation(): UseStockOutResult {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: postStockOut,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: stockKeys.all });
     },

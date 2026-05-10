@@ -8,6 +8,7 @@ import { useStock } from "../hooks/use-stock";
 import { useDebounce } from "../lib/use-debounce";
 import { formatRoundedPrice, matchProduct } from "../lib/utils";
 import { usePosStore } from "../store/use-pos-store";
+import BarcodeScannerButton from "../components/BarcodeScannerButton";
 
 const PAGE_SIZE = 24;
 
@@ -43,16 +44,19 @@ export default function SearchView() {
     <div className="p-6 h-full flex flex-col gap-5">
       {/* Search bar */}
       <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-md">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <input
-            autoFocus
-            value={query}
-            onChange={(e) => handleQueryChange(e.target.value)}
-            placeholder="Buscar por nombre o SKU..."
-            className="w-full bg-zinc-900 text-white rounded-lg pl-9 pr-4 py-2.5 text-sm
-                       border border-zinc-800 focus:border-zinc-600 outline-none transition-colors"
-          />
+        <div className="relative flex-1 max-w-md flex gap-2">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => handleQueryChange(e.target.value)}
+              placeholder="Buscar por nombre o SKU..."
+              className="w-full bg-zinc-900 text-white rounded-lg pl-9 pr-4 py-2.5 text-sm
+                         border border-zinc-800 focus:border-zinc-600 outline-none transition-colors"
+            />
+          </div>
+          <BarcodeScannerButton onScan={handleQueryChange} />
         </div>
         <span className="text-xs text-zinc-500 tabular-nums">
           {isLoading ? "Cargando…" : `${filtered.length} productos`}

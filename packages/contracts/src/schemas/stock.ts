@@ -32,6 +32,15 @@ export const StockMovementSchema = z.object({
 
 export type StockMovement = z.infer<typeof StockMovementSchema>;
 
+export const StockOutBodySchema = z.object({
+  productId: z.string().uuid(),
+  quantity:  z.number().int().positive(),
+  size:      z.string().optional(),
+  reason:    z.string().min(1, "El motivo es obligatorio para registrar la merma/ajuste"),
+});
+
+export type StockOutInput = z.infer<typeof StockOutBodySchema>;
+
 // ─── API Wrappers ─────────────────────────────────────────────────────────────
 
 export const StockResponseSchema = z.object({
@@ -57,3 +66,61 @@ export const StockMovementListResponseSchema = z.object({
 });
 
 export type StockMovementListResponse = z.infer<typeof StockMovementListResponseSchema>;
+
+// ─── Stock Balance (Inventory Count) ──────────────────────────────────────────
+
+export const StockBalanceStatusSchema = z.enum(["in_progress", "completed", "cancelled"]);
+
+export const StockBalanceItemSchema = z.object({
+  id:               z.string().uuid(),
+  balanceId:        z.string().uuid(),
+  productId:        z.string().uuid(),
+  size:             z.string().optional(),
+  expectedQuantity: z.number().int().nonnegative().nullable(),
+  countedQuantity:  z.number().int().nonnegative(),
+  unitPrice:        z.number().nullable(),
+});
+
+export type StockBalanceItem = z.infer<typeof StockBalanceItemSchema>;
+
+export const StockBalanceSchema = z.object({
+  id:                 z.string().uuid(),
+  status:             StockBalanceStatusSchema,
+  notes:              z.string().nullable(),
+  createdBy:          z.string().uuid(),
+  totalLosses:        z.number().nullable(),
+  totalDiscrepancies: z.number().nullable(),
+  accuracyPercentage: z.number().nullable(),
+  createdAt:          z.string().datetime(),
+  updatedAt:          z.string().datetime(),
+  completedAt:        z.string().datetime().nullable(),
+  items:              z.array(StockBalanceItemSchema).optional(),
+});
+
+export type StockBalance = z.infer<typeof StockBalanceSchema>;
+
+export const StockBalanceCreateSchema = z.object({
+  notes: z.string().optional(),
+});
+
+export const StockBalanceUpdateItemSchema = z.object({
+  productId: z.string().uuid(),
+  size:      z.string().optional(),
+  quantity:  z.number().int().nonnegative(),
+});
+
+export const StockBalanceUpdateSchema = z.object({
+  items: z.array(StockBalanceUpdateItemSchema),
+});
+
+export const StockBalanceResponseSchema = z.object({
+  data: StockBalanceSchema,
+});
+
+export type StockBalanceResponse = z.infer<typeof StockBalanceResponseSchema>;
+
+export const StockBalanceListResponseSchema = z.object({
+  data: z.array(StockBalanceSchema),
+});
+
+export type StockBalanceListResponse = z.infer<typeof StockBalanceListResponseSchema>;

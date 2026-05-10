@@ -12,25 +12,14 @@ import {
   ShoppingBag,
   XCircle,
 } from "lucide-react";
-import type { Sale } from "@kwinna/contracts";
+import type { Product, Sale } from "@kwinna/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useSales } from "@/hooks/use-sale";
+import { toast } from "sonner";
+import { useState } from "react";
+import { OrderDetailDialog } from "@/components/admin/order-detail-dialog";
+import { useProducts } from "@/hooks/use-products";
+import { useSales, useCancelSale, useDismissSale, useUpdateSaleStatus, useReconcileSale, useApproveTransfer } from "@/hooks/use-sale";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -140,7 +129,68 @@ function SkeletonRow() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TodayPage() {
+  const [dialogSale, setDialogSale] = useState<Sale | null>(null);
+
   const { sales, isLoading, isError, refetch } = useSales();
+  const { products } = useProducts();
+  const { mutateAsync: cancelSaleMutation,      isPending: isCancelling        } = useCancelSale();
+  const { mutateAsync: dismissSaleMutation,     isPending: isDismissing        } = useDismissSale();
+  const { mutateAsync: updateStatusMutation,    isPending: isMarkingAssembled  } = useUpdateSaleStatus();
+  const { mutateAsync: reconcileSaleMutation,   isPending: isReconciling       } = useReconcileSale();
+  const { mutateAsync: approveTransferMutation, isPending: isApprovingTransfer } = useApproveTransfer();
+
+  const productMap = useMemo(() => {
+    const map = new Map<string, Pick<Product, "sku" | "name">>();
+    for (const p of products) map.set(p.id, { sku: p.sku, name: p.name });
+    return map;
+  }, [products]);
+
+  async function handleCancel(id: string) {
+    try {
+      const result = await cancelSaleMutation(id);
+      toast.success("Venta cancelada", { description: `Stock restaurado · Orden #${id.slice(0, 8).toUpperCase()}` });
+      setDialogSale(result.data);
+    } catch (err) {
+      toast.error("No se pudo cancelar", { description: err instanceof Error ? err.message : "Error al cancelar la venta" });
+    }
+  }
+
+  async function handleDismiss(id: string, reason: string, restoreStock: boolean) {
+    try {
+      const result = await dismissSaleMutation({ id, payload: { reason, restoreStock } });
+      toast.success("Orden desestimada", { description: `La orden fue ocultada${restoreStock ? " y el stock fue restaurado" : ""}.` });
+      setDialogSale(result.data);
+    } catch (err) {
+      toast.error("No se pudo desestimar", { description: err instanceof Error ? err.message : "Error al desestimar la venta" });
+    }
+  }
+
+  async function handleMarkAssembled(id: string) {
+    try {
+      await updateStatusMutation({ id, status: "assembled" });
+      toast.success("Pedido marcado como entregado");
+    } catch {
+      toast.error("Error al actualizar pedido");
+    }
+  }
+
+  async function handleReconcile(id: string) {
+    try {
+      await reconcileSaleMutation(id);
+      toast.success("Pago verificado en MercadoPago");
+    } catch (err) {
+      toast.error("Error al verificar pago", { description: err instanceof Error ? err.message : "Error desconocido" });
+    }
+  }
+
+  async function handleApproveTransfer(id: string) {
+    try {
+      await approveTransferMutation(id);
+      toast.success("Transferencia aprobada");
+    } catch (err) {
+      toast.error("Error al aprobar transferencia", { description: err instanceof Error ? err.message : "Error desconocido" });
+    }
+  }
 
   const todaySales = useMemo(
     () => sales
@@ -301,7 +351,7 @@ export default function TodayPage() {
                   todaySales.map((sale) => {
                     const totalUnits = sale.items.reduce((a, i) => a + i.quantity, 0);
                     return (
-                      <TableRow key={sale.id}>
+                      <TableRow key={sale.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setDialogSale(sale)}>
                         <TableCell className="pl-6">
                           <span className="font-mono text-sm tabular-nums text-muted-foreground">
                             {fmtTime(sale.createdAt)}
@@ -334,6 +384,22 @@ export default function TodayPage() {
         </Card>
 
       </div>
+
+      <OrderDetailDialog
+        sale={dialogSale}
+        productMap={productMap}
+        onClose={() => setDialogSale(null)}
+        onCancel={handleCancel}
+        onDismiss={handleDismiss}
+        onMarkAssembled={handleMarkAssembled}
+        onReconcile={handleReconcile}
+        isCancelling={isCancelling}
+        isDismissing={isDismissing}
+        isMarkingAssembled={isMarkingAssembled}
+        isReconciling={isReconciling}
+        onApproveTransfer={handleApproveTransfer}
+        isApprovingTransfer={isApprovingTransfer}
+      />
     </main>
   );
 }

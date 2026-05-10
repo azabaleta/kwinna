@@ -11,6 +11,8 @@ import { formatPrice, matchProduct, normalize } from "../lib/utils";
 import { ApiError } from "../lib/api";
 import CreditNote from "../components/CreditNote";
 import type { CreditNoteData } from "../components/CreditNote";
+import BarcodeScannerButton from "../components/BarcodeScannerButton";
+import { Format } from "@tauri-apps/plugin-barcode-scanner";
 
 const REASONS = Object.entries(RETURN_REASON_LABELS) as [ReturnReason, string][];
 
@@ -86,10 +88,10 @@ export default function ReturnView() {
   }
 
   // ── Buscar venta por código de transacción ────────────────────────────────
-  async function handleTxSearch(e: React.FormEvent) {
-    e.preventDefault();
-    const code = txCode.trim().replace(/\s/g, "");
+  async function performTxSearch(codeQuery: string) {
+    const code = codeQuery.trim().replace(/\s/g, "");
     if (!code) return;
+    setTxCode(code);
     setTxError(""); setTxSale(null); setTxItem(null); resetForm();
     setTxSearching(true);
     try {
@@ -107,6 +109,11 @@ export default function ReturnView() {
     }
   }
 
+  async function handleTxSearch(e: React.FormEvent) {
+    e.preventDefault();
+    await performTxSearch(txCode);
+  }
+
   // ── Seleccionar un ítem de la transacción ─────────────────────────────────
   function selectTxItem(item: SaleItem) {
     setTxItem(item);
@@ -119,16 +126,21 @@ export default function ReturnView() {
   }
 
   // ── Búsqueda por producto ─────────────────────────────────────────────────
+  function performProductSearch(query: string) {
+    if (!query.trim()) return;
+    setSkuQuery(query);
+    setError("");
+    const exact = products.find((p) => normalize(p.sku) === normalize(query));
+    if (exact) { setSelected(exact); setResults([]); return; }
+    const matches = products.filter((p) => matchProduct(p.name, p.sku, query));
+    if (matches.length === 0) { setResults([]); setError(`No se encontró nada para "${query}".`); return; }
+    if (matches.length === 1) { setSelected(matches[0]!); setResults([]); return; }
+    setResults(matches);
+  }
+
   function handleProductSearch(e: React.FormEvent) {
     e.preventDefault();
-    if (!skuQuery.trim()) return;
-    setError("");
-    const exact = products.find((p) => normalize(p.sku) === normalize(skuQuery));
-    if (exact) { setSelected(exact); setResults([]); setSkuQuery(""); return; }
-    const matches = products.filter((p) => matchProduct(p.name, p.sku, skuQuery));
-    if (matches.length === 0) { setResults([]); setError(`No se encontró nada para "${skuQuery}".`); return; }
-    if (matches.length === 1) { setSelected(matches[0]!); setResults([]); setSkuQuery(""); return; }
-    setResults(matches);
+    performProductSearch(skuQuery);
   }
 
   function selectProduct(p: Product) {
@@ -313,11 +325,16 @@ export default function ReturnView() {
                 value={txCode}
                 onChange={(e) => { setTxCode(e.target.value.toUpperCase()); setTxSale(null); setTxItem(null); setTxError(""); resetForm(); }}
                 placeholder="Ej: A3F7B2D910"
-                maxLength={10}
                 className="w-full bg-zinc-900 text-white rounded-lg pl-9 pr-4 py-2.5 text-sm font-mono
                            border border-zinc-800 focus:border-zinc-600 outline-none transition-colors uppercase"
               />
             </div>
+            <BarcodeScannerButton 
+              formats={[Format.Code128]} 
+              onScan={async (code) => { 
+                await performTxSearch(code.toUpperCase()); 
+              }} 
+            />
             <button
               type="submit"
               disabled={txSearching || txCode.trim().length < 6}
@@ -445,6 +462,7 @@ export default function ReturnView() {
                            disabled:opacity-40"
               />
             </div>
+            <BarcodeScannerButton onScan={performProductSearch} />
             <button
               type="submit"
               disabled={isLoading}

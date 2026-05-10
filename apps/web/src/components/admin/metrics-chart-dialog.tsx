@@ -241,11 +241,11 @@ export function MetricsChartDialog({ isOpen, onClose, metric, sales, from, to }:
                     </AnimatePresence>
 
                     {/* Bar visual */}
-                    <div className={cn("w-full max-w-[40px] flex flex-col justify-end transition-opacity duration-200", dimOthers && "opacity-30")}>
+                    <div className={cn("w-full h-full max-w-[40px] flex flex-col justify-end transition-opacity duration-200", dimOthers && "opacity-30")}>
                       {(filter === "both" || filter === "pos") && (
                         <motion.div 
                           initial={{ height: 0 }}
-                          animate={{ height: `${filter === "pos" ? posH : (point.pos / point.total * totalH || 0)}%` }}
+                          animate={{ height: `${filter === "pos" ? posH : posH || 0}%` }}
                           transition={{ type: "spring", bounce: 0, duration: 0.6 }}
                           className={cn("bg-amber-500/90 w-full rounded-t-sm", filter === "both" && point.web === 0 ? "rounded-b-sm" : "")}
                         />
@@ -253,7 +253,7 @@ export function MetricsChartDialog({ isOpen, onClose, metric, sales, from, to }:
                       {(filter === "both" || filter === "web") && (
                         <motion.div 
                           initial={{ height: 0 }}
-                          animate={{ height: `${filter === "web" ? webH : (point.web / point.total * totalH || 0)}%` }}
+                          animate={{ height: `${filter === "web" ? webH : webH || 0}%` }}
                           transition={{ type: "spring", bounce: 0, duration: 0.6 }}
                           className={cn("bg-primary w-full rounded-b-sm", filter === "both" && point.pos === 0 ? "rounded-t-sm" : "", filter === "web" ? "rounded-t-sm" : "")}
                         />

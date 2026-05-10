@@ -27,6 +27,12 @@ export const stockMovementTypeEnum = pgEnum("stock_movement_type", [
   "adjustment",
 ]);
 
+export const stockBalanceStatusEnum = pgEnum("stock_balance_status", [
+  "in_progress",
+  "completed",
+  "cancelled",
+]);
+
 export const saleStatusEnum = pgEnum("sale_status", [
   "pending",
   "completed",
@@ -224,6 +230,44 @@ export const stockMovementsTable = pgTable("stock_movements", {
   reason:    text("reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── stock_balances ───────────────────────────────────────────────────────────
+// Sesiones de conteo de inventario.
+
+export const stockBalancesTable = pgTable("stock_balances", {
+  id:                 uuid("id").primaryKey().defaultRandom(),
+  status:             stockBalanceStatusEnum("status").notNull().default("in_progress"),
+  notes:              text("notes"),
+  createdBy:          uuid("created_by").notNull().references(() => usersTable.id),
+  totalLosses:        numeric("total_losses", { precision: 12, scale: 2 }), // en dinero
+  totalDiscrepancies: integer("total_discrepancies"), // cantidad de items que no cuadraron
+  accuracyPercentage: numeric("accuracy_percentage", { precision: 5, scale: 2 }), // ej 98.50
+  createdAt:          timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:          timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt:        timestamp("completed_at", { withTimezone: true }),
+});
+
+export const stockBalanceItemsTable = pgTable(
+  "stock_balance_items",
+  {
+    id:               uuid("id").primaryKey().defaultRandom(),
+    balanceId:        uuid("balance_id").notNull().references(() => stockBalancesTable.id, { onDelete: "cascade" }),
+    productId:        uuid("product_id").notNull().references(() => productsTable.id),
+    size:             text("size").notNull().default(""),
+    expectedQuantity: integer("expected_quantity"), // Puede ser nulo hasta que se complete (ciego)
+    countedQuantity:  integer("counted_quantity").notNull().default(0),
+    unitPrice:        numeric("unit_price", { precision: 12, scale: 2 }), // Guardado al momento de completar
+    createdAt:        timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt:        timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    balanceProductSizeUniq: uniqueIndex("stock_balance_items_uniq").on(
+      table.balanceId,
+      table.productId,
+      table.size
+    ),
+  })
+);
 
 // ─── sales ────────────────────────────────────────────────────────────────────
 // Contrato: SaleSchema

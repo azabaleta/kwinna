@@ -100,7 +100,21 @@ export async function createSale(
 
   const row = await db.transaction(async (tx) => {
 
-    // 1 — Resolver precios reales desde la BD ─────────────────────────────
+    // 1 — Check customer ban (solo web) ──────────────────────────────────
+    if (input.channel !== "pos") {
+      const [user] = await tx
+        .select({ isActive: usersTable.isActive })
+        .from(usersTable)
+        .where(eq(usersTable.email, input.customerEmail.toLowerCase()));
+      if (user && !user.isActive) {
+        throw Object.assign(
+          new Error("Esta cuenta se encuentra suspendida."),
+          { statusCode: 403 }
+        );
+      }
+    }
+
+    // 2 — Resolver precios reales desde la BD ─────────────────────────────
     const productIds = [...new Set(input.items.map((i) => i.productId))];
 
     const priceRows = await tx
@@ -119,7 +133,7 @@ export async function createSale(
       }
     }
 
-    // 2 — Deducir stock y construir SaleItems con precios verificados ──────
+    // 3 — Deducir stock y construir SaleItems con precios verificados ──────
     const saleItems: SaleItem[] = [];
 
     // priceTier solo aplica en ventas POS (indicado por presencia de vendorId).
@@ -147,7 +161,7 @@ export async function createSale(
       });
     }
 
-    // 3 — Calcular totales en el servidor ─────────────────────────────────
+    // 4 — Calcular totales en el servidor ─────────────────────────────────
     // Pickup siempre tiene envío gratis, independientemente de la ciudad.
     const isPickup    = input.shippingMethod === "pickup";
     const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity ?? "");
@@ -157,7 +171,7 @@ export async function createSale(
     const discount   = (!effectiveTier && input.paymentMethod === "transfer") ? itemsTotal * 0.25 : 0;
     const total      = itemsTotal - discount + shippingCost;
 
-    // 4 — Insertar venta ───────────────────────────────────────────────────
+    // 5 — Insertar venta ───────────────────────────────────────────────────
     const [inserted] = await tx
       .insert(salesTable)
       .values({
@@ -252,7 +266,21 @@ export async function createSale(
 export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
   const row = await db.transaction(async (tx) => {
 
-    // 1 — Resolver precios reales desde la BD ─────────────────────────────
+    // 1 — Check customer ban (solo web) ──────────────────────────────────
+    if (input.channel !== "pos") {
+      const [user] = await tx
+        .select({ isActive: usersTable.isActive })
+        .from(usersTable)
+        .where(eq(usersTable.email, input.customerEmail.toLowerCase()));
+      if (user && !user.isActive) {
+        throw Object.assign(
+          new Error("Esta cuenta se encuentra suspendida."),
+          { statusCode: 403 }
+        );
+      }
+    }
+
+    // 2 — Resolver precios reales desde la BD ─────────────────────────────
     const productIds = [...new Set(input.items.map((i) => i.productId))];
 
     const priceRows = await tx
@@ -271,7 +299,7 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
       }
     }
 
-    // 2 — Deducir stock y construir SaleItems con precios verificados ──────
+    // 3 — Deducir stock y construir SaleItems con precios verificados ──────
     const saleItems: SaleItem[] = [];
 
     // priceTier solo aplica en ventas POS (indicado por presencia de vendorId).
@@ -297,7 +325,7 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
       });
     }
 
-    // 3 — Calcular totales en el servidor ────────────────────────────────
+    // 4 — Calcular totales en el servidor ────────────────────────────────
     // Pickup siempre tiene envío gratis, independientemente de la ciudad.
     const isPickup     = input.shippingMethod === "pickup";
     const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity ?? "");
@@ -306,7 +334,7 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
     const discount   = (!effectiveTier && input.paymentMethod === "transfer") ? itemsTotal * 0.25 : 0;
     const total      = itemsTotal - discount + shippingCost;
 
-    // 4 — Insertar venta pending ───────────────────────────────────────────
+    // 5 — Insertar venta pending ───────────────────────────────────────────
     const [inserted] = await tx
       .insert(salesTable)
       .values({

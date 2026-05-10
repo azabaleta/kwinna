@@ -4,7 +4,20 @@ import express from "express";
 import morgan from "morgan";
 
 import { authGuard, errorHandler, optionalAuth, requestLogger } from "./middlewares";
-import { analyticsRoutes, authRoutes, creditNotesRoutes, glossaryRoutes, posCustomersRoutes, productRoutes, reportsRoutes, returnsRoutes, saleRoutes, stockRoutes, usersRoutes } from "./routes";
+import {
+  analyticsRoutes,
+  authRoutes,
+  creditNotesRoutes,
+  glossaryRoutes,
+  posCustomersRoutes,
+  productRoutes,
+  reportsRoutes,
+  returnsRoutes,
+  saleRoutes,
+  stockRoutes,
+  stockBalancesRoutes,
+  usersRoutes,
+} from "./routes";
 import { registerReportsJob } from "./jobs/reports.job";
 
 const app = express();
@@ -75,6 +88,7 @@ app.use("/glossary",       glossaryRoutes);
 
 app.use("/products", optionalAuth, productRoutes);
 app.use("/stock", optionalAuth, stockRoutes);
+app.use("/stock-balances", stockBalancesRoutes);
 // /sales: auth se gestiona a nivel de ruta — POST es público, GET requiere admin/operator
 app.use("/sales", saleRoutes);
 

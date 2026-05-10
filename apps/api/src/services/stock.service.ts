@@ -4,6 +4,8 @@ import {
   findAllStock,
   findStockByProductId,
   type AddStockInput,
+  type RemoveStockInput,
+  removeStock as repoRemoveStock,
 } from "../db/repositories";
 
 export async function getAllStock(): Promise<Stock[]> {
@@ -21,4 +23,10 @@ export type { AddStockInput as StockInInput };
 
 export async function addStock(input: AddStockInput): Promise<StockMovement> {
   return repoAddStock(input);
+}
+
+export type { RemoveStockInput as StockOutInput };
+
+export async function removeStock(input: RemoveStockInput): Promise<StockMovement> {
+  return repoRemoveStock(input);
 }

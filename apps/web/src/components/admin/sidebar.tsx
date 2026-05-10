@@ -1,12 +1,10 @@
 "use client";
 
-"use client";
-
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { BarChart3, CalendarCheck, LayoutDashboard, LogOut, Menu, Package2, RotateCcw, ShoppingBag, ShoppingCart, Tag, Users, UserCog, X } from "lucide-react";
+import { BarChart3, CalendarCheck, LayoutDashboard, LogOut, Menu, Package2, RotateCcw, ShoppingBag, ShoppingCart, Tag, Users, UserCog, X, ArrowRightLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { selectUser, useAuthStore } from "@/store/use-auth-store";
@@ -18,6 +16,7 @@ const NAV_ITEMS = [
   { href: "/admin/today",      label: "Pedidos del día", icon: CalendarCheck,   adminOnly: false },
   { href: "/admin/sell",       label: "Vender",          icon: ShoppingCart,    adminOnly: false },
   { href: "/admin/inventory",  label: "Inventario",      icon: Package2,        adminOnly: false },
+  { href: "/admin/kardex",     label: "Kardex",          icon: ArrowRightLeft,  adminOnly: false },
   { href: "/admin/orders",     label: "Pedidos",         icon: ShoppingBag,     adminOnly: false },
   { href: "/admin/customers",  label: "Clientes",        icon: Users,           adminOnly: false },
   { href: "/admin/operators",  label: "Operadores",      icon: UserCog,         adminOnly: true  },

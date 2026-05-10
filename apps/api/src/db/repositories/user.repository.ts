@@ -88,6 +88,7 @@ export async function findAllCustomers(): Promise<CustomerMetrics[]> {
       name:          usersTable.name,
       email:         usersTable.email,
       emailVerified: usersTable.emailVerified,
+      isActive:      usersTable.isActive,
       createdAt:     usersTable.createdAt,
     })
     .from(usersTable)
@@ -129,6 +130,7 @@ export async function findAllCustomers(): Promise<CustomerMetrics[]> {
       name:          c.name,
       email:         c.email,
       emailVerified: c.emailVerified,
+      isActive:      c.isActive,
       createdAt:     c.createdAt.toISOString(),
       totalLifetime,
       totalSemester,
@@ -139,14 +141,18 @@ export async function findAllCustomers(): Promise<CustomerMetrics[]> {
 
 export async function searchWebCustomers(
   q: string,
-): Promise<Array<{ id: string; name: string; email: string }>> {
+): Promise<Array<{ id: string; name: string; email: string; isActive: boolean }>> {
   const rows = await db
-    .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+    .select({ 
+      id: usersTable.id, 
+      name: usersTable.name, 
+      email: usersTable.email,
+      isActive: usersTable.isActive 
+    })
     .from(usersTable)
     .where(
       and(
         eq(usersTable.role, "customer"),
-        eq(usersTable.isActive, true),
         or(
           ilike(usersTable.name,  `%${q}%`),
           ilike(usersTable.email, `%${q}%`),
@@ -243,6 +249,13 @@ export async function setOperatorActive(id: string, active: boolean): Promise<vo
     .update(usersTable)
     .set({ isActive: active })
     .where(and(eq(usersTable.id, id), eq(usersTable.role, "operator")));
+}
+
+export async function setCustomerActive(id: string, active: boolean): Promise<void> {
+  await db
+    .update(usersTable)
+    .set({ isActive: active })
+    .where(and(eq(usersTable.id, id), eq(usersTable.role, "customer")));
 }
 
 export async function findOperatorById(id: string): Promise<Operator | undefined> {

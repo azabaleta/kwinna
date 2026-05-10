@@ -6,6 +6,8 @@ import {
   patchOperator,
   deleteOperator,
   reactivateOperator,
+  banCustomer,
+  unbanCustomer,
 } from "../controllers/users.controller";
 import { authGuard } from "../middlewares/auth-guard";
 import { requireRole } from "../middlewares/require-role";
@@ -14,6 +16,8 @@ const router = Router();
 
 // GET /users/customers — lista clientes con métricas (admin/operator)
 router.get("/customers", authGuard, requireRole(["admin", "operator"]), getCustomers);
+router.patch("/customers/:id/ban", authGuard, requireRole(["admin"]), banCustomer);
+router.patch("/customers/:id/unban", authGuard, requireRole(["admin"]), unbanCustomer);
 
 // ── Operadores (solo admin) ───────────────────────────────────────────────────
 router.get(    "/operators",                  authGuard, requireRole(["admin"]), getOperators);

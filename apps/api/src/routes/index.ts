@@ -8,4 +8,5 @@ export { default as reportsRoutes }      from "./reports.routes";
 export { default as returnsRoutes }      from "./returns.routes";
 export { default as saleRoutes }         from "./sale.routes";
 export { default as stockRoutes }        from "./stock.routes";
+export { default as stockBalancesRoutes} from "./stock-balances.routes";
 export { default as usersRoutes }        from "./users.routes";

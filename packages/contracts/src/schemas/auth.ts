@@ -82,6 +82,7 @@ export const CustomerMetricsSchema = z.object({
   name:          z.string(),
   email:         z.string().email(),
   emailVerified: z.boolean(),
+  isActive:      z.boolean(),
   createdAt:     z.string().datetime(),
   totalLifetime: z.number(),
   totalMonth:    z.number(),

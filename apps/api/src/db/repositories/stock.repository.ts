@@ -1,4 +1,4 @@
-import { and, eq, gte, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import type { Stock, StockMovement } from "@kwinna/contracts";
 import { db } from "../index";
 import { stockMovementsTable, stockTable } from "../schema";
@@ -71,6 +71,29 @@ export async function findStockMovementsInRange(from: Date, to: Date): Promise<S
   return rows.map(mapMovementRow);
 }
 
+/**
+ * Todos los movimientos de stock en un rango de fechas.
+ * Filtrado opcional por productId para aislar la historia de un único ítem.
+ */
+export async function findAllStockMovements(from: Date, to: Date, productId?: string): Promise<StockMovement[]> {
+  const conditions = [
+    gte(stockMovementsTable.createdAt, from),
+    lt(stockMovementsTable.createdAt, to),
+  ];
+
+  if (productId) {
+    conditions.push(eq(stockMovementsTable.productId, productId));
+  }
+
+  const rows = await db
+    .select()
+    .from(stockMovementsTable)
+    .where(and(...conditions))
+    .orderBy(desc(stockMovementsTable.createdAt));
+    
+  return rows.map(mapMovementRow);
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export interface AddStockInput {
@@ -78,6 +101,13 @@ export interface AddStockInput {
   quantity:  number;
   size?:     string;
   reason?:   string;
+}
+
+export interface RemoveStockInput {
+  productId: string;
+  quantity:  number;
+  size?:     string;
+  reason:    string;
 }
 
 /**
@@ -112,4 +142,51 @@ export async function addStock(input: AddStockInput): Promise<StockMovement> {
     .returning();
 
   return mapMovementRow(movement!);
+}
+
+/**
+ * Resta stock para (productId, size) y registra el movimiento de ajuste negativo.
+ * Arroja error 409 si no hay stock suficiente.
+ */
+export async function removeStock(input: RemoveStockInput): Promise<StockMovement> {
+  const dbSize = sizeToDb(input.size);
+
+  const row = await db.transaction(async (tx) => {
+    const [stockRow] = await tx
+      .select()
+      .from(stockTable)
+      .where(and(
+        eq(stockTable.productId, input.productId),
+        eq(stockTable.size, dbSize),
+      ))
+      .for("update");
+
+    if (!stockRow || stockRow.quantity < input.quantity) {
+      throw Object.assign(
+        new Error(`Stock insuficiente para descontar. Hay ${stockRow?.quantity ?? 0} unidades disponibles.`),
+        { statusCode: 409 }
+      );
+    }
+
+    await tx
+      .update(stockTable)
+      .set({ quantity: sql`${stockTable.quantity} - ${input.quantity}`, updatedAt: new Date() })
+      .where(eq(stockTable.id, stockRow.id));
+
+    const [movement] = await tx
+      .insert(stockMovementsTable)
+      .values({
+        productId: input.productId,
+        size:      dbSize,
+        type:      "adjustment",
+        quantity:  input.quantity, // quantity is positive, type 'adjustment' combined with stock subtraction defines the action
+        reason:    input.reason,
+        createdAt: new Date(),
+      })
+      .returning();
+
+    return movement!;
+  });
+
+  return mapMovementRow(row);
 }

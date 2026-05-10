@@ -38,6 +38,20 @@ export async function postStockIn(
   return StockMovementResponseSchema.parse(res.data);
 }
 
+export interface StockOutPayload {
+  productId: StockMovement["productId"];
+  quantity:  StockMovement["quantity"];
+  size?:     string;
+  reason:    string;
+}
+
+export async function postStockOut(
+  payload: StockOutPayload
+): Promise<StockMovementResponse> {
+  const res = await apiClient.post("/stock/out", payload);
+  return StockMovementResponseSchema.parse(res.data);
+}
+
 /**
  * GET /stock/movements?from=ISO&to=ISO
  * Devuelve todos los ingresos ("in") de mercadería en el rango.
@@ -47,5 +61,22 @@ export async function fetchStockMovements(from: Date, to: Date): Promise<StockMo
   const res = await apiClient.get("/stock/movements", {
     params: { from: from.toISOString(), to: to.toISOString() },
   });
+  return StockMovementListResponseSchema.parse(res.data).data;
+}
+
+/**
+ * GET /stock/movements/all?from=ISO&to=ISO&productId=UUID
+ * Devuelve todos los movimientos (in, out, adjustment) en el rango, opcionalmente filtrados por producto.
+ * Solo accesible por admin/operator.
+ */
+export async function fetchAllStockMovements(from: Date, to: Date, productId?: string): Promise<StockMovement[]> {
+  const params: Record<string, string> = {
+    from: from.toISOString(),
+    to: to.toISOString(),
+  };
+  if (productId) {
+    params.productId = productId;
+  }
+  const res = await apiClient.get("/stock/movements/all", { params });
   return StockMovementListResponseSchema.parse(res.data).data;
 }

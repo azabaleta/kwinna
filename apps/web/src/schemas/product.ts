@@ -84,6 +84,8 @@ export const PRODUCT_TAGS = [
   "Buzos",
   "Medias",
   "Deportivo",
+  "Plus Size",
+  "Seamless",
   "Accesorios",
 ] as const;
 

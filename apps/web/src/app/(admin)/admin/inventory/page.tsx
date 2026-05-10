@@ -32,6 +32,7 @@ import { useCreateSale } from "@/hooks/use-sale";
 import { useProducts } from "@/hooks/use-products";
 import { useStock } from "@/hooks/use-stock";
 import { RestockDialog } from "@/components/inventory/restock-dialog";
+import { RemoveStockDialog } from "@/components/inventory/remove-stock-dialog";
 import { CreateProductDialog } from "@/components/inventory/create-product-dialog";
 import { BulkImportDialog } from "@/components/inventory/bulk-import-dialog";
 import { DeleteProductDialog } from "@/components/inventory/delete-product-dialog";
@@ -277,6 +278,7 @@ export default function InventoryPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <BulkImportDialog />
+            <RemoveStockDialog products={products} stockByProduct={stockByProduct} />
             <RestockDialog products={products} stockByProduct={stockByProduct} />
             <CreateProductDialog />
           </div>

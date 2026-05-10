@@ -46,6 +46,7 @@ export const CustomerSearchResultSchema = z.object({
   address:  z.string().optional(),
   city:     z.string().optional(),
   province: z.string().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export type CustomerSearchResult = z.infer<typeof CustomerSearchResultSchema>;

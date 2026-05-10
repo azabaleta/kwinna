@@ -16,8 +16,10 @@ import {
   EyeOff,
   RotateCcw,
 } from "lucide-react";
+import { useOperators } from "@/hooks/use-operators";
 import WebReceiptTicket from "./web-receipt-ticket";
 import type { Product, Sale } from "@kwinna/contracts";
+import { selectUser, useAuthStore } from "@/store/use-auth-store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -103,6 +105,11 @@ export function OrderDetailDialog({
   const [restoreStock, setRestoreStock] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
+  const { operators } = useOperators();
+  const vendorName = sale?.vendorId
+    ? operators?.find((op) => op.id === sale.vendorId)?.name
+    : undefined;
+
   function handleReprint() {
     window.print();
   }
@@ -116,6 +123,10 @@ export function OrderDetailDialog({
       setRestoreStock(false);
     }
   }
+
+  const user = useAuthStore(selectUser);
+  const isAdmin = user?.role === "admin";
+  const canMarkDelivered = isAdmin || sale?.shippingMethod === "pickup";
 
   return (
     <>
@@ -261,7 +272,7 @@ export function OrderDetailDialog({
               </section>
 
               {/* ── Marcar como entregado: solo para completed ── */}
-              {sale.status === "completed" && !sale.isDismissed && onMarkAssembled && (
+              {sale.status === "completed" && !sale.isDismissed && onMarkAssembled && canMarkDelivered && (
                 <section>
                   <Button
                     size="sm"
@@ -492,7 +503,7 @@ export function OrderDetailDialog({
     {/* Hidden print area — visible only during window.print() */}
     {sale && productMap && (
       <div id="web-receipt-print-area" style={{ display: "none" }}>
-        <WebReceiptTicket ref={printRef} sale={sale} productMap={productMap} reprint />
+        <WebReceiptTicket ref={printRef} sale={sale} productMap={productMap} reprint vendorName={vendorName} />
       </div>
     )}
     </>

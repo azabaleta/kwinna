@@ -1,4 +1,5 @@
 import { forwardRef } from "react";
+import Barcode from "react-barcode";
 import type { Product, Sale } from "@kwinna/contracts";
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -29,10 +30,11 @@ interface WebReceiptTicketProps {
   sale:       Sale;
   productMap: Map<string, Pick<Product, "sku" | "name">>;
   reprint?:   boolean;
+  vendorName?: string;
 }
 
 const WebReceiptTicket = forwardRef<HTMLDivElement, WebReceiptTicketProps>(
-  ({ sale, productMap, reprint = false }, ref) => {
+  ({ sale, productMap, reprint = false, vendorName }, ref) => {
     const sep   = "─".repeat(32);
     const txCode = sale.id.replace(/-/g, "").slice(0, 10).toUpperCase();
 
@@ -53,6 +55,11 @@ const WebReceiptTicket = forwardRef<HTMLDivElement, WebReceiptTicketProps>(
               d="M280.26.28c-103.19-5.26-103.52,64.28-100.34,144.94,0,0,0,159.8,0,159.8,0,34.84-28.34,63.18-63.18,63.18-36.08,1.89-67.01-26.9-66.89-63.18,0,0,0-163.52,0-163.52H1.54c4.57,95.06-34.55,271.9,111.49,275,62.84,2.01,115.32-48.53,115.2-111.49.94-46.4-.68-182.32,0-226.69-.39-28.27,30.18-32.02,52.03-29.73,16.39,0,29.73,13.33,29.73,29.73,0,0,0,66.89,0,66.89v234.13c-3.44,80.06-2.32,150.68,100.34,144.94,80.66-4.35,81.12-74.96,78.04-137.5,0,0,0-7.43,0-7.43v-144.94c1.16-83.55,128.9-83.61,130.07,0,0,0,0,144.93,0,144.93,0,0,0,7.43,0,7.43-3.19,62.29-2.43,133.4,78.05,137.5,78.95,5.85,106.97-42.04,100.33-115.21-.27-17.31.2-153.84,0-174.67,0-34.84,28.34-63.18,63.18-63.18,36.07-1.89,67.02,26.9,66.89,63.18,0,0,0,174.67,0,174.67h48.31c-5.86-95.66,37.94-283.44-111.49-286.15-62.84-2-115.32,48.53-115.2,111.49-.59,46.99.42,166.6,0,211.83.39,28.27-30.18,32.02-52.03,29.73-16.39,0-29.73-13.33-29.73-29.73.24-43.6-.17-166.45,0-211.83.12-62.95-52.37-113.49-115.21-111.49-140.61,4.61-108.86,161.91-111.49,256.43-.38,3.51.27,61.97,0,66.89.39,28.27-30.19,32.02-52.04,29.73-16.39,0-29.72-13.34-29.72-29.73,0,0,0-66.89,0-66.89v-234.13c2.23-63.34,6.48-140.61-78.04-144.94"
             />
           </svg>
+          <div className="receipt-store-info" style={{ fontSize: "10px", lineHeight: "1.2", margin: "6px 0", opacity: 0.8 }}>
+            <p>Kwinna · CUIL 20-40294631-9</p>
+            <p>Andrés Bernabé Zabaleta</p>
+            <p>Luis Beltrán 824, Neuquén Capital</p>
+          </div>
           <p className="receipt-sub">Comprobante de venta</p>
           <p className="receipt-date">{fmtDate(new Date(sale.createdAt))}</p>
         </div>
@@ -101,12 +108,32 @@ const WebReceiptTicket = forwardRef<HTMLDivElement, WebReceiptTicketProps>(
             <p>Pago: {PAYMENT_LABELS[sale.paymentMethod] ?? sale.paymentMethod}</p>
           )}
           {sale.saleNotes && <p>Nota: {sale.saleNotes}</p>}
-          <p style={{ marginTop: "4px" }}>
-            N° transacción: <strong>{txCode}</strong>
-          </p>
+          <div style={{ marginTop: "6px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <p style={{ marginBottom: "2px" }}>
+              N° transacción: <strong>{txCode}</strong>
+            </p>
+            <div style={{ transform: "scale(0.95)", transformOrigin: "center" }}>
+              <Barcode 
+                value={txCode} 
+                format="CODE128" 
+                width={1.2} 
+                height={35} 
+                displayValue={false}
+                margin={0}
+                background="transparent"
+              />
+            </div>
+          </div>
+          {vendorName && (
+            <p style={{ marginTop: "4px" }}>Vendedor: {vendorName}</p>
+          )}
         </div>
 
         <p className="receipt-sep">{sep}</p>
+
+        <div className="receipt-policies" style={{ fontSize: "10px", textAlign: "center", opacity: 0.8, marginBottom: "8px", lineHeight: "1.3" }}>
+          <p>Devoluciones en el local hasta 30 días corridos post-compra. Requiere ticket, bolsa y prenda sin uso en perfecto estado.</p>
+        </div>
 
         <div className="receipt-thanks">
           <p>¡Gracias por tu compra!</p>

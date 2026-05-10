@@ -1,9 +1,9 @@
 import { Router } from "express";
-import { getMovements, getStock, listStock, stockIn } from "../controllers/stock.controller";
+import { getMovements, getAllMovements, getStock, listStock, stockIn, stockOut } from "../controllers/stock.controller";
 import { authGuard } from "../middlewares/auth-guard";
 import { requireRole } from "../middlewares/require-role";
 import { validate } from "../middlewares/validate";
-import { StockMovementSchema } from "@kwinna/contracts";
+import { StockMovementSchema, StockOutBodySchema } from "@kwinna/contracts";
 
 const router = Router();
 
@@ -26,6 +26,13 @@ router.get(
   getMovements,
 );
 
+router.get(
+  "/movements/all",
+  authGuard,
+  requireRole(["admin", "operator"]),
+  getAllMovements,
+);
+
 // POST /stock/in — solo admin/operator
 router.post(
   "/in",
@@ -33,6 +40,15 @@ router.post(
   requireRole(["admin", "operator"]),
   validate(StockInBodySchema),
   stockIn,
+);
+
+// POST /stock/out — solo admin/operator
+router.post(
+  "/out",
+  authGuard,
+  requireRole(["admin", "operator"]),
+  validate(StockOutBodySchema),
+  stockOut,
 );
 
 router.get("/:productId", getStock);

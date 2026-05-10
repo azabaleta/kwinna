@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import type { PriceTier } from "@kwinna/contracts";
+import Barcode from "react-barcode";
 import KwinnaLogo from "./KwinnaLogo";
 
 export interface ReceiptData {
@@ -20,6 +21,7 @@ export interface ReceiptData {
   creditApplied?:  number;
   creditNoteCode?: string;
   transactionId?:  string;
+  vendorName?:     string;
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -75,6 +77,11 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?
         {/* Header */}
         <div className="receipt-header">
           <KwinnaLogo className="receipt-logo" />
+          <div className="receipt-store-info" style={{ fontSize: "10px", lineHeight: "1.2", margin: "6px 0", opacity: 0.8 }}>
+            <p>Kwinna · CUIL 20-40294631-9</p>
+            <p>Andrés Bernabé Zabaleta</p>
+            <p>Luis Beltrán 824, Neuquén Capital</p>
+          </div>
           <p className="receipt-sub">
             {hidePrice ? "Ticket de regalo" : "Comprobante de venta"}
           </p>
@@ -141,9 +148,25 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?
           )}
           {data.saleNotes && <p>Nota: {data.saleNotes}</p>}
           {txCode && (
-            <p style={{ marginTop: "4px" }}>
-              N° transacción: <strong>{txCode}</strong>
-            </p>
+            <div style={{ marginTop: "6px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <p style={{ marginBottom: "2px" }}>
+                N° transacción: <strong>{txCode}</strong>
+              </p>
+              <div style={{ transform: "scale(0.95)", transformOrigin: "center" }}>
+                <Barcode 
+                  value={txCode} 
+                  format="CODE128" 
+                  width={1.2} 
+                  height={35} 
+                  displayValue={false}
+                  margin={0}
+                  background="transparent"
+                />
+              </div>
+            </div>
+          )}
+          {data.vendorName && (
+            <p style={{ marginTop: "4px" }}>Vendedor: {data.vendorName}</p>
           )}
           {hidePrice && (
             <p style={{ marginTop: "6px", fontSize: "9px", opacity: 0.6 }}>
@@ -153,6 +176,11 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?
         </div>
 
         <p className="receipt-sep">{separator}</p>
+
+        {/* Policies */}
+        <div className="receipt-policies" style={{ fontSize: "10px", textAlign: "center", opacity: 0.8, marginBottom: "8px", lineHeight: "1.3" }}>
+          <p>Devoluciones en el local hasta 30 días corridos post-compra. Requiere ticket, bolsa y prenda sin uso en perfecto estado.</p>
+        </div>
 
         {/* Tagline */}
         <div className="receipt-thanks">

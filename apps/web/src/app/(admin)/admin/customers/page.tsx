@@ -19,7 +19,8 @@ import { useCustomers } from "@/hooks/use-customers";
 import { useSales } from "@/hooks/use-sale";
 import { cn } from "@/lib/utils";
 import { CustomerDetailSheet } from "@/components/admin/customer-detail-sheet";
-import type { CustomerMetrics } from "@kwinna/contracts";
+import { useProducts } from "@/hooks/use-products";
+import type { CustomerMetrics, Product } from "@kwinna/contracts";
 
 const PAGE_SIZE = 20;
 
@@ -69,6 +70,13 @@ function CustomersContent() {
 
   const { customers, isLoading, isError } = useCustomers();
   const { sales } = useSales();
+  const { products } = useProducts();
+
+  const productMap = useMemo(() => {
+    const map = new Map<string, Pick<Product, "sku" | "name">>();
+    for (const p of products) map.set(p.id, { sku: p.sku, name: p.name });
+    return map;
+  }, [products]);
 
   function updateParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -225,13 +233,21 @@ function CustomersContent() {
                     : paginated.map((c) => (
                       <TableRow
                         key={c.id}
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        className={cn(
+                          "cursor-pointer hover:bg-muted/50 transition-colors",
+                          !c.isActive && "opacity-50 grayscale-[0.5]"
+                        )}
                         onClick={() => setSelectedCustomer(c)}
                       >
                         <TableCell className="pl-6">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-foreground">{c.name}</span>
-                            {!c.emailVerified && (
+                            {!c.isActive && (
+                              <Badge variant="destructive" className="text-[10px] h-5 px-1.5">
+                                Baneado
+                              </Badge>
+                            )}
+                            {!c.emailVerified && c.isActive && (
                               <Badge variant="outline" className="text-[10px] text-muted-foreground">
                                 Sin verificar
                               </Badge>
@@ -306,6 +322,7 @@ function CustomersContent() {
         customer={selectedCustomer}
         onClose={() => setSelectedCustomer(null)}
         sales={sales.filter((s) => s.userId === selectedCustomer?.id || s.customerEmail === selectedCustomer?.email)}
+        productMap={productMap}
       />
     </main>
   );

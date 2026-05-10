@@ -27,10 +27,11 @@ export async function getCustomerSearch(
 
     const data = [
       ...webCustomers.map((c) => ({
-        source: "web" as const,
-        id:     c.id,
-        name:   c.name,
-        email:  c.email,
+        source:   "web" as const,
+        id:       c.id,
+        name:     c.name,
+        email:    c.email,
+        isActive: c.isActive,
       })),
       ...posCustomers.map((c) => ({
         source:   "pos" as const,

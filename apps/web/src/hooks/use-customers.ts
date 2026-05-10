@@ -1,8 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { CustomerMetrics } from "@kwinna/contracts";
-import { fetchCustomers } from "@/services/users";
+import { fetchCustomers, banCustomer, unbanCustomer } from "@/services/users";
 import { customerKeys } from "./query-keys";
 
 export interface UseCustomersResult {
@@ -27,4 +27,24 @@ export function useCustomers(): UseCustomersResult {
     error:     query.error,
     refetch:   query.refetch,
   };
+}
+
+export function useBanCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => banCustomer(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+    },
+  });
+}
+
+export function useUnbanCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unbanCustomer(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+    },
+  });
 }

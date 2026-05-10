@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
-import { addStock, getAllStock, getStockByProductId, type StockInInput } from "../services/stock.service";
-import { findStockMovementsInRange } from "../db/repositories";
+import { addStock, getAllStock, getStockByProductId, removeStock, type StockInInput, type StockOutInput } from "../services/stock.service";
+import { findStockMovementsInRange, findAllStockMovements } from "../db/repositories";
 
 export async function listStock(
   _req: Request,
@@ -68,6 +68,38 @@ export async function stockIn(
     const input = req.body as StockInInput;
     const movement = await addStock(input);
     res.status(201).json({ data: movement });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function stockOut(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const input = req.body as StockOutInput;
+    const movement = await removeStock(input);
+    res.status(201).json({ data: movement });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── GET /stock/movements/all?from=ISO&to=ISO&productId=UUID ──────────────────
+
+export async function getAllMovements(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { from, to, productId } = req.query as { from?: string; to?: string; productId?: string };
+    const fromDate = from ? new Date(from) : new Date(0);
+    const toDate   = to   ? new Date(to)   : new Date();
+    const data = await findAllStockMovements(fromDate, toDate, productId);
+    res.json({ data });
   } catch (err) {
     next(err);
   }

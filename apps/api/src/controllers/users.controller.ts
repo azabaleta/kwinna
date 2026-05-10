@@ -7,6 +7,7 @@ import {
   createOperator,
   updateOperator,
   setOperatorActive,
+  setCustomerActive,
 } from "../db/repositories/user.repository";
 
 // ─── GET /users/customers ─────────────────────────────────────────────────────
@@ -24,6 +25,28 @@ export async function getCustomers(
   } catch (err) {
     next(err);
   }
+}
+
+// ─── PATCH /users/customers/:id/ban ───────────────────────────────────────────
+export async function banCustomer(
+  req: Request, res: Response, next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    await setCustomerActive(id, false);
+    res.status(204).send();
+  } catch (err) { next(err); }
+}
+
+// ─── PATCH /users/customers/:id/unban ─────────────────────────────────────────
+export async function unbanCustomer(
+  req: Request, res: Response, next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    await setCustomerActive(id, true);
+    res.status(204).send();
+  } catch (err) { next(err); }
 }
 
 // ─── GET /users/operators ─────────────────────────────────────────────────────

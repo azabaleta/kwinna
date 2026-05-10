@@ -9,8 +9,9 @@ import {
   UserCheck,
   UserX,
   History,
+  ShieldAlert,
 } from "lucide-react";
-import type { CustomerMetrics, Sale } from "@kwinna/contracts";
+import type { CustomerMetrics, Sale, Product } from "@kwinna/contracts";
 import {
   Sheet,
   SheetContent,
@@ -18,6 +19,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -29,11 +31,14 @@ import {
 } from "@/components/ui/table";
 import { OrderDetailDialog, StatusBadge, DismissBadge } from "./order-detail-dialog";
 import { useCancelSale, useDismissSale } from "@/hooks/use-sale";
+import { useBanCustomer, useUnbanCustomer } from "@/hooks/use-customers";
+import { useAuthStore } from "@/store/use-auth-store";
 import { toast } from "sonner";
 
 interface CustomerDetailSheetProps {
   customer: CustomerMetrics | null;
   sales: Sale[];
+  productMap: Map<string, Pick<Product, "sku" | "name">>;
   onClose: () => void;
 }
 
@@ -44,12 +49,18 @@ function fmt(n: number): string {
 export function CustomerDetailSheet({
   customer,
   sales,
+  productMap,
   onClose,
 }: CustomerDetailSheetProps) {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
 
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === "admin";
+
   const { mutateAsync: cancelSaleMutation, isPending: isCancelling } = useCancelSale();
   const { mutateAsync: dismissSaleMutation, isPending: isDismissing } = useDismissSale();
+  const { mutateAsync: banCustomerMutation, isPending: isBanning } = useBanCustomer();
+  const { mutateAsync: unbanCustomerMutation, isPending: isUnbanning } = useUnbanCustomer();
 
   // Sort sales: newest first
   const sortedSales = [...sales].sort(
@@ -82,6 +93,22 @@ export function CustomerDetailSheet({
     }
   }
 
+  async function handleToggleBan() {
+    if (!customer) return;
+    try {
+      if (customer.isActive) {
+        await banCustomerMutation(customer.id);
+        toast.success("Cliente baneado", { description: "Ya no podrá realizar compras web." });
+      } else {
+        await unbanCustomerMutation(customer.id);
+        toast.success("Cliente desbaneado", { description: "Se han restaurado sus permisos." });
+      }
+      onClose(); // Cerrar para que la data refrescada se vuelva a inyectar limpia
+    } catch (err) {
+      toast.error("Error al actualizar estado del cliente");
+    }
+  }
+
   return (
     <>
       <Sheet open={!!customer} onOpenChange={(o) => !o && onClose()}>
@@ -98,6 +125,11 @@ export function CustomerDetailSheet({
                       ) : (
                         <UserX className="h-4 w-4 text-muted-foreground" />
                       )}
+                      {!customer.isActive && (
+                        <Badge variant="destructive" className="ml-2">
+                          Baneado
+                        </Badge>
+                      )}
                     </SheetTitle>
                     <SheetDescription className="flex items-center gap-2 mt-1">
                       <Mail className="h-3.5 w-3.5 shrink-0" />
@@ -106,6 +138,18 @@ export function CustomerDetailSheet({
                       </a>
                     </SheetDescription>
                   </div>
+                  {isAdmin && (
+                    <Button
+                      variant={customer.isActive ? "destructive" : "outline"}
+                      size="sm"
+                      onClick={handleToggleBan}
+                      disabled={isBanning || isUnbanning}
+                      className="gap-2 shrink-0"
+                    >
+                      <ShieldAlert className="h-4 w-4" />
+                      {customer.isActive ? "Banear" : "Restaurar"}
+                    </Button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mt-6">
@@ -207,6 +251,7 @@ export function CustomerDetailSheet({
 
       <OrderDetailDialog
         sale={selectedSale}
+        productMap={productMap}
         onClose={() => setSelectedSale(null)}
         onCancel={handleCancel}
         onDismiss={handleDismiss}
