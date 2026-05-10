@@ -6,11 +6,12 @@ import { createStockBalance, getStockBalance, listStockBalances, updateStockBala
 
 export async function createBalance(req: Request, res: Response) {
   try {
-    const userId = req.user!.id;
+    const userId = req.user!.sub;
     const balance = await createStockBalance(userId, req.body);
     res.status(201).json({ data: balance });
-  } catch (err: any) {
-    res.status(500).json({ message: "Error al crear el balance", error: err.message });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    res.status(500).json({ message: "Error al crear el balance", error: msg });
   }
 }
 
@@ -18,8 +19,9 @@ export async function listBalances(req: Request, res: Response) {
   try {
     const balances = await listStockBalances();
     res.json({ data: balances });
-  } catch (err: any) {
-    res.status(500).json({ message: "Error listando balances", error: err.message });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    res.status(500).json({ message: "Error listando balances", error: msg });
   }
 }
 
@@ -30,8 +32,9 @@ export async function getBalance(req: Request, res: Response) {
       return res.status(404).json({ message: "Balance no encontrado" });
     }
     res.json({ data: balance });
-  } catch (err: any) {
-    res.status(500).json({ message: "Error obteniendo balance", error: err.message });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    res.status(500).json({ message: "Error obteniendo balance", error: msg });
   }
 }
 
@@ -45,8 +48,9 @@ export async function updateDraft(req: Request, res: Response) {
 
     await updateStockBalanceDraft(req.params.id, req.body.items);
     res.json({ message: "Borrador guardado" });
-  } catch (err: any) {
-    res.status(500).json({ message: "Error guardando borrador", error: err.message });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    res.status(500).json({ message: "Error guardando borrador", error: msg });
   }
 }
 
@@ -236,7 +240,8 @@ export async function completeBalance(req: Request, res: Response) {
     const finalBalance = await getStockBalance(balanceId);
     res.json({ data: finalBalance });
     
-  } catch (err: any) {
-    res.status(500).json({ message: "Error completando balance", error: err.message });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    res.status(500).json({ message: "Error completando balance", error: msg });
   }
 }

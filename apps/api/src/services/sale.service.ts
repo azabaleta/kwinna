@@ -4,7 +4,7 @@ import { db } from "../db";
 import { mapSaleRow } from "../db/repositories";
 import { generateCreditNoteCode, mapCreditNoteRow } from "../db/repositories/credit-note.repository";
 import { findSaleById } from "../db/repositories/sale.repository";
-import { creditNotesTable, productsTable, salesTable, stockMovementsTable, stockTable } from "../db/schema";
+import { creditNotesTable, productsTable, salesTable, stockMovementsTable, stockTable, usersTable } from "../db/schema";
 import { computeShippingCost } from "./shipping.service";
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
