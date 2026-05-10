@@ -28,7 +28,7 @@ import { ProductCombobox } from "@/components/inventory/product-combobox";
 import { StockBalanceList } from "./components/stock-balance-list";
 
 import { useProducts } from "@/hooks/use-products";
-import { useAllStockMovements } from "@/hooks/use-stock";
+import { useInfiniteStockMovements } from "@/hooks/use-stock";
 
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
@@ -72,7 +72,14 @@ export default function KardexPage() {
 
   const { products, isLoading: loadingProducts } = useProducts();
 
-  const { movements, isLoading: loadingMovements } = useAllStockMovements(
+  const {
+    movements,
+    total,
+    isLoading: loadingMovements,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteStockMovements(
     new Date(dateFrom),
     new Date(dateTo),
     selectedProductId || undefined
@@ -214,6 +221,29 @@ export default function KardexPage() {
             </TableBody>
           </Table>
         </CardContent>
+        {/* ── Cargar más ── */}
+        {(hasNextPage || isFetchingNextPage) && (
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <p className="text-xs text-muted-foreground">
+              Mostrando <span className="font-semibold">{movements.length}</span> de{" "}
+              <span className="font-semibold">{total}</span> movimientos
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+            >
+              {isFetchingNextPage && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+              Cargar más
+            </Button>
+          </div>
+        )}
+        {!hasNextPage && movements.length > 0 && (
+          <p className="px-4 py-2 text-center text-xs text-muted-foreground border-t">
+            {movements.length} movimientos en total
+          </p>
+        )}
       </Card>
       </TabsContent>
 

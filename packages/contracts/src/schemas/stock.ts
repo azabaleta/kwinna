@@ -67,6 +67,15 @@ export const StockMovementListResponseSchema = z.object({
 
 export type StockMovementListResponse = z.infer<typeof StockMovementListResponseSchema>;
 
+export const StockMovementPageResponseSchema = z.object({
+  data:   z.array(StockMovementSchema),
+  total:  z.number().int().nonnegative(),
+  limit:  z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
+});
+
+export type StockMovementPageResponse = z.infer<typeof StockMovementPageResponseSchema>;
+
 // ─── Stock Balance (Inventory Count) ──────────────────────────────────────────
 
 export const StockBalanceStatusSchema = z.enum(["in_progress", "completed", "cancelled"]);

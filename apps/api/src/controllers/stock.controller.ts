@@ -87,7 +87,7 @@ export async function stockOut(
   }
 }
 
-// ─── GET /stock/movements/all?from=ISO&to=ISO&productId=UUID ──────────────────
+// ─── GET /stock/movements/all?from=ISO&to=ISO&productId=UUID&limit=50&offset=0 ─
 
 export async function getAllMovements(
   req: Request,
@@ -95,11 +95,16 @@ export async function getAllMovements(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { from, to, productId } = req.query as { from?: string; to?: string; productId?: string };
+    const { from, to, productId, limit: limitStr, offset: offsetStr } = req.query as {
+      from?: string; to?: string; productId?: string; limit?: string; offset?: string;
+    };
     const fromDate = from ? new Date(from) : new Date(0);
     const toDate   = to   ? new Date(to)   : new Date();
-    const data = await findAllStockMovements(fromDate, toDate, productId);
-    res.json({ data });
+    const limit    = Math.min(Math.max(parseInt(limitStr  ?? "50",  10), 1), 200);
+    const offset   = Math.max(parseInt(offsetStr ?? "0", 10), 0);
+
+    const { data, total } = await findAllStockMovements(fromDate, toDate, productId, limit, offset);
+    res.json({ data, total, limit, offset });
   } catch (err) {
     next(err);
   }

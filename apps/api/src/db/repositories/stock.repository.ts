@@ -72,10 +72,17 @@ export async function findStockMovementsInRange(from: Date, to: Date): Promise<S
 }
 
 /**
- * Todos los movimientos de stock en un rango de fechas.
+ * Todos los movimientos de stock en un rango de fechas, con paginación server-side.
  * Filtrado opcional por productId para aislar la historia de un único ítem.
+ * Devuelve { data, total } para que el cliente sepa cuántas páginas hay.
  */
-export async function findAllStockMovements(from: Date, to: Date, productId?: string): Promise<StockMovement[]> {
+export async function findAllStockMovements(
+  from: Date,
+  to: Date,
+  productId?: string,
+  limit = 50,
+  offset = 0,
+): Promise<{ data: StockMovement[]; total: number }> {
   const conditions = [
     gte(stockMovementsTable.createdAt, from),
     lt(stockMovementsTable.createdAt, to),
@@ -85,13 +92,24 @@ export async function findAllStockMovements(from: Date, to: Date, productId?: st
     conditions.push(eq(stockMovementsTable.productId, productId));
   }
 
-  const rows = await db
-    .select()
-    .from(stockMovementsTable)
-    .where(and(...conditions))
-    .orderBy(desc(stockMovementsTable.createdAt));
-    
-  return rows.map(mapMovementRow);
+  const where = and(...conditions);
+
+  const [rows, countResult] = await Promise.all([
+    db
+      .select()
+      .from(stockMovementsTable)
+      .where(where)
+      .orderBy(desc(stockMovementsTable.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(stockMovementsTable)
+      .where(where),
+  ]);
+
+  const total = countResult[0]?.count ?? 0;
+  return { data: rows.map(mapMovementRow), total };
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Stock, StockListResponse, StockMovement, StockMovementResponse } from "@kwinna/contracts";
 import { fetchProductStock, fetchStock, fetchStockMovements, fetchAllStockMovements, postStockIn, postStockOut, type StockInPayload, type StockOutPayload } from "@/services/stock";
 import { stockKeys } from "./query-keys";
@@ -75,23 +75,36 @@ export function useStockMovements(from: Date, to: Date): {
   };
 }
 
-// ─── useAllStockMovements (Kardex) ────────────────────────────────────────────
+// ─── useInfiniteStockMovements (Kardex) ──────────────────────────────────────
+// Paginación "cargar más" — 50 registros por página, acumulados en el cliente.
 
-export function useAllStockMovements(from: Date, to: Date, productId?: string): {
-  movements: StockMovement[];
-  isLoading: boolean;
-  isError:   boolean;
-} {
-  const query = useQuery({
-    queryKey:  [...stockKeys.all, "movements-all", from.toISOString(), to.toISOString(), productId ?? "all"],
-    queryFn:   () => fetchAllStockMovements(from, to, productId),
+const PAGE_SIZE = 50;
+
+export function useInfiniteStockMovements(from: Date, to: Date, productId?: string) {
+  const query = useInfiniteQuery({
+    queryKey:  [...stockKeys.all, "movements-paged", from.toISOString(), to.toISOString(), productId ?? "all"],
+    queryFn:   ({ pageParam }) =>
+      fetchAllStockMovements(from, to, productId, PAGE_SIZE, (pageParam as number) * PAGE_SIZE),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p) => sum + p.data.length, 0);
+      return loaded < lastPage.total ? allPages.length : undefined;
+    },
     staleTime: 60_000,
     retry:     false,
   });
+
+  const movements = query.data?.pages.flatMap((p) => p.data) ?? [];
+  const total     = query.data?.pages[0]?.total ?? 0;
+
   return {
-    movements: query.data ?? [],
-    isLoading: query.isLoading,
-    isError:   query.isError,
+    movements,
+    total,
+    isLoading:          query.isLoading,
+    isError:            query.isError,
+    hasNextPage:        query.hasNextPage,
+    fetchNextPage:      query.fetchNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
   };
 }
 

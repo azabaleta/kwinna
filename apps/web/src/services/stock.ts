@@ -1,10 +1,12 @@
 import {
   StockListResponseSchema,
   StockMovementListResponseSchema,
+  StockMovementPageResponseSchema,
   StockMovementResponseSchema,
   type Stock,
   type StockListResponse,
   type StockMovement,
+  type StockMovementPageResponse,
   type StockMovementResponse,
 } from "@kwinna/contracts";
 import apiClient from "@/lib/axios";
@@ -65,18 +67,23 @@ export async function fetchStockMovements(from: Date, to: Date): Promise<StockMo
 }
 
 /**
- * GET /stock/movements/all?from=ISO&to=ISO&productId=UUID
- * Devuelve todos los movimientos (in, out, adjustment) en el rango, opcionalmente filtrados por producto.
- * Solo accesible por admin/operator.
+ * GET /stock/movements/all?from=ISO&to=ISO&productId=UUID&limit=N&offset=N
+ * Devuelve la página de movimientos + total para paginación infinita.
  */
-export async function fetchAllStockMovements(from: Date, to: Date, productId?: string): Promise<StockMovement[]> {
-  const params: Record<string, string> = {
-    from: from.toISOString(),
-    to: to.toISOString(),
+export async function fetchAllStockMovements(
+  from: Date,
+  to: Date,
+  productId?: string,
+  limit = 50,
+  offset = 0,
+): Promise<StockMovementPageResponse> {
+  const params: Record<string, string | number> = {
+    from:   from.toISOString(),
+    to:     to.toISOString(),
+    limit,
+    offset,
   };
-  if (productId) {
-    params.productId = productId;
-  }
+  if (productId) params.productId = productId;
   const res = await apiClient.get("/stock/movements/all", { params });
-  return StockMovementListResponseSchema.parse(res.data).data;
+  return StockMovementPageResponseSchema.parse(res.data);
 }
