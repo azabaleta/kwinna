@@ -15,7 +15,6 @@ import type { StockMovement } from "@kwinna/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { DatePickerWithRange } from "@/components/ui/date-picker-with-range";
 import {
   Table,
   TableBody,
@@ -30,6 +29,7 @@ import { StockBalanceList } from "./components/stock-balance-list";
 
 import { useProducts } from "@/hooks/use-products";
 import { useAllStockMovements } from "@/hooks/use-stock";
+
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
@@ -62,17 +62,19 @@ function MovementBadge({ type }: { type: StockMovement["type"] }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function KardexPage() {
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>({
-    from: subDays(new Date(), 30),
-    to: new Date(),
-  });
+  const [dateFrom, setDateFrom] = useState<string>(
+    subDays(new Date(), 30).toISOString().split("T")[0]!
+  );
+  const [dateTo, setDateTo] = useState<string>(
+    new Date().toISOString().split("T")[0]!
+  );
   const [selectedProductId, setSelectedProductId] = useState<string>("");
 
   const { products, isLoading: loadingProducts } = useProducts();
 
   const { movements, isLoading: loadingMovements } = useAllStockMovements(
-    dateRange?.from ?? subDays(new Date(), 30),
-    dateRange?.to ?? new Date(),
+    new Date(dateFrom),
+    new Date(dateTo),
     selectedProductId || undefined
   );
 
@@ -106,7 +108,7 @@ export default function KardexPage() {
             <CardTitle className="text-base font-semibold">Filtros</CardTitle>
             <CardDescription>Visualizá un rango de fechas o aislá un producto.</CardDescription>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="w-[300px]">
               <ProductCombobox
                 products={products}
@@ -125,7 +127,21 @@ export default function KardexPage() {
                 </Button>
               )}
             </div>
-            <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground"
+              />
+              <span className="text-sm text-muted-foreground">—</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground"
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
