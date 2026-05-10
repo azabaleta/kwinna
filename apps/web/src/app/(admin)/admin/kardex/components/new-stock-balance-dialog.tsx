@@ -15,7 +15,7 @@ import type { StockBalance } from "@kwinna/contracts";
 interface ScannedItem {
   productId: string;
   size?: string;
-  quantity: number;
+  countedQuantity: number;
 }
 
 export function NewStockBalanceDialog({ 
@@ -100,20 +100,20 @@ export function NewStockBalanceDialog({
     setItems(prev => {
       const existing = prev.find(i => i.productId === product.id && i.size === "");
       if (existing) {
-        return prev.map(i => i === existing ? { ...i, quantity: i.quantity + 1 } : i);
+        return prev.map(i => i === existing ? { ...i, countedQuantity: i.countedQuantity + 1 } : i);
       }
-      return [{ productId: product.id, size: "", quantity: 1 }, ...prev];
+      return [{ productId: product.id, size: "", countedQuantity: 1 }, ...prev];
     });
 
     setScanInput("");
   };
 
   const incrementQty = (productId: string, size: string = "") => {
-    setItems(prev => prev.map(i => (i.productId === productId && i.size === size) ? { ...i, quantity: i.quantity + 1 } : i));
+    setItems(prev => prev.map(i => (i.productId === productId && i.size === size) ? { ...i, countedQuantity: i.countedQuantity + 1 } : i));
   };
 
   const decrementQty = (productId: string, size: string = "") => {
-    setItems(prev => prev.map(i => (i.productId === productId && i.size === size) ? { ...i, quantity: Math.max(0, i.quantity - 1) } : i).filter(i => i.quantity > 0));
+    setItems(prev => prev.map(i => (i.productId === productId && i.size === size) ? { ...i, countedQuantity: Math.max(0, i.countedQuantity - 1) } : i).filter(i => i.countedQuantity > 0));
   };
 
   const handleComplete = () => {
@@ -124,7 +124,7 @@ export function NewStockBalanceDialog({
         toast.success("Balance de stock completado");
         onOpenChange(false);
       },
-      onError: (err: any) => toast.error(err.message || "Error al completar balance")
+      onError: (err) => toast.error(err instanceof Error ? err.message : "Error al completar balance")
     });
   };
 
@@ -205,7 +205,7 @@ export function NewStockBalanceDialog({
                           {item.size ? <Badge variant="secondary">{item.size}</Badge> : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className="font-mono text-lg font-bold">{item.quantity}</span>
+                          <span className="font-mono text-lg font-bold">{item.countedQuantity}</span>
                         </TableCell>
                         {!isReviewing && (
                           <TableCell className="text-right">
