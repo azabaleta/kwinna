@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { db } from "../db";
 import { stockBalancesTable, stockBalanceItemsTable, stockTable, productsTable, stockMovementsTable } from "../db/schema";
 import { eq, and } from "drizzle-orm";
-import { createStockBalance, getStockBalance, listStockBalances, updateStockBalanceDraft } from "../repositories/stock-balance.repository";
+import { createStockBalance, getStockBalance, listStockBalances, updateStockBalanceDraft, cancelStockBalance } from "../repositories/stock-balance.repository";
 
 export async function createBalance(req: Request, res: Response) {
   try {
@@ -243,5 +243,18 @@ export async function completeBalance(req: Request, res: Response) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error desconocido";
     res.status(500).json({ message: "Error completando balance", error: msg });
+  }
+}
+
+export async function cancelBalance(req: Request, res: Response) {
+  try {
+    const result = await cancelStockBalance(req.params.id);
+    if (!result) {
+      return res.status(409).json({ message: "El balance no existe o ya está completado/cancelado" });
+    }
+    res.json({ data: result });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    res.status(500).json({ message: "Error cancelando balance", error: msg });
   }
 }

@@ -8,7 +8,8 @@ import {
   listBalances,
   getBalance,
   updateDraft,
-  completeBalance
+  completeBalance,
+  cancelBalance
 } from "../controllers/stock-balances.controller";
 
 const router = Router();
@@ -21,5 +22,6 @@ router.post("/", validate(StockBalanceCreateSchema), createBalance);
 router.get("/:id", getBalance);
 router.patch("/:id", validate(StockBalanceUpdateSchema), updateDraft);
 router.post("/:id/complete", validate(StockBalanceUpdateSchema), completeBalance);
+router.delete("/:id", cancelBalance);
 
 export default router;

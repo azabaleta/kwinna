@@ -76,7 +76,7 @@ export async function updateStockBalanceDraft(id: string, items: any[]): Promise
         balanceId: id,
         productId: item.productId,
         size: item.size ?? "",
-        countedQuantity: item.quantity,
+        countedQuantity: item.countedQuantity ?? item.quantity,
       }));
       await tx.insert(stockBalanceItemsTable).values(newItems);
     }
@@ -85,4 +85,21 @@ export async function updateStockBalanceDraft(id: string, items: any[]): Promise
       .set({ updatedAt: new Date() })
       .where(eq(stockBalancesTable.id, id));
   });
+}
+
+export async function cancelStockBalance(id: string): Promise<StockBalance | null> {
+  const [balance] = await db
+    .select()
+    .from(stockBalancesTable)
+    .where(eq(stockBalancesTable.id, id));
+
+  if (!balance || balance.status !== "in_progress") return null;
+
+  const [updated] = await db
+    .update(stockBalancesTable)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(eq(stockBalancesTable.id, id))
+    .returning();
+
+  return mapToContract(updated!);
 }

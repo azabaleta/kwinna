@@ -70,3 +70,17 @@ export function useCompleteStockBalance() {
     },
   });
 }
+
+export function useCancelStockBalance() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiClient.delete<StockBalanceResponse>(`/stock-balances/${id}`);
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-balances"] });
+    },
+  });
+}
