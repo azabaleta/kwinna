@@ -15,6 +15,8 @@ import {
 import type { Product, Sale } from "@kwinna/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { useState } from "react";
 import { OrderDetailDialog } from "@/components/admin/order-detail-dialog";
