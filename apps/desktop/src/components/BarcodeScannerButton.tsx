@@ -6,8 +6,21 @@ import {
   Format,
   checkPermissions,
   requestPermissions,
+  type PermissionState,
 } from "@tauri-apps/plugin-barcode-scanner";
-import { platform } from "@tauri-apps/api/core";
+
+// ── Platform detection ────────────────────────────────────────────────────────
+// We detect mobile by checking for the Tauri globals AND the userAgent.
+// This avoids importing @tauri-apps/plugin-os (which adds a Rust dependency
+// just for platform detection) while being reliable inside a Tauri WebView.
+function detectMobile(): boolean {
+  if (typeof window === "undefined") return false;
+  // In Tauri Android/iOS the global __TAURI_INTERNALS__ is always injected.
+  const isTauri = Boolean((window as Record<string, unknown>).__TAURI_INTERNALS__);
+  if (!isTauri) return false;
+  const ua = navigator.userAgent.toLowerCase();
+  return ua.includes("android") || ua.includes("iphone") || ua.includes("ipad");
+}
 
 export interface BarcodeScannerButtonProps {
   /** Called with the raw scanned string when a barcode is successfully read. */
@@ -20,20 +33,12 @@ export default function BarcodeScannerButton({
   onScan,
   formats = [Format.EAN8],
 }: BarcodeScannerButtonProps) {
-  const [isMobile,        setIsMobile]        = useState(false);
-  const [isScanning,      setIsScanning]       = useState(false);
-  const [permDenied,      setPermDenied]       = useState(false);
+  const [isMobile,   setIsMobile]   = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [permDenied, setPermDenied] = useState(false);
 
   useEffect(() => {
-    // Use Tauri's native platform() API — more reliable than navigator.userAgent
-    // inside a Tauri WebView, especially on Android.
-    platform()
-      .then((p) => setIsMobile(p === "android" || p === "ios"))
-      .catch(() => {
-        // Fallback: if platform() is unavailable (e.g. running in plain browser),
-        // stay hidden — this feature is mobile-only.
-        setIsMobile(false);
-      });
+    setIsMobile(detectMobile());
   }, []);
 
   // Only render on mobile platforms.
@@ -43,11 +48,15 @@ export default function BarcodeScannerButton({
     setPermDenied(false);
     try {
       // 1. Check current permission state before attempting to scan.
-      let permission = await checkPermissions();
+      //    Cast to string so TS doesn't complain about the union narrowing —
+      //    the actual runtime values include "prompt" and "prompt-with-rationale"
+      //    on some Android versions even if the type definition doesn't list them.
+      const currentPerm = (await checkPermissions()) as string;
 
       // 2. If not yet decided, request permission from the user.
-      if (permission === "prompt" || permission === "prompt-with-rationale") {
-        permission = await requestPermissions();
+      let permission: string = currentPerm;
+      if (currentPerm === "prompt" || currentPerm === "prompt-with-rationale") {
+        permission = (await requestPermissions()) as string;
       }
 
       // 3. Hard-stop if denied — show UI feedback instead of a silent failure.
@@ -125,3 +134,5 @@ export default function BarcodeScannerButton({
   );
 }
 
+// Re-export type for consumers that need to type the permission state
+export type { PermissionState };
