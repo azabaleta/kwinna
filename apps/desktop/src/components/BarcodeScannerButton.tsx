@@ -16,7 +16,7 @@ import {
 function detectMobile(): boolean {
   if (typeof window === "undefined") return false;
   // In Tauri Android/iOS the global __TAURI_INTERNALS__ is always injected.
-  const isTauri = Boolean((window as Record<string, unknown>).__TAURI_INTERNALS__);
+  const isTauri = Boolean((window as unknown as Record<string, unknown>).__TAURI_INTERNALS__);
   if (!isTauri) return false;
   const ua = navigator.userAgent.toLowerCase();
   return ua.includes("android") || ua.includes("iphone") || ua.includes("ipad");
