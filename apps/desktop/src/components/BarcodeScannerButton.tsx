@@ -66,9 +66,10 @@ export default function BarcodeScannerButton({
         await onScan(result.content);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      // Ignore user-initiated cancel (back button)
-      if (!msg.toLowerCase().includes("cancel") && msg !== "") {
+      const msg = err instanceof Error
+        ? err.message
+        : JSON.stringify(err, null, 2);
+      if (!msg.toLowerCase().includes("cancel")) {
         alert(`Error al escanear:\n${msg}`);
       }
     } finally {
