@@ -44,33 +44,31 @@ export default function BarcodeScannerButton({
     setPermDenied(false);
     setScanError(null);
     try {
-      const currentPerm = (await checkPermissions()) as string;
-
-      let permission: string = currentPerm;
-      if (currentPerm === "prompt" || currentPerm === "prompt-with-rationale") {
-        permission = (await requestPermissions()) as string;
-      }
-
-      if (permission !== "granted") {
-        setPermDenied(true);
-        return;
-      }
-
       setIsScanning(true);
 
-      // windowed: false → full-screen scanner overlay.
-      // windowed: true requires WebView background transparency (not configured).
+      // scan() internally checks and requests camera permission on Android.
+      // Calling requestPermissions() separately causes a Kotlin lateinit crash
+      // in tauri-plugin-barcode-scanner because the ActivityResultLauncher
+      // is not initialized when invoked outside of the scan() lifecycle.
       const result = await scan({ windowed: false, formats });
 
       if (result?.content) {
         await onScan(result.content);
       }
     } catch (err) {
+      setIsScanning(false);
       const msg = err instanceof Error
         ? err.message
         : JSON.stringify(err, null, 2);
-      if (!msg.toLowerCase().includes("cancel")) {
-        alert(`Error al escanear:\n${msg}`);
+
+      // Detect permission denial
+      if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("denied")) {
+        setPermDenied(true);
+        return;
+      }
+      // Ignore user-initiated cancel (back button)
+      if (!msg.toLowerCase().includes("cancel") && msg !== "null" && msg !== "{}") {
+        setScanError(msg);
       }
     } finally {
       setIsScanning(false);
