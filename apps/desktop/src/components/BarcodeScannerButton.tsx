@@ -8,7 +8,17 @@ import {
   requestPermissions,
   type PermissionState,
 } from "@tauri-apps/plugin-barcode-scanner";
-import { platform } from "@tauri-apps/plugin-os";
+
+// ── Platform detection ────────────────────────────────────────────────────────
+// We detect Android using navigator.userAgent — it's always synchronous,
+// never fails, and the Android WebView UA always contains "Android".
+// Using IPC (plugin-os platform()) caused a race condition: the component
+// returned null on the first render and the platform() promise sometimes
+// failed silently due to missing capability permissions.
+function isAndroidWebView(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /android/i.test(navigator.userAgent);
+}
 
 export interface BarcodeScannerButtonProps {
   /** Called with the raw scanned string when a barcode is successfully read. */
@@ -21,19 +31,12 @@ export default function BarcodeScannerButton({
   onScan,
   formats = [Format.EAN8],
 }: BarcodeScannerButtonProps) {
-  const [isMobile,   setIsMobile]   = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [permDenied, setPermDenied] = useState(false);
+  // Initialize synchronously — no async IPC, no flash of null on first render.
+  const [isMobile]                    = useState(() => isAndroidWebView());
+  const [isScanning, setIsScanning]   = useState(false);
+  const [permDenied, setPermDenied]   = useState(false);
 
-  useEffect(() => {
-    // platform() from @tauri-apps/plugin-os is the correct Tauri v2 API.
-    // It communicates with the Rust tauri-plugin-os crate via IPC.
-    platform()
-      .then((p) => setIsMobile(p === "android" || p === "ios"))
-      .catch(() => setIsMobile(false));
-  }, []);
-
-  // Only render on mobile platforms.
+  // Only render on Android.
   if (!isMobile) return null;
 
   async function handleScan() {

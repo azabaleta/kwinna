@@ -5,6 +5,7 @@
   "platforms": ["android", "iOS"],
   "windows": ["main"],
   "permissions": [
-    "barcode-scanner:default"
+    "barcode-scanner:default",
+    "os:default"
   ]
 }
