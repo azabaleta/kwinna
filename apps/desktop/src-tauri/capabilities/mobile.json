@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "mobile",
   "description": "Kwinna POS — Android-only capabilities",
-  "platforms": ["android", "ios"],
+  "platforms": ["android", "iOS"],
   "windows": ["main"],
   "permissions": [
     "barcode-scanner:default"
