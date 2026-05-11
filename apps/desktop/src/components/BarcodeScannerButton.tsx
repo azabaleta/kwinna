@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Camera, X, ShieldOff } from "lucide-react";
+import { AlertCircle, Camera, X, ShieldOff } from "lucide-react";
 import {
   scan,
   cancel,
@@ -35,25 +35,22 @@ export default function BarcodeScannerButton({
   const [isMobile]                    = useState(() => isAndroidWebView());
   const [isScanning, setIsScanning]   = useState(false);
   const [permDenied, setPermDenied]   = useState(false);
+  const [scanError,  setScanError]    = useState<string | null>(null);
 
   // Only render on Android.
   if (!isMobile) return null;
 
   async function handleScan() {
     setPermDenied(false);
+    setScanError(null);
     try {
-      // 1. Check current permission state before attempting to scan.
-      //    Cast to string: runtime Android may return "prompt" / "prompt-with-rationale"
-      //    even if the TS union only declares "denied" | "granted".
       const currentPerm = (await checkPermissions()) as string;
 
-      // 2. If not yet decided, request permission from the user.
       let permission: string = currentPerm;
       if (currentPerm === "prompt" || currentPerm === "prompt-with-rationale") {
         permission = (await requestPermissions()) as string;
       }
 
-      // 3. Hard-stop if denied — show UI feedback instead of a silent failure.
       if (permission !== "granted") {
         setPermDenied(true);
         return;
@@ -61,14 +58,19 @@ export default function BarcodeScannerButton({
 
       setIsScanning(true);
 
-      // 4. Open native scanner overlay.
-      const result = await scan({ windowed: true, formats });
+      // windowed: false → full-screen scanner overlay.
+      // windowed: true requires WebView background transparency (not configured).
+      const result = await scan({ windowed: false, formats });
 
       if (result?.content) {
         await onScan(result.content);
       }
-    } catch {
-      // User cancelled the scan by pressing the back button — not an error.
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Ignore user-initiated cancel (back button)
+      if (!msg.toLowerCase().includes("cancel") && msg !== "") {
+        setScanError(msg);
+      }
     } finally {
       setIsScanning(false);
     }
@@ -95,6 +97,21 @@ export default function BarcodeScannerButton({
                    flex items-center justify-center transition-colors flex-shrink-0"
       >
         <ShieldOff size={15} />
+      </button>
+    );
+  }
+
+  // ── Scanner error ─────────────────────────────────────────────────────────
+  if (scanError) {
+    return (
+      <button
+        type="button"
+        onClick={() => setScanError(null)}
+        title={`Error: ${scanError}. Tocá para reintentar.`}
+        className="bg-red-950/60 text-red-400 p-2.5 rounded-lg border border-red-800/50
+                   flex items-center justify-center transition-colors flex-shrink-0"
+      >
+        <AlertCircle size={15} />
       </button>
     );
   }
