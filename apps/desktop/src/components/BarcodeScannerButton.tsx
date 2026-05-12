@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { AlertCircle, Camera, X, ShieldOff } from "lucide-react";
+import { AlertCircle, Camera, X, ShieldOff, Settings } from "lucide-react";
 import {
   scan,
   cancel,
   Format,
+  checkPermissions,
+  openAppSettings,
   type PermissionState,
 } from "@tauri-apps/plugin-barcode-scanner";
 
@@ -21,7 +23,7 @@ function isAndroidWebView(): boolean {
 export interface BarcodeScannerButtonProps {
   /** Called with the raw scanned string when a barcode is successfully read. */
   onScan: (code: string) => void | Promise<void>;
-  /** Barcode formats to accept. Defaults to EAN-8 only. */
+  /** Barcode formats to accept. Defaults to EAN-8 (products). Pass [Format.Code128] for transactions. */
   formats?: Format[];
 }
 
@@ -42,9 +44,18 @@ export default function BarcodeScannerButton({
     setPermDenied(false);
     setScanError(null);
     try {
+      // checkPermissions() is safe: it only reads the current state without
+      // touching ActivityResultLauncher. We use it only to detect the "denied"
+      // case early so we can send the user to Settings instead of failing silently.
+      const currentPerm = await checkPermissions();
+      if (currentPerm === "denied") {
+        setPermDenied(true);
+        return;
+      }
+
       setIsScanning(true);
 
-      // scan() internally checks and requests camera permission on Android.
+      // scan() handles camera permission internally (prompt-with-rationale flow).
       // Calling requestPermissions() separately causes a Kotlin lateinit crash
       // in tauri-plugin-barcode-scanner because the ActivityResultLauncher
       // is not initialized when invoked outside of the scan() lifecycle.
@@ -54,18 +65,29 @@ export default function BarcodeScannerButton({
         await onScan(result.content);
       }
     } catch (err) {
-      setIsScanning(false);
-      const msg = err instanceof Error
-        ? err.message
-        : JSON.stringify(err, null, 2);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+          ? err
+          : JSON.stringify(err);
 
-      // Detect permission denial
-      if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("denied")) {
+      // Treat any camera/permission failure as permission denied → offer Settings.
+      if (
+        msg.toLowerCase().includes("permission") ||
+        msg.toLowerCase().includes("denied") ||
+        msg.toLowerCase().includes("camera")
+      ) {
         setPermDenied(true);
         return;
       }
-      // Ignore user-initiated cancel (back button)
-      if (!msg.toLowerCase().includes("cancel") && msg !== "null" && msg !== "{}") {
+      // Ignore user-initiated cancel (back button) and empty/null results.
+      if (
+        !msg.toLowerCase().includes("cancel") &&
+        msg !== "null" &&
+        msg !== "{}" &&
+        msg.trim() !== ""
+      ) {
         setScanError(msg);
       }
     } finally {
@@ -84,31 +106,36 @@ export default function BarcodeScannerButton({
   }
 
   // ── Permission denied state ───────────────────────────────────────────────
+  // Show visible text label on Android (title tooltips don't appear on touch).
+  // Tapping opens Android app settings so the user can grant camera access.
   if (permDenied) {
     return (
       <button
         type="button"
-        onClick={() => setPermDenied(false)}
-        title="Permiso de cámara denegado. Tocá para reintentar."
-        className="bg-amber-950/60 text-amber-400 p-2.5 rounded-lg border border-amber-800/50
-                   flex items-center justify-center transition-colors flex-shrink-0"
+        onClick={() => void openAppSettings()}
+        className="bg-amber-950/60 text-amber-400 px-2.5 py-2 rounded-lg border border-amber-800/50
+                   flex items-center gap-1.5 justify-center transition-colors flex-shrink-0"
       >
-        <ShieldOff size={15} />
+        <ShieldOff size={13} />
+        <Settings size={11} />
       </button>
     );
   }
 
-  // ── Scanner error ─────────────────────────────────────────────────────────
+  // ── Scanner error state ───────────────────────────────────────────────────
+  // Show visible "Error" label — title tooltips are invisible on Android touch.
+  // Tapping resets to idle so the user can retry.
   if (scanError) {
     return (
       <button
         type="button"
         onClick={() => setScanError(null)}
-        title={`Error: ${scanError}. Tocá para reintentar.`}
-        className="bg-red-950/60 text-red-400 p-2.5 rounded-lg border border-red-800/50
-                   flex items-center justify-center transition-colors flex-shrink-0"
+        title={scanError}
+        className="bg-red-950/60 text-red-400 px-2.5 py-2 rounded-lg border border-red-800/50
+                   flex items-center gap-1.5 justify-center transition-colors flex-shrink-0"
       >
-        <AlertCircle size={15} />
+        <AlertCircle size={13} />
+        <span className="text-[11px] leading-none">Error</span>
       </button>
     );
   }
