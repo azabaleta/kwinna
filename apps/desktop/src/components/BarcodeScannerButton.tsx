@@ -4,7 +4,6 @@ import {
   scan,
   cancel,
   Format,
-  checkPermissions,
   openAppSettings,
   type PermissionState,
 } from "@tauri-apps/plugin-barcode-scanner";
@@ -43,22 +42,12 @@ export default function BarcodeScannerButton({
   async function handleScan() {
     setPermDenied(false);
     setScanError(null);
+    setIsScanning(true);
     try {
-      // checkPermissions() is safe: it only reads the current state without
-      // touching ActivityResultLauncher. We use it only to detect the "denied"
-      // case early so we can send the user to Settings instead of failing silently.
-      const currentPerm = await checkPermissions();
-      if (currentPerm === "denied") {
-        setPermDenied(true);
-        return;
-      }
-
-      setIsScanning(true);
-
-      // scan() handles camera permission internally (prompt-with-rationale flow).
-      // Calling requestPermissions() separately causes a Kotlin lateinit crash
-      // in tauri-plugin-barcode-scanner because the ActivityResultLauncher
-      // is not initialized when invoked outside of the scan() lifecycle.
+      // scan() handles camera permission internally on Android.
+      // Do NOT call requestPermissions() or checkPermissions() before this —
+      // both can cause a Kotlin lateinit crash or return false negatives before
+      // the ActivityResultLauncher is initialized in the scan() lifecycle.
       const result = await scan({ windowed: false, formats });
 
       if (result?.content) {
@@ -72,7 +61,10 @@ export default function BarcodeScannerButton({
           ? err
           : JSON.stringify(err);
 
-      // Treat any camera/permission failure as permission denied → offer Settings.
+      // DEBUG: show raw error so we can identify the root cause.
+      // Remove this alert once the scanner works correctly.
+      alert(`[Scanner debug]\n${msg}`);
+
       if (
         msg.toLowerCase().includes("permission") ||
         msg.toLowerCase().includes("denied") ||
@@ -81,7 +73,6 @@ export default function BarcodeScannerButton({
         setPermDenied(true);
         return;
       }
-      // Ignore user-initiated cancel (back button) and empty/null results.
       if (
         !msg.toLowerCase().includes("cancel") &&
         msg !== "null" &&
