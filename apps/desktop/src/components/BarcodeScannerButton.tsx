@@ -4,8 +4,6 @@ import {
   scan,
   cancel,
   Format,
-  checkPermissions,
-  requestPermissions,
   type PermissionState,
 } from "@tauri-apps/plugin-barcode-scanner";
 
