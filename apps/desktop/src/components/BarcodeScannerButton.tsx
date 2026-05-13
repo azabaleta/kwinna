@@ -43,6 +43,11 @@ export default function BarcodeScannerButton({
   async function handleScan() {
     setPermDenied(false);
     setScanError(null);
+    // Make the WebView transparent so the native camera layer (placed behind
+    // it by windowed:true) can show through the transparent scanning zone.
+    // The body CSS bg-zinc-950 is overridden here and restored in finally.
+    document.documentElement.style.background = "transparent";
+    document.body.style.background = "transparent";
     setIsScanning(true);
     try {
       // windowed: true keeps the camera inside the existing WebView window,
@@ -84,10 +89,16 @@ export default function BarcodeScannerButton({
       }
     } finally {
       setIsScanning(false);
+      document.documentElement.style.background = "";
+      document.body.style.background = "";
     }
   }
 
   async function handleCancel() {
+    // Restore background immediately so there's no flash of transparent body
+    // if cancel() takes a moment to resolve the scan() promise.
+    document.documentElement.style.background = "";
+    document.body.style.background = "";
     try {
       await cancel();
     } catch {
