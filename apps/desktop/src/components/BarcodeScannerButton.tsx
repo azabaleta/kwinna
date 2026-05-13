@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { AlertCircle, Camera, X, ShieldOff, Settings } from "lucide-react";
+import { createPortal } from "react-dom";
+import { AlertCircle, Camera, ShieldOff, Settings, X } from "lucide-react";
 import {
   scan,
   cancel,
@@ -44,11 +45,15 @@ export default function BarcodeScannerButton({
     setScanError(null);
     setIsScanning(true);
     try {
-      // scan() handles camera permission internally on Android.
-      // Do NOT call requestPermissions() or checkPermissions() before this —
-      // both can cause a Kotlin lateinit crash or return false negatives before
-      // the ActivityResultLauncher is initialized in the scan() lifecycle.
-      const result = await scan({ windowed: false, formats });
+      // windowed: true keeps the camera inside the existing WebView window,
+      // allowing the React scanning overlay to remain visible on top.
+      // windowed: false launches a separate native Activity that completely
+      // covers the WebView, making it impossible to show a React cancel button.
+      //
+      // Do NOT call requestPermissions() or checkPermissions() before scan() —
+      // both can cause a Kotlin lateinit crash because the ActivityResultLauncher
+      // is not initialized outside of the scan() lifecycle.
+      const result = await scan({ windowed: true, formats });
 
       if (result?.content) {
         await onScan(result.content);
@@ -60,10 +65,6 @@ export default function BarcodeScannerButton({
           : typeof err === "string"
           ? err
           : JSON.stringify(err);
-
-      // DEBUG: show raw error so we can identify the root cause.
-      // Remove this alert once the scanner works correctly.
-      alert(`[Scanner debug]\n${msg}`);
 
       if (
         msg.toLowerCase().includes("permission") ||
@@ -97,8 +98,6 @@ export default function BarcodeScannerButton({
   }
 
   // ── Permission denied state ───────────────────────────────────────────────
-  // Show visible text label on Android (title tooltips don't appear on touch).
-  // Tapping opens Android app settings so the user can grant camera access.
   if (permDenied) {
     return (
       <button
@@ -114,8 +113,6 @@ export default function BarcodeScannerButton({
   }
 
   // ── Scanner error state ───────────────────────────────────────────────────
-  // Show visible "Error" label — title tooltips are invisible on Android touch.
-  // Tapping resets to idle so the user can retry.
   if (scanError) {
     return (
       <button
@@ -132,17 +129,68 @@ export default function BarcodeScannerButton({
   }
 
   // ── Scanning in progress ──────────────────────────────────────────────────
+  // With windowed:true the camera renders behind the WebView. We render a
+  // full-screen portal overlay on top so the rest of the app is hidden and the
+  // user sees the camera through the transparent scanning zone.
   if (isScanning) {
     return (
-      <button
-        type="button"
-        onClick={handleCancel}
-        title="Cancelar escaneo"
-        className="bg-red-900/50 hover:bg-red-900/70 text-red-400 p-2.5 rounded-lg border border-red-800/50
-                   flex items-center justify-center transition-colors flex-shrink-0"
-      >
-        <X size={15} />
-      </button>
+      <>
+        {/* Ghost placeholder to preserve search-bar layout */}
+        <div className="w-[34px] h-[34px] flex-shrink-0" />
+
+        {createPortal(
+          <div className="fixed inset-0 z-[9999] flex flex-col" style={{ background: "transparent" }}>
+            {/* ── Top dark band ── */}
+            <div className="bg-black/80 flex items-end justify-center pb-3" style={{ flex: 3 }}>
+              <p className="text-white/70 text-sm tracking-wide">
+                Apuntá la cámara al código
+              </p>
+            </div>
+
+            {/* ── Middle row: side strips + transparent scanning window ── */}
+            <div className="flex" style={{ flex: 4 }}>
+              <div className="bg-black/80" style={{ flex: 1 }} />
+
+              {/* Camera shows through this area (transparent background) */}
+              <div className="relative" style={{ flex: 8, background: "transparent" }}>
+                {/* Corner frame markers */}
+                <span className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-white/90 rounded-tl" />
+                <span className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-white/90 rounded-tr" />
+                <span className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-white/90 rounded-bl" />
+                <span className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-white/90 rounded-br" />
+                {/* Animated scan line */}
+                <div
+                  className="absolute left-1 right-1 h-px bg-white/50"
+                  style={{ top: "50%", boxShadow: "0 0 6px 1px rgba(255,255,255,0.4)" }}
+                />
+              </div>
+
+              <div className="bg-black/80" style={{ flex: 1 }} />
+            </div>
+
+            {/* ── Bottom dark band with cancel button ── */}
+            <div
+              className="bg-black/80 flex flex-col items-center justify-start gap-4 pt-6"
+              style={{ flex: 5 }}
+            >
+              <p className="text-white/40 text-xs">
+                El código debe estar dentro del marco
+              </p>
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 active:bg-white/30
+                           text-white border border-white/25 rounded-full px-8 py-3
+                           text-sm font-medium transition-colors"
+              >
+                <X size={15} />
+                Cancelar
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
+      </>
     );
   }
 
