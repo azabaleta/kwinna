@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertCircle, Camera, ShieldOff, Settings, X } from "lucide-react";
+import { AlertCircle, Camera, ShieldOff, Settings, ScanLine, X } from "lucide-react";
 import {
   scan,
   cancel,
@@ -10,11 +10,8 @@ import {
 } from "@tauri-apps/plugin-barcode-scanner";
 
 // ── Platform detection ────────────────────────────────────────────────────────
-// We detect Android using navigator.userAgent — it's always synchronous,
-// never fails, and the Android WebView UA always contains "Android".
-// Using IPC (plugin-os platform()) caused a race condition: the component
-// returned null on the first render and the platform() promise sometimes
-// failed silently due to missing capability permissions.
+// navigator.userAgent is synchronous and always available — no async IPC,
+// no race condition, no flash of null on first render.
 function isAndroidWebView(): boolean {
   if (typeof navigator === "undefined") return false;
   return /android/i.test(navigator.userAgent);
@@ -31,35 +28,35 @@ export default function BarcodeScannerButton({
   onScan,
   formats = [Format.EAN8],
 }: BarcodeScannerButtonProps) {
-  // Initialize synchronously — no async IPC, no flash of null on first render.
-  const [isMobile]                    = useState(() => isAndroidWebView());
-  const [isScanning, setIsScanning]   = useState(false);
-  const [permDenied, setPermDenied]   = useState(false);
-  const [scanError,  setScanError]    = useState<string | null>(null);
+  const [isMobile]                      = useState(() => isAndroidWebView());
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isScanning,   setIsScanning]   = useState(false);
+  const [permDenied,   setPermDenied]   = useState(false);
+  const [scanError,    setScanError]    = useState<string | null>(null);
 
-  // Only render on Android.
   if (!isMobile) return null;
 
-  async function handleScan() {
-    setPermDenied(false);
+  // ── Step 1: user presses camera button → show pre-scan confirmation ──────
+  // windowed:false launches a native Android Activity that completely covers
+  // the WebView. React UI is invisible while the camera is open, so it's
+  // impossible to show a cancel button inside the camera. This confirmation
+  // screen lets the user cancel BEFORE the camera opens, and informs them
+  // that the system back gesture closes the camera if needed.
+  function handlePress() {
     setScanError(null);
-    // Make the WebView transparent so the native camera layer (placed behind
-    // it by windowed:true) can show through the transparent scanning zone.
-    // The body CSS bg-zinc-950 is overridden here and restored in finally.
-    document.documentElement.style.background = "transparent";
-    document.body.style.background = "transparent";
+    setPermDenied(false);
+    setIsConfirming(true);
+  }
+
+  // ── Step 2: user confirms → open camera ─────────────────────────────────
+  async function handleScan() {
+    setIsConfirming(false);
     setIsScanning(true);
     try {
-      // windowed: true keeps the camera inside the existing WebView window,
-      // allowing the React scanning overlay to remain visible on top.
-      // windowed: false launches a separate native Activity that completely
-      // covers the WebView, making it impossible to show a React cancel button.
-      //
       // Do NOT call requestPermissions() or checkPermissions() before scan() —
-      // both can cause a Kotlin lateinit crash because the ActivityResultLauncher
-      // is not initialized outside of the scan() lifecycle.
-      const result = await scan({ windowed: true, formats });
-
+      // both cause a Kotlin lateinit crash because ActivityResultLauncher is
+      // not initialized outside of the scan() lifecycle.
+      const result = await scan({ windowed: false, formats });
       if (result?.content) {
         await onScan(result.content);
       }
@@ -89,26 +86,20 @@ export default function BarcodeScannerButton({
       }
     } finally {
       setIsScanning(false);
-      document.documentElement.style.background = "";
-      document.body.style.background = "";
     }
   }
 
   async function handleCancel() {
-    // Restore background immediately so there's no flash of transparent body
-    // if cancel() takes a moment to resolve the scan() promise.
-    document.documentElement.style.background = "";
-    document.body.style.background = "";
     try {
       await cancel();
     } catch {
-      // Ignore cancel errors — scanner may have already closed.
+      // ignore
     } finally {
       setIsScanning(false);
     }
   }
 
-  // ── Permission denied state ───────────────────────────────────────────────
+  // ── Permission denied ────────────────────────────────────────────────────
   if (permDenied) {
     return (
       <button
@@ -123,7 +114,7 @@ export default function BarcodeScannerButton({
     );
   }
 
-  // ── Scanner error state ───────────────────────────────────────────────────
+  // ── Scan error ───────────────────────────────────────────────────────────
   if (scanError) {
     return (
       <button
@@ -139,60 +130,44 @@ export default function BarcodeScannerButton({
     );
   }
 
-  // ── Scanning in progress ──────────────────────────────────────────────────
-  // With windowed:true the camera renders behind the WebView. We render a
-  // full-screen portal overlay on top so the rest of the app is hidden and the
-  // user sees the camera through the transparent scanning zone.
-  if (isScanning) {
+  // ── Pre-scan confirmation overlay ────────────────────────────────────────
+  if (isConfirming) {
     return (
       <>
-        {/* Ghost placeholder to preserve search-bar layout */}
         <div className="w-[34px] h-[34px] flex-shrink-0" />
-
         {createPortal(
-          <div className="fixed inset-0 z-[9999] flex flex-col" style={{ background: "transparent" }}>
-            {/* ── Top dark band ── */}
-            <div className="bg-black/80 flex items-end justify-center pb-3" style={{ flex: 3 }}>
-              <p className="text-white/70 text-sm tracking-wide">
-                Apuntá la cámara al código
+          <div className="fixed inset-0 z-[9999] bg-black/90 flex flex-col items-center justify-center gap-6 px-8">
+            <div className="w-16 h-16 rounded-2xl bg-zinc-800 border border-zinc-700
+                            flex items-center justify-center">
+              <ScanLine size={32} className="text-zinc-300" />
+            </div>
+
+            <div className="text-center flex flex-col gap-1.5">
+              <p className="text-white text-base font-medium">
+                Escanear código
+              </p>
+              <p className="text-zinc-400 text-sm leading-relaxed">
+                La cámara se abrirá en pantalla completa.{"\n"}
+                Deslizá desde el borde ← para cancelar.
               </p>
             </div>
 
-            {/* ── Middle row: side strips + transparent scanning window ── */}
-            <div className="flex" style={{ flex: 4 }}>
-              <div className="bg-black/80" style={{ flex: 1 }} />
-
-              {/* Camera shows through this area (transparent background) */}
-              <div className="relative" style={{ flex: 8, background: "transparent" }}>
-                {/* Corner frame markers */}
-                <span className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-white/90 rounded-tl" />
-                <span className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-white/90 rounded-tr" />
-                <span className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-white/90 rounded-bl" />
-                <span className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-white/90 rounded-br" />
-                {/* Animated scan line */}
-                <div
-                  className="absolute left-1 right-1 h-px bg-white/50"
-                  style={{ top: "50%", boxShadow: "0 0 6px 1px rgba(255,255,255,0.4)" }}
-                />
-              </div>
-
-              <div className="bg-black/80" style={{ flex: 1 }} />
-            </div>
-
-            {/* ── Bottom dark band with cancel button ── */}
-            <div
-              className="bg-black/80 flex flex-col items-center justify-start gap-4 pt-6"
-              style={{ flex: 5 }}
-            >
-              <p className="text-white/40 text-xs">
-                El código debe estar dentro del marco
-              </p>
+            <div className="flex flex-col gap-3 w-full max-w-xs">
               <button
                 type="button"
-                onClick={handleCancel}
-                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 active:bg-white/30
-                           text-white border border-white/25 rounded-full px-8 py-3
-                           text-sm font-medium transition-colors"
+                onClick={handleScan}
+                className="w-full bg-white text-zinc-900 rounded-xl py-3.5 text-sm font-semibold
+                           flex items-center justify-center gap-2 active:bg-zinc-100 transition-colors"
+              >
+                <Camera size={16} />
+                Abrir cámara
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsConfirming(false)}
+                className="w-full bg-zinc-800 text-zinc-300 rounded-xl py-3.5 text-sm font-medium
+                           flex items-center justify-center gap-2 active:bg-zinc-700 transition-colors
+                           border border-zinc-700"
               >
                 <X size={15} />
                 Cancelar
@@ -205,11 +180,25 @@ export default function BarcodeScannerButton({
     );
   }
 
-  // ── Default: camera button ────────────────────────────────────────────────
+  // ── Scanning in progress (native Activity is open, WebView is hidden) ────
+  if (isScanning) {
+    return (
+      <button
+        type="button"
+        onClick={handleCancel}
+        className="bg-red-900/50 text-red-400 p-2.5 rounded-lg border border-red-800/50
+                   flex items-center justify-center transition-colors flex-shrink-0"
+      >
+        <X size={15} />
+      </button>
+    );
+  }
+
+  // ── Default: camera button ───────────────────────────────────────────────
   return (
     <button
       type="button"
-      onClick={handleScan}
+      onClick={handlePress}
       title="Escanear código de barras"
       className="bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 p-2.5 rounded-lg border
                  border-zinc-700 transition-colors flex items-center justify-center flex-shrink-0"
@@ -219,5 +208,4 @@ export default function BarcodeScannerButton({
   );
 }
 
-// Re-export type for consumers that need to type the permission state
 export type { PermissionState };
