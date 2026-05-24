@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { BarChart3, CalendarCheck, LayoutDashboard, LogOut, Menu, Package2, RotateCcw, ShoppingBag, ShoppingCart, Tag, Users, UserCog, X, ArrowRightLeft } from "lucide-react";
+import { ArrowRightLeft, BarChart3, CalendarCheck, LayoutDashboard, LogOut, Menu, Package2, RotateCcw, Share2, ShoppingBag, ShoppingCart, Tag, Users, UserCog, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { selectUser, useAuthStore } from "@/store/use-auth-store";
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { href: "/admin/returns",    label: "Devoluciones",    icon: RotateCcw,       adminOnly: false },
   { href: "/admin/labels",     label: "Etiquetas",       icon: Tag,             adminOnly: true  },
   { href: "/admin/reports",    label: "Reportes",        icon: BarChart3,       adminOnly: false },
+  { href: "/admin/social",     label: "RRSS",            icon: Share2,          adminOnly: true  },
 ] as const;
 
 // ─── Isotipo inline (no SVGR configured in next.config) ───────────────────────

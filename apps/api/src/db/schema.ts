@@ -418,3 +418,21 @@ export const returnsTable = pgTable("returns", {
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── social_form_drafts ───────────────────────────────────────────────────────
+// Borrador semanal del formulario de redes sociales.
+// Un registro por usuario (upsert). El campo data almacena el JSON completo
+// del formulario; la validación de estructura la hace el frontend.
+
+export const socialFormDraftsTable = pgTable(
+  "social_form_drafts",
+  {
+    id:        uuid("id").primaryKey().defaultRandom(),
+    userId:    uuid("user_id").notNull(),
+    data:      jsonb("data").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdUniq: uniqueIndex("social_form_drafts_user_id_uniq").on(table.userId),
+  })
+);

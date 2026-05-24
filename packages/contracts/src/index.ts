@@ -6,3 +6,4 @@ export * from "./schemas/report";
 export * from "./schemas/return";
 export * from "./schemas/sale";
 export * from "./schemas/stock";
+export * from "./schemas/social-form";

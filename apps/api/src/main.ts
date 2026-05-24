@@ -14,6 +14,7 @@ import {
   reportsRoutes,
   returnsRoutes,
   saleRoutes,
+  socialFormRoutes,
   stockRoutes,
   stockBalancesRoutes,
   usersRoutes,
@@ -81,6 +82,7 @@ app.use("/reports",        reportsRoutes);
 app.use("/users",          usersRoutes);
 app.use("/pos-customers",  posCustomersRoutes);
 app.use("/glossary",       glossaryRoutes);
+app.use("/social-form",    socialFormRoutes);
 
 // ─── Semi-protected Routes ────────────────────────────────────────────────────
 // /products y /stock usan optionalAuth: los GETs son públicos (catálogo/stock
