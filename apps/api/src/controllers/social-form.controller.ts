@@ -14,7 +14,7 @@ export async function getDraft(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const draft = await findDraftByUserId(req.user!.id);
+    const draft = await findDraftByUserId(req.user!.sub);
     res.json({
       data:      draft?.data      ?? null,
       updatedAt: draft?.updatedAt ?? null,
@@ -38,7 +38,7 @@ export async function putDraft(
       return;
     }
 
-    const draft = await upsertDraft(req.user!.id, parsed.data);
+    const draft = await upsertDraft(req.user!.sub, parsed.data);
     res.json({ data: draft.data, updatedAt: draft.updatedAt });
   } catch (err) {
     next(err);
@@ -53,7 +53,7 @@ export async function deleteDraft(
   next: NextFunction,
 ): Promise<void> {
   try {
-    await deleteDraftByUserId(req.user!.id);
+    await deleteDraftByUserId(req.user!.sub);
     res.status(204).end();
   } catch (err) {
     next(err);
