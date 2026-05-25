@@ -127,33 +127,20 @@ export default function SocialPage() {
     });
   }
 
-  // ── Save indicator ────────────────────────────────────────────────────────
-  const isSaving     = saveDraft.isPending;
-  const lastSavedAt  = draft?.updatedAt
+  // ── Status label ──────────────────────────────────────────────────────────
+  const isSaving    = saveDraft.isPending;
+  const lastSavedAt = draft?.updatedAt
     ? new Date(draft.updatedAt).toLocaleString("es-AR", {
         day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
       })
     : null;
 
-  // ── Loading / error states ────────────────────────────────────────────────
-  if (isLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center gap-2 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <span className="text-sm">Cargando borrador...</span>
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
-        <p className="text-sm">No se pudo cargar el formulario.</p>
-        <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-          Reintentar
-        </Button>
-      </div>
-    );
+  function statusLabel() {
+    if (isLoading)  return "Cargando borrador...";
+    if (isError)    return "Sin conexión con el servidor — los cambios no se guardan";
+    if (isSaving)   return "Guardando...";
+    if (lastSavedAt) return `Guardado el ${lastSavedAt}`;
+    return "Completá a lo largo de la semana · Generá el archivo el sábado";
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -172,12 +159,8 @@ export default function SocialPage() {
               <h1 className="text-base font-bold text-foreground leading-none">
                 Datos semanales RRSS
               </h1>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {isSaving
-                  ? "Guardando..."
-                  : lastSavedAt
-                  ? `Guardado el ${lastSavedAt}`
-                  : "Completá a lo largo de la semana · Generá el archivo el sábado"}
+              <p className={cn("mt-0.5 text-xs", isError ? "text-destructive" : "text-muted-foreground")}>
+                {statusLabel()}
               </p>
             </div>
           </div>

@@ -141,6 +141,13 @@
       "when": 1778396672186,
       "tag": "0019_colossal_dormammu",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1779672702097,
+      "tag": "0020_perpetual_santa_claus",
+      "breakpoints": true
     }
   ]
 }
