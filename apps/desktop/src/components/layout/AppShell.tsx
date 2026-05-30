@@ -89,7 +89,10 @@ function MobileLayout({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div
+      className="flex flex-col h-screen overflow-hidden"
+      style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       {/* Top bar */}
       <header className="flex-shrink-0 flex items-center gap-3 px-4 py-3
                          bg-zinc-900 border-b border-zinc-800">
@@ -121,6 +124,7 @@ function MobileLayout({
         className={`fixed top-0 left-0 h-full w-64 bg-zinc-900 border-r border-zinc-800
                     flex flex-col z-50 transform transition-transform duration-200 ease-in-out
                     ${open ? "translate-x-0" : "-translate-x-full"}`}
+        style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {/* Drawer header */}
         <div className="flex items-center justify-between px-5 py-5 border-b border-zinc-800">
