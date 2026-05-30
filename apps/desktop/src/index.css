@@ -56,20 +56,22 @@
 }
 
 .receipt-sub {
-  font-size: 9px;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
 .receipt-date {
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 600;
   margin-top: 1mm;
 }
 
 .receipt-sep {
   text-align: center;
   font-size: 10px;
-  color: #999;
+  color: #555;
   margin: 1.5mm 0;
   overflow: hidden;
 }
@@ -81,15 +83,16 @@
 }
 
 .receipt-item-name {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   word-wrap: break-word;
 }
 
 .receipt-item-line {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .receipt-totals {
@@ -101,7 +104,7 @@
 .receipt-total-line {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .receipt-grand-total {
@@ -110,18 +113,19 @@
 }
 
 .receipt-footer p {
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 500;
   word-wrap: break-word;
 }
 
 .receipt-thanks {
   text-align: center;
-  font-size: 10px;
+  font-size: 11px;
   margin-top: 1mm;
 }
 
 .receipt-url {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
 }

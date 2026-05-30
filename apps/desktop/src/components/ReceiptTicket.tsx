@@ -77,7 +77,7 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?
         {/* Header */}
         <div className="receipt-header">
           <KwinnaLogo className="receipt-logo" />
-          <div className="receipt-store-info" style={{ fontSize: "10px", lineHeight: "1.2", margin: "6px 0", opacity: 0.8 }}>
+          <div className="receipt-store-info" style={{ fontSize: "10px", lineHeight: "1.2", margin: "6px 0" }}>
             <p>Kwinna · CUIL 20-40294631-9</p>
             <p>Andrés Bernabé Zabaleta</p>
             <p>Luis Beltrán 824, Neuquén Capital</p>
@@ -152,24 +152,22 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?
               <p style={{ marginBottom: "2px" }}>
                 N° transacción: <strong>{txCode}</strong>
               </p>
-              <div style={{ transform: "scale(0.95)", transformOrigin: "center" }}>
-                <Barcode 
-                  value={txCode} 
-                  format="CODE128" 
-                  width={1.2} 
-                  height={35} 
+              <Barcode
+                  value={txCode}
+                  format="CODE128"
+                  width={2}
+                  height={45}
                   displayValue={false}
-                  margin={0}
-                  background="transparent"
+                  margin={10}
+                  background="#ffffff"
                 />
-              </div>
             </div>
           )}
           {data.vendorName && (
             <p style={{ marginTop: "4px" }}>Vendedor: {data.vendorName}</p>
           )}
           {hidePrice && (
-            <p style={{ marginTop: "6px", fontSize: "9px", opacity: 0.6 }}>
+            <p style={{ marginTop: "6px", fontSize: "10px" }}>
               Presentá este comprobante para cambios.
             </p>
           )}
@@ -178,7 +176,7 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?
         <p className="receipt-sep">{separator}</p>
 
         {/* Policies */}
-        <div className="receipt-policies" style={{ fontSize: "10px", textAlign: "center", opacity: 0.8, marginBottom: "8px", lineHeight: "1.3" }}>
+        <div className="receipt-policies" style={{ fontSize: "10px", textAlign: "center", marginBottom: "8px", lineHeight: "1.3" }}>
           <p>Devoluciones en el local hasta 30 días corridos post-compra. Requiere ticket, bolsa y prenda sin uso en perfecto estado.</p>
         </div>
 
