@@ -46,7 +46,7 @@ const RESET_COOLDOWN_MS     = 60 * 1000;             // 60 segundos entre solici
 
 function makeToken(user: User): string {
   return jwt.sign(
-    { sub: user.id, email: user.email, role: user.role },
+    { sub: user.id, email: user.email, role: user.role, name: user.name },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES },
   );
@@ -259,6 +259,7 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
 export interface JwtPayload {
   sub:   string;
   email: string;
+  name?: string; // presente en tokens emitidos a partir de esta versión
   role:  "admin" | "operator" | "customer";
   iat:   number;
   exp:   number;

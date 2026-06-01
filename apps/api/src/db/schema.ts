@@ -6,6 +6,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
@@ -457,4 +458,40 @@ export const planificacionSemanasTable = pgTable(
   (table) => ({
     semanaDesc: index("idx_planificacion_semana").on(table.semana),
   })
+);
+
+// ─── planificacion_estados ────────────────────────────────────────────────────
+// Un registro por (semana, pieza_id). Marca si la pieza fue realizada.
+// Se hace upsert en PATCH /planificacion/semana/:n/ficha/:id/realizada.
+
+export const planificacionEstadosTable = pgTable(
+  "planificacion_estados",
+  {
+    semana:              integer("semana").notNull(),
+    piezaId:             text("pieza_id").notNull(),
+    realizada:           boolean("realizada").notNull().default(false),
+    actualizadoEn:       timestamp("actualizado_en", { withTimezone: true }).notNull().defaultNow(),
+    actualizadoPorId:    uuid("actualizado_por_id"),
+    actualizadoPorNombre:text("actualizado_por_nombre"),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.semana, table.piezaId] }),
+  })
+);
+
+// ─── planificacion_comentarios ────────────────────────────────────────────────
+// Comentarios libres por pieza. Cada fila incluye el nombre del usuario
+// para mostrarlo en la UI sin joins adicionales.
+
+export const planificacionComentariosTable = pgTable(
+  "planificacion_comentarios",
+  {
+    id:       serial("id").primaryKey(),
+    semana:   integer("semana").notNull(),
+    piezaId:  text("pieza_id").notNull(),
+    userId:   uuid("user_id").notNull(),
+    userName: text("user_name").notNull(),
+    texto:    text("texto").notNull(),
+    creadoEn: timestamp("creado_en", { withTimezone: true }).notNull().defaultNow(),
+  }
 );

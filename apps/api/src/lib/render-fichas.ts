@@ -157,7 +157,7 @@ export function renderFichasHTML(data: FichasData): string {
 </head>
 <body>
   <div style="max-width:680px;margin:0 auto 24px;text-align:center;padding:20px 0 12px">
-    <div style="font-size:24px;font-weight:bold;color:#E1306C">KWINNA</div>
+    <div style="font-size:24px;font-weight:bold;color:#70005E">KWINNA</div>
     <div style="font-size:14px;color:#888;margin-top:4px">Fichas de producción — Semana ${semana ?? ""} · ${safe(periodo ?? "")}</div>
     <div style="font-size:12px;color:#aaa;margin-top:4px">${piezas.length} piezas · ${piezas.filter((p) => p.tipo !== "IA").length} para grabar</div>
   </div>

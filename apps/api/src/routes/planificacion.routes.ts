@@ -2,14 +2,17 @@ import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
 import { authGuard, requireRole } from "../middlewares";
 import {
+  getInteraccion,
   getSemana,
   getSemanaHtml,
   getSemanas,
+  patchRealizada,
+  postComentario,
+  removeComentario,
   uploadSemana,
 } from "../controllers/planificacion.controller";
 
 // ─── API Key middleware ───────────────────────────────────────────────────────
-// Usado exclusivamente por el pipeline externo (script Python).
 
 function apiKeyAuth(req: Request, res: Response, next: NextFunction): void {
   const key = req.headers["x-api-key"];
@@ -20,11 +23,17 @@ function apiKeyAuth(req: Request, res: Response, next: NextFunction): void {
   next();
 }
 
+const jwtOp = [authGuard, requireRole(["admin", "operator"])] as const;
+
 const router = Router();
 
-router.post(  "/upload",          apiKeyAuth,                             uploadSemana);
-router.get(   "/semanas",         authGuard, requireRole(["admin", "operator"]), getSemanas);
-router.get(   "/semana/:n",       authGuard, requireRole(["admin", "operator"]), getSemana);
-router.get(   "/semana/:n/html",  authGuard, requireRole(["admin", "operator"]), getSemanaHtml);
+router.post(  "/upload",                          apiKeyAuth,  uploadSemana);
+router.get(   "/semanas",                         ...jwtOp,    getSemanas);
+router.get(   "/semana/:n",                       ...jwtOp,    getSemana);
+router.get(   "/semana/:n/html",                  ...jwtOp,    getSemanaHtml);
+router.get(   "/semana/:n/interaccion",           ...jwtOp,    getInteraccion);
+router.patch( "/semana/:n/ficha/:id/realizada",   ...jwtOp,    patchRealizada);
+router.post(  "/semana/:n/ficha/:id/comentario",  ...jwtOp,    postComentario);
+router.delete("/comentario/:id",                  ...jwtOp,    removeComentario);
 
 export default router;
