@@ -11,3 +11,4 @@ export { default as stockRoutes }        from "./stock.routes";
 export { default as stockBalancesRoutes} from "./stock-balances.routes";
 export { default as usersRoutes }        from "./users.routes";
 export { default as socialFormRoutes }   from "./social-form.routes";
+export { default as planificacionRoutes } from "./planificacion.routes";

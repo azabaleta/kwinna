@@ -1,10 +1,12 @@
 import {
   boolean,
+  index,
   integer,
   jsonb,
   numeric,
   pgEnum,
   pgTable,
+  serial,
   text,
   timestamp,
   uniqueIndex,
@@ -434,5 +436,25 @@ export const socialFormDraftsTable = pgTable(
   },
   (table) => ({
     userIdUniq: uniqueIndex("social_form_drafts_user_id_uniq").on(table.userId),
+  })
+);
+
+// ─── planificacion_semanas ────────────────────────────────────────────────────
+// Una fila por semana del año. El pipeline externo hace UPSERT via POST /planificacion/upload.
+// json_data almacena el payload completo { semana, semana_str, periodo, piezas }.
+
+export const planificacionSemanasTable = pgTable(
+  "planificacion_semanas",
+  {
+    id:           serial("id").primaryKey(),
+    semana:       integer("semana").notNull().unique(),
+    semanaStr:    varchar("semana_str", { length: 4 }).notNull(),
+    periodo:      text("periodo"),
+    jsonData:     jsonb("json_data").notNull(),
+    creadoEn:     timestamp("creado_en",      { withTimezone: true }).notNull().defaultNow(),
+    actualizadoEn:timestamp("actualizado_en", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    semanaDesc: index("idx_planificacion_semana").on(table.semana),
   })
 );

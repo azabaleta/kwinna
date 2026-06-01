@@ -6,6 +6,7 @@ import SearchView from "./views/SearchView";
 import SellView from "./views/SellView";
 import ReturnView from "./views/ReturnView";
 import OrdersView from "./views/OrdersView";
+import PlanificacionView from "./views/PlanificacionView";
 
 function PrivateRoutes() {
   return (
@@ -16,6 +17,7 @@ function PrivateRoutes() {
         <Route path="/sell" element={<SellView />} />
         <Route path="/return" element={<ReturnView />} />
         <Route path="/orders" element={<OrdersView />} />
+        <Route path="/planificacion" element={<PlanificacionView />} />
         <Route path="*" element={<Navigate to="/search" replace />} />
       </Routes>
     </AppShell>

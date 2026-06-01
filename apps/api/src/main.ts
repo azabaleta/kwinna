@@ -9,6 +9,7 @@ import {
   authRoutes,
   creditNotesRoutes,
   glossaryRoutes,
+  planificacionRoutes,
   posCustomersRoutes,
   productRoutes,
   reportsRoutes,
@@ -83,6 +84,7 @@ app.use("/users",          usersRoutes);
 app.use("/pos-customers",  posCustomersRoutes);
 app.use("/glossary",       glossaryRoutes);
 app.use("/social-form",    socialFormRoutes);
+app.use("/planificacion",  planificacionRoutes);
 
 // ─── Semi-protected Routes ────────────────────────────────────────────────────
 // /products y /stock usan optionalAuth: los GETs son públicos (catálogo/stock

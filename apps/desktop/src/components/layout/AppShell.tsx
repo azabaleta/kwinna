@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Search, ShoppingCart, RotateCcw, Package, LogOut, Menu, X } from "lucide-react";
+import { CalendarDays, Search, ShoppingCart, RotateCcw, Package, LogOut, Menu, X } from "lucide-react";
 import { useAuthStore } from "../../store/use-auth-store";
 import { isAndroid } from "../../lib/platform";
 
 const NAV = [
-  { to: "/search",  label: "Buscar",   icon: Search       },
-  { to: "/sell",    label: "Vender",   icon: ShoppingCart },
-  { to: "/return",  label: "Devolver", icon: RotateCcw    },
-  { to: "/orders",  label: "Pedidos",  icon: Package      },
+  { to: "/search",        label: "Buscar",       icon: Search       },
+  { to: "/sell",          label: "Vender",        icon: ShoppingCart },
+  { to: "/return",        label: "Devolver",      icon: RotateCcw    },
+  { to: "/orders",        label: "Pedidos",       icon: Package      },
+  { to: "/planificacion", label: "Planificación", icon: CalendarDays },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
