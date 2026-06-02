@@ -1,4 +1,5 @@
 import { Router } from "express";
+import express from "express";
 import type { NextFunction, Request, Response } from "express";
 import { authGuard, requireRole } from "../middlewares";
 import {
@@ -27,7 +28,7 @@ const jwtOp = [authGuard, requireRole(["admin", "operator"])] as const;
 
 const router = Router();
 
-router.post(  "/upload",                          apiKeyAuth,  uploadSemana);
+router.post(  "/upload",                          apiKeyAuth, express.json({ limit: "10mb" }), uploadSemana);
 router.get(   "/semanas",                         ...jwtOp,    getSemanas);
 router.get(   "/semana/:n",                       ...jwtOp,    getSemana);
 router.get(   "/semana/:n/html",                  ...jwtOp,    getSemanaHtml);
