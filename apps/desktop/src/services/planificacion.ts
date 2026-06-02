@@ -9,11 +9,13 @@ export interface SemanaListItem {
 }
 
 export interface Pieza {
-  id:         string;
-  plataforma: string;
-  tipo:       string;
-  dia_hora:   string;
-  gancho:     string;
+  id:                string;
+  plataforma:        string;
+  canal_alternativo?:string;
+  formato?:          string;
+  tipo:              string;
+  dia_hora:          string;
+  gancho:            string;
 }
 
 export interface PiezasData {

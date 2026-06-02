@@ -69,12 +69,21 @@ function FichaCard({
       {/* Barra de plataforma + estado */}
       <div
         className="flex items-center justify-between px-4 py-3"
-        style={{ background: realizada ? "#2a2a2a" : colorPlat(pieza.plataforma) }}
+        style={{ background: realizada ? "#2a2a2a" : colorPlat(
+          pieza.plataforma === "Alternativo" && pieza.canal_alternativo
+            ? pieza.canal_alternativo
+            : pieza.plataforma
+        ) }}
       >
         <div className="flex items-center gap-2">
-          <span className="text-white font-bold text-sm">{pieza.plataforma}</span>
+          <span className="text-white font-bold text-sm">
+            {pieza.plataforma === "Alternativo" && pieza.canal_alternativo
+              ? pieza.canal_alternativo
+              : pieza.plataforma}
+            {pieza.formato ? ` · ${pieza.formato}` : ""}
+          </span>
           <span className="text-white/60 text-xs">
-            {pieza.tipo === "IA" ? "🤖 IA" : "🎬 Para grabar"}
+            {pieza.tipo === "IA" ? "🤖 IA" : "🎬 Propia"}
           </span>
         </div>
         <span className="text-white/80 text-xs font-medium">{pieza.dia_hora}</span>

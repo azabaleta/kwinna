@@ -77,7 +77,7 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?
         {/* Header */}
         <div className="receipt-header">
           <KwinnaLogo className="receipt-logo" />
-          <div className="receipt-store-info" style={{ fontSize: "10px", lineHeight: "1.2", margin: "6px 0" }}>
+          <div className="receipt-store-info" style={{ fontSize: "11px", fontWeight: 700, lineHeight: "1.2", margin: "6px 0" }}>
             <p>Kwinna · CUIL 20-40294631-9</p>
             <p>Andrés Bernabé Zabaleta</p>
             <p>Luis Beltrán 824, Neuquén Capital</p>
@@ -155,10 +155,10 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?
               <Barcode
                   value={txCode}
                   format="CODE128"
-                  width={2}
-                  height={45}
+                  width={1}
+                  height={32}
                   displayValue={false}
-                  margin={10}
+                  margin={5}
                   background="#ffffff"
                 />
             </div>
@@ -167,7 +167,7 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?
             <p style={{ marginTop: "4px" }}>Vendedor: {data.vendorName}</p>
           )}
           {hidePrice && (
-            <p style={{ marginTop: "6px", fontSize: "10px" }}>
+            <p style={{ marginTop: "6px", fontSize: "11px", fontWeight: 600 }}>
               Presentá este comprobante para cambios.
             </p>
           )}
@@ -176,7 +176,7 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?
         <p className="receipt-sep">{separator}</p>
 
         {/* Policies */}
-        <div className="receipt-policies" style={{ fontSize: "10px", textAlign: "center", marginBottom: "8px", lineHeight: "1.3" }}>
+        <div className="receipt-policies" style={{ fontSize: "11px", fontWeight: 600, textAlign: "center", marginBottom: "8px", lineHeight: "1.3" }}>
           <p>Devoluciones en el local hasta 30 días corridos post-compra. Requiere ticket, bolsa y prenda sin uso en perfecto estado.</p>
         </div>
 

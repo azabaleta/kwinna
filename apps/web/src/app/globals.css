@@ -74,7 +74,7 @@
   color: #000;
 }
 
-.receipt-sub { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.receipt-sub { font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .receipt-date { font-size: 11px; font-weight: 600; margin-top: 1mm; }
 
 .receipt-sep {
@@ -93,7 +93,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .receipt-totals { display: flex; flex-direction: column; gap: 1mm; }
@@ -102,14 +102,17 @@
   display: flex;
   justify-content: space-between;
   font-size: 11px;
+  font-weight: 700;
 }
 
 .receipt-grand-total { font-size: 14px; font-weight: 800; }
 
-.receipt-footer p { font-size: 11px; font-weight: 500; word-wrap: break-word; }
+.receipt-footer p { font-size: 11px; font-weight: 700; word-wrap: break-word; }
+
+.receipt-ticket svg { display: block; max-width: 100%; height: auto; }
 
 .receipt-thanks { text-align: center; font-size: 11px; margin-top: 1mm; }
-.receipt-url { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+.receipt-url { font-size: 11px; font-weight: 700; }
 
 .receipt-reprint-mark {
   text-align: center;

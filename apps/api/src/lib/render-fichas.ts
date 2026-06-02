@@ -17,18 +17,20 @@ interface Checklist {
 }
 
 interface Pieza {
-  plataforma?:     string;
-  tipo?:           string;
-  dia_hora?:       string;
-  gancho?:         string;
-  secuencia?:      Secuencia[];
-  dialogo?:        string;
-  textos_pantalla?:string[];
-  checklist?:      Checklist;
-  camara?:         Camara;
-  caption_a?:      string;
-  caption_b?:      string;
-  hashtags?:       string;
+  plataforma?:       string;
+  canal_alternativo?:string;
+  formato?:          string;
+  tipo?:             string;
+  dia_hora?:         string;
+  gancho?:           string;
+  secuencia?:        Secuencia[];
+  dialogo?:          string;
+  textos_pantalla?:  string[];
+  checklist?:        Checklist;
+  camara?:           Camara;
+  caption_a?:        string;
+  caption_b?:        string;
+  hashtags?:         string;
 }
 
 interface FichasData {
@@ -59,7 +61,11 @@ export function renderFichasHTML(data: FichasData): string {
   const { semana, periodo, piezas = [] } = data;
 
   const fichas = piezas.map((p) => {
-    const color = COLORES[p.plataforma ?? ""] ?? COLORES["default"]!;
+    const nombrePlat = (p.plataforma === "Alternativo" && p.canal_alternativo)
+      ? p.canal_alternativo
+      : (p.plataforma ?? "");
+    const formatoStr = p.formato ? ` · ${p.formato}` : "";
+    const color = COLORES[nombrePlat] ?? COLORES["default"]!;
     const esIA  = p.tipo === "IA";
 
     const filasSec = (p.secuencia ?? []).map((s, idx) => `
@@ -78,14 +84,14 @@ export function renderFichasHTML(data: FichasData): string {
 
       <div style="background:${color};padding:14px 18px;display:flex;justify-content:space-between;align-items:center">
         <div>
-          <span style="color:white;font-size:16px;font-weight:bold">${safe(p.plataforma)}</span>
-          <span style="color:rgba(255,255,255,.75);font-size:12px;margin-left:10px">${esIA ? "🤖 IA" : "🎬 Para grabar"}</span>
+          <span style="color:white;font-size:16px;font-weight:bold">${safe(nombrePlat)}${safe(formatoStr)}</span>
+          <span style="color:rgba(255,255,255,.75);font-size:12px;margin-left:10px">${esIA ? "🤖 IA" : "🎬 Propia"}</span>
         </div>
         <span style="color:rgba(255,255,255,.9);font-size:13px;font-weight:600">${safe(p.dia_hora)}</span>
       </div>
 
       <div style="padding:18px;background:#fff">
-        ${esIA ? `<p style="color:#888;font-style:italic;font-size:13px;margin:0 0 12px">Este contenido se produce con IA — no requiere grabación.</p>` : ""}
+        ${esIA ? `<p style="color:#888;font-style:italic;font-size:13px;margin:0 0 12px">Este contenido se genera con inteligencia artificial — no requiere sesión de filmación.</p>` : ""}
 
         <div style="background:#FFFDE7;border-left:4px solid #F57F17;padding:12px 16px;border-radius:0 6px 6px 0;margin-bottom:16px">
           <div style="font-size:10px;font-weight:bold;color:#F57F17;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">⚡ GANCHO — Primeros 2 segundos</div>
