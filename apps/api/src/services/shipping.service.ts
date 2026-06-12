@@ -1,15 +1,6 @@
 import { findShippingZoneByCity, findAllShippingZones, insertShippingZone, updateShippingZone, deleteShippingZone } from "../db/repositories/shipping-zone.repository";
 import type { ShippingZone, ShippingZoneCreateInput, ShippingZoneUpdateInput } from "@kwinna/contracts";
-
-// ─── Normalización ────────────────────────────────────────────────────────────
-
-export function normalizeCity(s: string): string {
-  return s
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-}
+import { normalizeCity } from "@kwinna/contracts";
 
 // ─── Costo de envío (fuente de verdad del backend) ────────────────────────────
 // Consultado ANTES de abrir la transacción de venta para mantener la TX síncrona.

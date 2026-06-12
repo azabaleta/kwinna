@@ -5,4 +5,4 @@ cmds = [
 ]
 
 [start]
-cmd = "node dist/main.js"
+cmd = "pnpm --filter @kwinna/api db:migrate && node dist/main.js"

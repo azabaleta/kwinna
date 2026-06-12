@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+// Única fuente de verdad de la clave `city`: minúsculas, sin espacios extremos
+// ni diacríticos. La usan el backend (persistencia/lookup), el checkout web
+// (preview de costo) y los mocks MSW — deben coincidir siempre.
+export function normalizeCity(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 export const ShippingZoneSchema = z.object({
   id:          z.string().uuid(),
   city:        z.string(),        // key normalizado (minúsculas, sin tildes): "neuquen"

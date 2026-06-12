@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { PromoCodeValidateResponse, SaleOrderInput } from "@kwinna/contracts";
+import { normalizeCity } from "@kwinna/contracts";
 import { validatePromoCode } from "@/services/promo-codes";
 import { useShippingZones } from "@/hooks/use-shipping-zones";
 import { Button } from "@/components/ui/button";
@@ -75,16 +76,8 @@ function isMercadoPagoUrl(url: string): boolean {
 }
 
 // ─── Shipping zones ───────────────────────────────────────────────────────────
-// Mapa ciudad normalizada → costo de envío en ARS.
-// Solo las ciudades listadas aquí tienen envío configurado.
-
-function normalize(s: string): string {
-  return s
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
+// Preview del costo contra el mapa ciudad normalizada → costo que viene de la API.
+// El backend recalcula el costo real al confirmar la venta.
 
 interface ShippingInfo {
   cost:    number;
@@ -96,7 +89,7 @@ function computeShipping(city: string, zonesMap: Record<string, number>): Shippi
   const raw = city.trim();
   if (!raw) return { cost: 0, label: "", isKnown: false };
 
-  const key  = normalize(raw);
+  const key  = normalizeCity(raw);
   const cost = zonesMap[key];
 
   return cost !== undefined
@@ -496,12 +489,11 @@ export default function CheckoutPage() {
 
             {/* ── Totales ───────────────────────────────────────────────────── */}
             <div className="mt-5 space-y-2 border-t border-border/50 pt-5">
-              {shipping.isKnown && (
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span className="text-[11px] tracking-wide uppercase">Productos</span>
-                  <span className="tabular-nums">${cartTotal.toLocaleString("es-AR")}</span>
-                </div>
-              )}
+              {/* Subtotal siempre visible: el desglose no mezcla descuentos */}
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span className="text-[11px] tracking-wide uppercase">Subtotal</span>
+                <span className="tabular-nums">${cartTotal.toLocaleString("es-AR")}</span>
+              </div>
               {!isPickup && (
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
                   <span className="text-[11px] tracking-wide uppercase">Envío</span>

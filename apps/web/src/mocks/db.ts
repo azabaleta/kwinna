@@ -136,6 +136,22 @@ export const promoCodes: PromoCode[] = [
     createdAt:             "2026-01-01T00:00:00.000Z",
     updatedAt:             "2026-01-01T00:00:00.000Z",
   },
+  {
+    id:                    "pc-0001-0000-0000-0000-000000000002",
+    code:                  "SOYKWINNA",
+    description:           "Lanzamiento: 10% extra transferencia / 10% tarjeta",
+    transferDiscountType:  "percentage",
+    transferDiscountValue: 10,
+    cardDiscountType:      "percentage",
+    cardDiscountValue:     10,
+    isActive:              true,
+    validFrom:             null,
+    validUntil:            null,
+    maxUses:               null,
+    usedCount:             0,
+    createdAt:             "2026-06-12T00:00:00.000Z",
+    updatedAt:             "2026-06-12T00:00:00.000Z",
+  },
 ];
 
 export const sales: Sale[] = [

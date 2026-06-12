@@ -14,6 +14,7 @@ import {
   SaleListResponseSchema,
   SaleOrderInputSchema,
   SaleResponseSchema,
+  normalizeCity,
   ShippingZoneCreateInputSchema,
   ShippingZoneUpdateInputSchema,
   StockListResponseSchema,
@@ -51,10 +52,6 @@ const mockUsers: MockUser[] = [
 ];
 
 // ─── Mock shipping zones ─────────────────────────────────────────────────────
-
-function normalizeCity(s: string): string {
-  return s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
 
 let mockShippingZones: ShippingZone[] = [
   { id: "sz-1", city: "neuquen",    displayName: "Neuquén",    cost: 3500, updatedAt: new Date().toISOString() },

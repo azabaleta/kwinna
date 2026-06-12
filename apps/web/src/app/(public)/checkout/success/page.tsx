@@ -7,6 +7,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useSaleById } from "@/hooks/use-sale";
+import { waLink } from "@/lib/constants";
 
 const BANK_DETAILS = {
   bank: "Brubank",
@@ -15,8 +16,6 @@ const BANK_DETAILS = {
   alias: "kwinna26",
   cbu: "1430001713047444170018",
 };
-
-const WHATSAPP_NUMBER = "5492993294998"; // Formato internacional sin '+'
 
 function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
@@ -83,7 +82,7 @@ function CheckoutSuccessContent() {
             </Button>
             <Button asChild variant="link" className="text-xs text-muted-foreground tracking-widest uppercase">
               <a
-                href={`https://wa.me/5492993294998?text=${encodeURIComponent("Hola, tuve un problema con mi orden #" + sale.id.slice(0, 8).toUpperCase())}`}
+                href={waLink("Hola, tuve un problema con mi orden #" + sale.id.slice(0, 8).toUpperCase())}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -97,8 +96,7 @@ function CheckoutSuccessContent() {
   }
 
   // Generar link de WhatsApp
-  const wsMessage = encodeURIComponent(`Hola! Realicé una compra en la web y acá te dejo el comprobante de transferencia.\nMi orden es: #${sale.id.slice(0, 8).toUpperCase()}`);
-  const wsLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${wsMessage}`;
+  const wsLink = waLink(`Hola! Realicé una compra en la web y acá te dejo el comprobante de transferencia.\nMi orden es: #${sale.id.slice(0, 8).toUpperCase()}`);
 
   return (
     <main className="min-h-screen bg-background pb-20 pt-24 lg:pt-32">

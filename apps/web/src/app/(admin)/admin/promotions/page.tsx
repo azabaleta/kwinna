@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tag, Plus, Pencil, Loader2, TicketPercent, MapPin, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { PromoCode, PromoCodeCreateInput, DiscountType, ShippingZone } from "@kwinna/contracts";
@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -35,6 +36,12 @@ import {
 } from "@/components/ui/select";
 import { usePromoCodes, useCreatePromoCode, useUpdatePromoCode, useDeletePromoCode } from "@/hooks/use-promo-codes";
 import { useShippingZones, useCreateShippingZone, useUpdateShippingZone, useDeleteShippingZone } from "@/hooks/use-shipping-zones";
+import {
+  fetchProvincias,
+  fetchMunicipios,
+  type Provincia,
+  type Municipio,
+} from "@/services/georef";
 import { cn } from "@/lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -180,6 +187,12 @@ function DiscountSection({
   );
 }
 
+// ─── Pending delete (confirmación) ────────────────────────────────────────────
+
+type PendingDelete =
+  | { kind: "promo"; promo: PromoCode }
+  | { kind: "zone";  zone:  ShippingZone };
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PromotionsPage() {
@@ -205,11 +218,43 @@ export default function PromotionsPage() {
   const [zoneCost,        setZoneCost]        = useState("");
   const [zoneErrors,      setZoneErrors]      = useState<{ name?: string; cost?: string }>({});
 
+  // Confirmación de borrado (promos y zonas comparten el mismo diálogo)
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+
+  // ── Georef — misma fuente de provincias/ciudades que usa el checkout ──────
+  const [provincias,          setProvincias]          = useState<Provincia[]>([]);
+  const [loadingProvincias,   setLoadingProvincias]   = useState(false);
+  const [selectedProvinciaId, setSelectedProvinciaId] = useState("");
+  const [municipios,          setMunicipios]          = useState<Municipio[]>([]);
+  const [loadingMunicipios,   setLoadingMunicipios]   = useState(false);
+
+  useEffect(() => {
+    if (!zoneDialogOpen || provincias.length > 0) return;
+    setLoadingProvincias(true);
+    fetchProvincias()
+      .then(setProvincias)
+      .catch(() => toast.error("No se pudieron cargar las provincias"))
+      .finally(() => setLoadingProvincias(false));
+  }, [zoneDialogOpen, provincias.length]);
+
+  useEffect(() => {
+    if (!selectedProvinciaId) {
+      setMunicipios([]);
+      return;
+    }
+    setLoadingMunicipios(true);
+    fetchMunicipios(selectedProvinciaId)
+      .then(setMunicipios)
+      .catch(() => toast.error("No se pudieron cargar las ciudades"))
+      .finally(() => setLoadingMunicipios(false));
+  }, [selectedProvinciaId]);
+
   function openCreateZone() {
     setEditingZone(null);
     setZoneName("");
     setZoneCost("");
     setZoneErrors({});
+    setSelectedProvinciaId("");
     setZoneDialogOpen(true);
   }
 
@@ -218,12 +263,13 @@ export default function PromotionsPage() {
     setZoneName(zone.displayName);
     setZoneCost(String(zone.cost));
     setZoneErrors({});
+    setSelectedProvinciaId("");
     setZoneDialogOpen(true);
   }
 
   async function handleZoneSubmit() {
     const errs: { name?: string; cost?: string } = {};
-    if (!zoneName.trim()) errs.name = "Requerido";
+    if (!zoneName.trim()) errs.name = "Seleccioná una ciudad";
     const costNum = Number(zoneCost);
     if (!zoneCost || isNaN(costNum) || costNum < 0) errs.cost = "Valor inválido";
     if (Object.keys(errs).length) { setZoneErrors(errs); return; }
@@ -251,7 +297,15 @@ export default function PromotionsPage() {
     }
   }
 
-  const isZonePending = createZone.isPending || updateZone.isPending;
+  const isZonePending   = createZone.isPending || updateZone.isPending;
+  const isDeletePending = deleteMutation.isPending || deleteZone.isPending;
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    if (pendingDelete.kind === "promo") await handleDeletePromo(pendingDelete.promo);
+    else await handleDeleteZone(pendingDelete.zone);
+    setPendingDelete(null);
+  }
 
   function openCreate() {
     setEditingPromo(null);
@@ -429,7 +483,7 @@ export default function PromotionsPage() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-none text-destructive hover:text-destructive"
-                            onClick={() => handleDeletePromo(promo)}
+                            onClick={() => setPendingDelete({ kind: "promo", promo })}
                             disabled={deleteMutation.isPending}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -517,7 +571,7 @@ export default function PromotionsPage() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-none text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteZone(zone)}
+                            onClick={() => setPendingDelete({ kind: "zone", zone })}
                             disabled={deleteZone.isPending}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -542,17 +596,73 @@ export default function PromotionsPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {editingZone && (
+              <div className="rounded-none border border-border/50 px-4 py-3">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Ciudad actual</p>
+                <p className="text-sm font-medium mt-0.5">{zoneName}</p>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label className="text-[11px] text-muted-foreground uppercase tracking-wider">
-                Ciudad <span className="text-destructive">*</span>
+                {editingZone ? "Cambiar ciudad (opcional)" : <>Provincia <span className="text-destructive">*</span></>}
               </Label>
-              <Input
-                value={zoneName}
-                onChange={(e) => { setZoneName(e.target.value); setZoneErrors((p) => ({ ...p, name: undefined })); }}
-                placeholder="Ej: Neuquén"
-                className="rounded-none text-sm"
-              />
+              <Select
+                value={selectedProvinciaId}
+                disabled={loadingProvincias}
+                onValueChange={(id) => {
+                  setSelectedProvinciaId(id);
+                  // Si la zona es nueva, la ciudad anterior deja de tener sentido
+                  if (!editingZone) setZoneName("");
+                  setZoneErrors((p) => ({ ...p, name: undefined }));
+                }}
+              >
+                <SelectTrigger className="rounded-none text-sm">
+                  <SelectValue placeholder={loadingProvincias ? "Cargando…" : "Seleccioná una provincia"} />
+                </SelectTrigger>
+                <SelectContent className="max-h-64">
+                  {provincias.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-muted-foreground uppercase tracking-wider">
+                Ciudad {!editingZone && <span className="text-destructive">*</span>}
+              </Label>
+              <Select
+                value={municipios.some((m) => m.nombre === zoneName) ? zoneName : ""}
+                disabled={!selectedProvinciaId || loadingMunicipios}
+                onValueChange={(nombre) => {
+                  setZoneName(nombre);
+                  setZoneErrors((p) => ({ ...p, name: undefined }));
+                }}
+              >
+                <SelectTrigger className="rounded-none text-sm">
+                  <SelectValue
+                    placeholder={
+                      !selectedProvinciaId
+                        ? "Primero elegí una provincia"
+                        : loadingMunicipios
+                        ? "Cargando…"
+                        : "Seleccioná una ciudad"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent className="max-h-64">
+                  {municipios.map((m) => (
+                    <SelectItem key={m.id} value={m.nombre}>
+                      {m.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {zoneErrors.name && <p className="text-[11px] text-destructive">{zoneErrors.name}</p>}
+              <p className="text-[10px] text-muted-foreground">
+                Mismo listado que ve el cliente en el checkout — los nombres coinciden exactamente.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-[11px] text-muted-foreground uppercase tracking-wider">
@@ -584,6 +694,47 @@ export default function PromotionsPage() {
               className="rounded-none text-xs tracking-wider uppercase"
             >
               {isZonePending ? <Loader2 className="h-4 w-4 animate-spin" /> : editingZone ? "Guardar" : "Crear zona"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+        <DialogContent className="max-w-sm rounded-none">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold tracking-wide uppercase">
+              {pendingDelete?.kind === "zone" ? "Eliminar zona de envío" : "Eliminar código"}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {pendingDelete?.kind === "zone" ? (
+                <>
+                  Se eliminará <span className="font-medium text-foreground">{pendingDelete.zone.displayName}</span>.
+                  Los envíos a esa ciudad pasarán a calcularse como $0 (coordinación manual).
+                </>
+              ) : pendingDelete?.kind === "promo" ? (
+                <>
+                  Se eliminará el código <span className="font-mono font-medium text-foreground">{pendingDelete.promo.code}</span>.
+                  Los clientes ya no podrán canjearlo. Esta acción no se puede deshacer.
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setPendingDelete(null)}
+              className="rounded-none text-xs tracking-wider uppercase"
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={isDeletePending}
+              className="rounded-none text-xs tracking-wider uppercase"
+            >
+              {isDeletePending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Eliminar"}
             </Button>
           </DialogFooter>
         </DialogContent>
