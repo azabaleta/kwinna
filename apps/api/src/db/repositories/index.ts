@@ -3,6 +3,7 @@ export * from "./glossary.repository";
 export * from "./credit-note.repository";
 export * from "./pos-customer.repository";
 export * from "./product.repository";
+export * from "./promo-code.repository";
 export * from "./reports.repository";
 export * from "./returns.repository";
 export * from "./sale.repository";

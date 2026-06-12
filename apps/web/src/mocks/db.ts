@@ -1,4 +1,4 @@
-import type { Product, Sale, Stock, StockMovement } from "@kwinna/contracts";
+import type { Product, PromoCode, Sale, Stock, StockMovement } from "@kwinna/contracts";
 
 // ─── Category UUIDs ───────────────────────────────────────────────────────────
 // Deben coincidir con CATEGORY_ID_MAP en shop/page.tsx y con el seed de la API.
@@ -117,6 +117,27 @@ export const stock: Stock[] = [
 
 export const stockMovements: StockMovement[] = [];
 
+// ─── Promo codes ──────────────────────────────────────────────────────────────
+
+export const promoCodes: PromoCode[] = [
+  {
+    id:                    "pc-0001-0000-0000-0000-000000000001",
+    code:                  "KWINNA20",
+    description:           "Descuento transferencia lanzamiento",
+    transferDiscountType:  "percentage",
+    transferDiscountValue: 10,
+    cardDiscountType:      null,
+    cardDiscountValue:     null,
+    isActive:              true,
+    validFrom:             null,
+    validUntil:            null,
+    maxUses:               null,
+    usedCount:             3,
+    createdAt:             "2026-01-01T00:00:00.000Z",
+    updatedAt:             "2026-01-01T00:00:00.000Z",
+  },
+];
+
 export const sales: Sale[] = [
   {
     id:               "aa0e8400-e29b-41d4-a716-446655440001",
@@ -136,6 +157,7 @@ export const sales: Sale[] = [
     shippingMethod:   "delivery",
     shippingCost:     3500,
     isDismissed:      false,
+    promoDiscount:    0,
     createdAt:        "2026-04-10T14:30:00.000Z",
     updatedAt:        "2026-04-10T14:30:00.000Z",
   },
@@ -158,6 +180,7 @@ export const sales: Sale[] = [
     shippingMethod:   "delivery",
     shippingCost:     3500,
     isDismissed:      false,
+    promoDiscount:    0,
     createdAt:        "2026-04-13T09:15:00.000Z",
     updatedAt:        "2026-04-13T09:15:00.000Z",
   },
@@ -179,6 +202,7 @@ export const sales: Sale[] = [
     shippingMethod:   "delivery",
     shippingCost:     0,
     isDismissed:      false,
+    promoDiscount:    0,
     createdAt:        "2026-04-11T18:00:00.000Z",
     updatedAt:        "2026-04-12T10:00:00.000Z",
   },

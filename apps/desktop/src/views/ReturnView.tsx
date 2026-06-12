@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Search, CheckCircle2, ArrowRight, RotateCcw, Printer, X, Receipt, Package } from "lucide-react";
 import type { Product, Return, ReturnReason, Sale, SaleItem } from "@kwinna/contracts";
-import { RETURN_REASON_LABELS, RETURN_REASON_RESALABLE } from "@kwinna/contracts";
+import { LIBRE_PRODUCT_ID, RETURN_REASON_LABELS, RETURN_REASON_RESALABLE } from "@kwinna/contracts";
 import { useProducts } from "../hooks/use-products";
 import { useStock } from "../hooks/use-stock";
 import { createReturn, lookupSaleByCode } from "../services/returns";
@@ -116,6 +116,8 @@ export default function ReturnView() {
 
   // ── Seleccionar un ítem de la transacción ─────────────────────────────────
   function selectTxItem(item: SaleItem) {
+    // Los artículos libres no tienen entrada en el catálogo ni stock registrado
+    if (item.productId === LIBRE_PRODUCT_ID) return;
     setTxItem(item);
     const prod = products.find((p) => p.id === item.productId) ?? null;
     setSelected(prod);
@@ -382,25 +384,35 @@ export default function ReturnView() {
                   Seleccioná la prenda a devolver
                 </p>
                 {txSale.items.map((item, i) => {
-                  const prod = products.find((p) => p.id === item.productId);
+                  const isLibre = item.productId === LIBRE_PRODUCT_ID;
+                  const prod    = isLibre ? null : products.find((p) => p.id === item.productId);
                   return (
                     <button
                       key={i}
                       type="button"
                       onClick={() => selectTxItem(item)}
-                      className="w-full flex items-center gap-3 rounded-lg p-2.5 text-left
-                                 hover:bg-zinc-800 transition-colors"
+                      disabled={isLibre}
+                      className={`w-full flex items-center gap-3 rounded-lg p-2.5 text-left transition-colors ${
+                        isLibre
+                          ? "opacity-40 cursor-not-allowed"
+                          : "hover:bg-zinc-800"
+                      }`}
                     >
-                      {prod?.images[0] && (
+                      {prod?.images[0] ? (
                         <img src={prod.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-zinc-800 flex-shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-white truncate">
-                          {prod?.name ?? item.productId.slice(0, 8) + "…"}
+                          {isLibre
+                            ? (item.name ?? "Artículo libre")
+                            : (prod?.name ?? item.productId.slice(0, 8) + "…")}
                         </p>
                         <p className="text-xs text-zinc-500">
-                          {item.size ? `Talle ${item.size} · ` : ""}
-                          {item.quantity} u. · {formatPrice(item.unitPrice)} c/u
+                          {isLibre
+                            ? "Sin devolución disponible"
+                            : `${item.size ? `Talle ${item.size} · ` : ""}${item.quantity} u. · ${formatPrice(item.unitPrice)} c/u`}
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0">

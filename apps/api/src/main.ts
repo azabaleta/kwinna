@@ -12,6 +12,8 @@ import {
   planificacionRoutes,
   posCustomersRoutes,
   productRoutes,
+  promoCodesRoutes,
+  shippingRoutes,
   reportsRoutes,
   returnsRoutes,
   saleRoutes,
@@ -94,7 +96,10 @@ app.use("/products", optionalAuth, productRoutes);
 app.use("/stock", optionalAuth, stockRoutes);
 app.use("/stock-balances", stockBalancesRoutes);
 // /sales: auth se gestiona a nivel de ruta — POST es público, GET requiere admin/operator
-app.use("/sales", saleRoutes);
+app.use("/sales",        saleRoutes);
+// /promo-codes: validate es público, el resto requiere admin
+app.use("/promo-codes",  promoCodesRoutes);
+app.use("/shipping",     shippingRoutes);
 
 // ─── Global Error Handler ─────────────────────────────────────────────────────
 

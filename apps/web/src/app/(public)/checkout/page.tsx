@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowLeft, Loader2, MapPin, Package, ShoppingCart, Trash2, Truck, CreditCard, Landmark } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, CheckCircle2, Loader2, MapPin, Package, ShoppingCart, Tag, Trash2, Truck, CreditCard, Landmark, X } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { SaleOrderInput } from "@kwinna/contracts";
+import type { PromoCodeValidateResponse, SaleOrderInput } from "@kwinna/contracts";
+import { validatePromoCode } from "@/services/promo-codes";
+import { useShippingZones } from "@/hooks/use-shipping-zones";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -84,28 +86,18 @@ function normalize(s: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-// Debe mantenerse en sincronía con shipping.service.ts del backend.
-// El backend es la fuente de verdad del costo real; este mapa solo alimenta
-// el preview al usuario antes de confirmar. Ciudades y valores deben coincidir.
-const SHIPPING_COSTS: Record<string, number> = {
-  neuquen:    3500,
-  plottier:   3500,
-  cipolletti: 3500,
-  centenario: 3500,
-};
-
 interface ShippingInfo {
   cost:    number;
   label:   string;
   isKnown: boolean;
 }
 
-function computeShipping(city: string): ShippingInfo {
+function computeShipping(city: string, zonesMap: Record<string, number>): ShippingInfo {
   const raw = city.trim();
   if (!raw) return { cost: 0, label: "", isKnown: false };
 
   const key  = normalize(raw);
-  const cost = SHIPPING_COSTS[key];
+  const cost = zonesMap[key];
 
   return cost !== undefined
     ? { cost, label: raw, isKnown: true }
@@ -124,6 +116,10 @@ export default function CheckoutPage() {
   const user = useAuthStore((s) => s.user);
 
   const { mutateAsync, isPending } = useCheckout();
+
+  // Zonas de envío desde la API (reemplaza el mapa hardcodeado)
+  const { data: shippingZones = [] } = useShippingZones();
+  const zonesMap = Object.fromEntries(shippingZones.map((z) => [z.city, z.cost]));
 
   // checkout_start: el usuario llegó al checkout con ítems en el carrito
   useEffect(() => { trackEvent("checkout_start"); }, []);
@@ -225,12 +221,91 @@ export default function CheckoutPage() {
   const shippingCity   = form.watch("shippingCity");
   const shippingMethod = form.watch("shippingMethod");
   const paymentMethod  = form.watch("paymentMethod");
-  
-  const isPickup       = shippingMethod === "pickup";
-  const shipping       = isPickup ? { cost: 0, label: "", isKnown: false } : computeShipping(shippingCity ?? "");
-  
-  const discount       = paymentMethod === "transfer" ? cartTotal * 0.25 : 0;
-  const grandTotal     = cartTotal - discount + shipping.cost;
+
+  const isPickup = shippingMethod === "pickup";
+  const shipping = isPickup ? { cost: 0, label: "", isKnown: false } : computeShipping(shippingCity ?? "", zonesMap);
+
+  // ── Código promocional ────────────────────────────────────────────────────
+  const [promoInput,       setPromoInput]       = useState("");
+  const [promoValidating,  setPromoValidating]  = useState(false);
+  const [appliedPromo,     setAppliedPromo]     = useState<{ code: string; result: PromoCodeValidateResponse } | null>(null);
+  const promoInputRef = useRef<HTMLInputElement>(null);
+
+  // Re-validar cuando cambia el método de pago para recalcular el descuento aplicable
+  useEffect(() => {
+    if (!appliedPromo) return;
+    const pm = paymentMethod as "mercadopago" | "transfer";
+    validatePromoCode(appliedPromo.code, pm)
+      .then((result) => setAppliedPromo(result.valid ? { code: appliedPromo.code, result } : null))
+      .catch(() => setAppliedPromo(null));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentMethod]);
+
+  async function applyPromoCode() {
+    if (appliedPromo) return; // solo un código por compra
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
+    setPromoValidating(true);
+    try {
+      const pm = paymentMethod as "mercadopago" | "transfer";
+      const result = await validatePromoCode(code, pm);
+      if (result.valid) {
+        setAppliedPromo({ code, result });
+        setPromoInput("");
+        const toastDesc =
+          result.discountType === "percentage" && result.discountValue && pm === "transfer"
+            ? `¡${20 + result.discountValue}% de descuento total! (transferencia 20% + código ${result.discountValue}%)`
+            : result.discountLabel;
+        toast.success("¡Código aplicado!", { description: toastDesc });
+      } else {
+        toast.error("Código inválido", { description: result.errorMessage });
+      }
+    } catch {
+      toast.error("No se pudo validar el código");
+    } finally {
+      setPromoValidating(false);
+    }
+  }
+
+  function removePromo() {
+    setAppliedPromo(null);
+    setPromoInput("");
+    promoInputRef.current?.focus();
+  }
+
+  // ── Totales ───────────────────────────────────────────────────────────────
+  const transferDiscount = paymentMethod === "transfer" ? cartTotal * 0.20 : 0;
+  const promoDiscount = (() => {
+    if (!appliedPromo?.result.valid) return 0;
+    const { discountType, discountValue } = appliedPromo.result;
+    if (!discountType || discountValue === undefined) return 0;
+    if (discountType === "percentage") {
+      // Suma aditiva: aplica sobre precio lista (no sobre base post-transferencia)
+      return cartTotal * (discountValue / 100);
+    }
+    // Monto fijo: aplica sobre el remanente post-transferencia
+    const base = cartTotal - transferDiscount;
+    return Math.min(discountValue, base);
+  })();
+  const grandTotal     = cartTotal - transferDiscount - promoDiscount + shipping.cost;
+  const totalSavings   = transferDiscount + promoDiscount;
+
+  // Cuando transfer + código porcentual: mostrar descuento combinado
+  const combinedPct =
+    paymentMethod === "transfer" && transferDiscount > 0 &&
+    promoDiscount > 0 && appliedPromo?.result.discountType === "percentage"
+      ? 20 + (appliedPromo.result.discountValue ?? 0)
+      : null;
+
+  // Label contextual del código aplicado
+  const appliedPromoLabel = (() => {
+    if (!appliedPromo) return "";
+    const { discountType, discountValue, discountLabel } = appliedPromo.result;
+    if (discountType === "percentage" && discountValue && paymentMethod === "transfer") {
+      return `+${discountValue}% sobre transferencia → ${20 + discountValue}% de descuento total`;
+    }
+    return discountLabel ?? "";
+  })();
   
   // MP Cuotas: el máximo disponible entre los productos del carrito.
   // Si algún producto califica para 3 cuotas, todo el carrito puede pagarse en 3.
@@ -264,6 +339,7 @@ export default function CheckoutPage() {
       paymentMethod:    values.paymentMethod,
       ...address,
       userId:           user?.id,
+      promoCode:        appliedPromo?.code,
     };
 
     try {
@@ -434,11 +510,38 @@ export default function CheckoutPage() {
                   </span>
                 </div>
               )}
-              {paymentMethod === "transfer" && discount > 0 && (
-                <div className="flex items-center justify-between text-sm text-emerald-600 font-medium">
-                  <span className="text-[11px] tracking-wide uppercase">Descuento Transferencia (25%)</span>
-                  <span className="tabular-nums">-${discount.toLocaleString("es-AR")}</span>
+              {/* Descuentos */}
+              {combinedPct !== null ? (
+                /* Transfer + código porcentual → línea unificada */
+                <div className="rounded-none border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 px-3 py-2.5">
+                  <div className="flex items-center justify-between text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                    <span className="text-[11px] tracking-wide uppercase">{combinedPct}% de descuento</span>
+                    <span className="tabular-nums">-${totalSavings.toLocaleString("es-AR")}</span>
+                  </div>
+                  <p className="mt-0.5 text-[10px] text-emerald-600/70">
+                    Transferencia 20% + código {appliedPromo!.code} {appliedPromo!.result.discountValue}%
+                  </p>
                 </div>
+              ) : (
+                <>
+                  {paymentMethod === "transfer" && transferDiscount > 0 && (
+                    <div className="flex items-center justify-between text-sm text-emerald-600 font-medium">
+                      <span className="text-[11px] tracking-wide uppercase">Descuento transferencia (20%)</span>
+                      <span className="tabular-nums">-${transferDiscount.toLocaleString("es-AR")}</span>
+                    </div>
+                  )}
+                  {promoDiscount > 0 && appliedPromo && (
+                    <div className="flex items-center justify-between text-sm text-emerald-600 font-medium">
+                      <span className="text-[11px] tracking-wide uppercase flex items-center gap-1">
+                        <Tag className="h-3 w-3" />
+                        {appliedPromo.code}
+                        {appliedPromo.result.discountType === "percentage" &&
+                          ` (${appliedPromo.result.discountValue}%)`}
+                      </span>
+                      <span className="tabular-nums">-${promoDiscount.toLocaleString("es-AR")}</span>
+                    </div>
+                  )}
+                </>
               )}
               <div className="flex items-center justify-between pt-2">
                 <span className="text-[11px] tracking-widest text-muted-foreground uppercase">
@@ -547,10 +650,68 @@ export default function CheckoutPage() {
                         "text-[10px]",
                         paymentMethod === "transfer" ? "text-background/70" : "text-emerald-600",
                       )}>
-                        25% OFF
+                        20% OFF
                       </span>
                     </button>
                   </div>
+                </fieldset>
+
+                {/* ── Código promocional ───────────────────────────── */}
+                <fieldset className="space-y-3">
+                  <legend className="mb-3 text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
+                    Código promocional
+                  </legend>
+                  {appliedPromo ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between rounded-none border border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/20 px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 tracking-wider">
+                              {appliedPromo.code}
+                            </p>
+                            <p className="text-[10px] text-emerald-600/80">
+                              {appliedPromoLabel}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={removePromo}
+                          className="ml-4 rounded-none p-1 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Quitar código"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Solo se aplica un código por compra. Quitá este para usar otro.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        ref={promoInputRef}
+                        type="text"
+                        placeholder="KWINNA20"
+                        value={promoInput}
+                        onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), applyPromoCode())}
+                        className="rounded-none uppercase tracking-widest placeholder:normal-case placeholder:tracking-normal text-sm"
+                        maxLength={50}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={applyPromoCode}
+                        disabled={!promoInput.trim() || promoValidating}
+                        className="rounded-none shrink-0 text-xs tracking-wider uppercase"
+                      >
+                        {promoValidating ? <Loader2 className="h-3 w-3 animate-spin" /> : "Aplicar"}
+                      </Button>
+                    </div>
+                  )}
                 </fieldset>
 
                 {/* ── Contacto ─────────────────────────────────────── */}

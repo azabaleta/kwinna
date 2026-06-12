@@ -7,19 +7,26 @@ import {
   ProductListResponseSchema,
   ProductResponseSchema,
   ProductUpdateInputSchema,
+  PromoCodeCreateInputSchema,
+  PromoCodeUpdateInputSchema,
+  PromoCodeValidateInputSchema,
   RegisterInputSchema,
   SaleListResponseSchema,
   SaleOrderInputSchema,
   SaleResponseSchema,
+  ShippingZoneCreateInputSchema,
+  ShippingZoneUpdateInputSchema,
   StockListResponseSchema,
   StockMovementSchema,
+  type PromoCode,
   type Product,
   type Sale,
   type SaleItem,
+  type ShippingZone,
   type StockMovement,
 } from "@kwinna/contracts";
 import { z } from "zod";
-import { products, sales, stock, stockMovements } from "./db";
+import { products, promoCodes, sales, stock, stockMovements } from "./db";
 
 // ─── Mock users (dev-only, sin bcrypt) ────────────────────────────────────────
 // En mock mode las contraseñas se comparan en texto plano por simplicidad.
@@ -43,17 +50,22 @@ const mockUsers: MockUser[] = [
   },
 ];
 
-// ─── Mock shipping (espeja la lógica de shipping.service.ts del backend) ──────
+// ─── Mock shipping zones ─────────────────────────────────────────────────────
 
 function normalizeCity(s: string): string {
   return s.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
-const SHIPPING_COSTS: Record<string, number> = {
-  neuquen:  3_500,
-  plottier: 5_000,
-};
+
+let mockShippingZones: ShippingZone[] = [
+  { id: "sz-1", city: "neuquen",    displayName: "Neuquén",    cost: 3500, updatedAt: new Date().toISOString() },
+  { id: "sz-2", city: "plottier",   displayName: "Plottier",   cost: 3500, updatedAt: new Date().toISOString() },
+  { id: "sz-3", city: "cipolletti", displayName: "Cipolletti", cost: 3500, updatedAt: new Date().toISOString() },
+  { id: "sz-4", city: "centenario", displayName: "Centenario", cost: 3500, updatedAt: new Date().toISOString() },
+];
+
 function mockShippingCost(city: string): number {
-  return SHIPPING_COSTS[normalizeCity(city)] ?? 0;
+  const norm = normalizeCity(city);
+  return mockShippingZones.find((z) => z.city === norm)?.cost ?? 0;
 }
 
 const BASE = "http://localhost:3001";
@@ -62,6 +74,42 @@ const BASE = "http://localhost:3001";
 
 function now() {
   return new Date().toISOString();
+}
+
+// Espeja la lógica de descuento del backend (sale.service.ts).
+// Retorna { transferDiscount, promoDiscount, promoCodeId, total }.
+function calcMockTotals(
+  itemsTotal:    number,
+  shippingCost:  number,
+  paymentMethod: string | undefined,
+  promoCode:     string | undefined
+): { transferDiscount: number; promoDiscount: number; promoCodeId: string | undefined; total: number } {
+  const transferDiscount = paymentMethod === "transfer" ? itemsTotal * 0.20 : 0;
+
+  let promoDiscount = 0;
+  let promoCodeId: string | undefined;
+
+  if (promoCode) {
+    const promo = promoCodes.find((p) => p.code === promoCode.toUpperCase());
+    if (promo && promo.isActive) {
+      const isTransfer    = paymentMethod === "transfer";
+      const discountType  = isTransfer ? promo.transferDiscountType  : promo.cardDiscountType;
+      const discountValue = isTransfer ? promo.transferDiscountValue : promo.cardDiscountValue;
+
+      if (discountType && discountValue != null) {
+        if (discountType === "percentage") {
+          promoDiscount = itemsTotal * (discountValue / 100);
+        } else {
+          promoDiscount = Math.min(discountValue, itemsTotal - transferDiscount);
+        }
+        promoCodeId = promo.id;
+        promo.usedCount += 1;
+      }
+    }
+  }
+
+  const total = itemsTotal - transferDiscount - promoDiscount + shippingCost;
+  return { transferDiscount, promoDiscount, promoCodeId, total };
 }
 
 function uuid() {
@@ -333,7 +381,8 @@ export const handlers = [
     if (!result.success) return validationError(result.error.issues);
 
     const { items, customerName, customerEmail, customerPhone,
-            shippingAddress, shippingCity, shippingProvince, userId } = result.data;
+            shippingAddress, shippingCity, shippingProvince,
+            userId, paymentMethod, promoCode } = result.data;
 
     // Verificar disponibilidad antes de procesar (por talle si aplica)
     for (const item of items) {
@@ -361,7 +410,7 @@ export const handlers = [
 
     // Calcular precios desde mock DB (mismo patrón que el backend real)
     const saleItems: SaleItem[] = [];
-    let productSubtotal = 0;
+    let itemsTotal = 0;
 
     for (const item of items) {
       const product = products.find((p) => p.id === item.productId);
@@ -369,13 +418,13 @@ export const handlers = [
         return HttpResponse.json({ error: "Producto no encontrado", productId: item.productId }, { status: 404 });
       }
       const subtotal = product.price * item.quantity;
-      productSubtotal += subtotal;
+      itemsTotal += subtotal;
       saleItems.push({ productId: item.productId, quantity: item.quantity,
                        unitPrice: product.price, subtotal, size: item.size });
     }
 
     const shippingCost = mockShippingCost(shippingCity ?? '');
-    const total = productSubtotal + shippingCost;
+    const { promoDiscount, promoCodeId, total } = calcMockTotals(itemsTotal, shippingCost, paymentMethod, promoCode);
 
     // Descontar stock + registrar movimientos
     for (const item of saleItems) {
@@ -402,7 +451,7 @@ export const handlers = [
       id: uuid(), items: saleItems, total, status: "completed", channel: "web",
       customerName, customerEmail, customerPhone,
       shippingAddress: shippingAddress ?? '', shippingCity: shippingCity ?? '', shippingProvince: shippingProvince ?? '', shippingZipCode: "", shippingMethod: "delivery" as const, shippingCost, userId,
-      isDismissed: false,
+      isDismissed: false, promoCodeId, promoDiscount,
       createdAt: now(), updatedAt: now(),
     };
     sales.push(sale);
@@ -542,7 +591,8 @@ export const handlers = [
     if (!result.success) return validationError(result.error.issues);
 
     const { items, customerName, customerEmail, customerPhone,
-            shippingAddress, shippingCity, shippingProvince, userId } = result.data;
+            shippingAddress, shippingCity, shippingProvince,
+            userId, paymentMethod, promoCode } = result.data;
 
     // Verificar disponibilidad
     for (const item of items) {
@@ -570,7 +620,7 @@ export const handlers = [
 
     // Calcular precios desde mock DB
     const saleItems: SaleItem[] = [];
-    let productSubtotal = 0;
+    let itemsTotal = 0;
 
     for (const item of items) {
       const product = products.find((p) => p.id === item.productId);
@@ -578,13 +628,13 @@ export const handlers = [
         return HttpResponse.json({ error: "Producto no encontrado", productId: item.productId }, { status: 404 });
       }
       const subtotal = product.price * item.quantity;
-      productSubtotal += subtotal;
+      itemsTotal += subtotal;
       saleItems.push({ productId: item.productId, quantity: item.quantity,
                        unitPrice: product.price, subtotal, size: item.size });
     }
 
     const shippingCost = mockShippingCost(shippingCity ?? '');
-    const total = productSubtotal + shippingCost;
+    const { promoDiscount, promoCodeId, total } = calcMockTotals(itemsTotal, shippingCost, paymentMethod, promoCode);
 
     // Descontar stock
     for (const item of saleItems) {
@@ -612,12 +662,152 @@ export const handlers = [
       status: "pending", channel: "web",
       customerName, customerEmail, customerPhone,
       shippingAddress: shippingAddress ?? '', shippingCity: shippingCity ?? '', shippingProvince: shippingProvince ?? '', shippingZipCode: "", shippingMethod: "delivery" as const, shippingCost, userId,
-      isDismissed: false,
+      isDismissed: false, promoCodeId, promoDiscount,
       createdAt: now(), updatedAt: now(),
     };
     sales.push(sale);
 
     const initPoint = `http://localhost:3000/checkout/success`;
     return HttpResponse.json({ data: { sale, initPoint } }, { status: 201 });
+  }),
+  // GET /promo-codes — admin
+  http.get(`${BASE}/promo-codes`, () => {
+    return HttpResponse.json({ data: promoCodes });
+  }),
+
+  // POST /promo-codes/validate — public
+  http.post(`${BASE}/promo-codes/validate`, async ({ request }) => {
+    const body = await request.json();
+    const result = PromoCodeValidateInputSchema.safeParse(body);
+    if (!result.success) return validationError(result.error.issues);
+    const { code, paymentMethod } = result.data;
+
+    const promo = promoCodes.find((p) => p.code === code.toUpperCase());
+    if (!promo)        return HttpResponse.json({ valid: false, errorMessage: "Código inválido" });
+    if (!promo.isActive) return HttpResponse.json({ valid: false, errorMessage: "Código inactivo" });
+    const nowIso = new Date().toISOString();
+    if (promo.validFrom  && promo.validFrom  > nowIso) return HttpResponse.json({ valid: false, errorMessage: "Código aún no vigente" });
+    if (promo.validUntil && promo.validUntil < nowIso) return HttpResponse.json({ valid: false, errorMessage: "Código vencido" });
+    if (promo.maxUses != null && promo.usedCount >= promo.maxUses) return HttpResponse.json({ valid: false, errorMessage: "Código agotado" });
+
+    const isTransfer    = paymentMethod === "transfer";
+    const discountType  = isTransfer ? promo.transferDiscountType  : promo.cardDiscountType;
+    const discountValue = isTransfer ? promo.transferDiscountValue : promo.cardDiscountValue;
+    if (!discountType || discountValue == null) {
+      return HttpResponse.json({ valid: false, errorMessage: `Este código no aplica para ${isTransfer ? "transferencia" : "tarjeta"}` });
+    }
+    const discountLabel = discountType === "percentage"
+      ? `${discountValue}% de descuento adicional`
+      : `$${discountValue.toLocaleString("es-AR")} de descuento`;
+    return HttpResponse.json({ valid: true, discountType, discountValue, discountLabel });
+  }),
+
+  // POST /promo-codes — admin
+  http.post(`${BASE}/promo-codes`, async ({ request }) => {
+    const body = await request.json();
+    const result = PromoCodeCreateInputSchema.safeParse(body);
+    if (!result.success) return validationError(result.error.issues);
+    const input = result.data;
+    if (promoCodes.some((p) => p.code === input.code.toUpperCase())) {
+      return HttpResponse.json({ error: "Ya existe un código con ese nombre" }, { status: 409 });
+    }
+    const promo: PromoCode = {
+      id:                    uuid(),
+      code:                  input.code.toUpperCase(),
+      description:           input.description ?? null,
+      transferDiscountType:  input.transferDiscountType  ?? null,
+      transferDiscountValue: input.transferDiscountValue ?? null,
+      cardDiscountType:      input.cardDiscountType      ?? null,
+      cardDiscountValue:     input.cardDiscountValue     ?? null,
+      isActive:              input.isActive ?? true,
+      validFrom:             input.validFrom  ?? null,
+      validUntil:            input.validUntil ?? null,
+      maxUses:               input.maxUses    ?? null,
+      usedCount:             0,
+      createdAt:             now(),
+      updatedAt:             now(),
+    };
+    promoCodes.push(promo);
+    return HttpResponse.json({ data: promo }, { status: 201 });
+  }),
+
+  // PATCH /promo-codes/:id — admin
+  http.patch(`${BASE}/promo-codes/:id`, async ({ params, request }) => {
+    const { id } = params as { id: string };
+    const idx = promoCodes.findIndex((p) => p.id === id);
+    if (idx === -1) return notFound("Código promocional no encontrado");
+    const body = await request.json();
+    const result = PromoCodeUpdateInputSchema.safeParse(body);
+    if (!result.success) return validationError(result.error.issues);
+    const patch = result.data;
+    const p = promoCodes[idx]!;
+    if (patch.code               !== undefined) p.code                  = patch.code.toUpperCase();
+    if (patch.description        !== undefined) p.description           = patch.description        ?? null;
+    if (patch.isActive           !== undefined) p.isActive              = patch.isActive;
+    if (patch.maxUses            !== undefined) p.maxUses               = patch.maxUses            ?? null;
+    if (patch.validFrom          !== undefined) p.validFrom             = patch.validFrom          ?? null;
+    if (patch.validUntil         !== undefined) p.validUntil            = patch.validUntil         ?? null;
+    if (patch.transferDiscountType  !== undefined) p.transferDiscountType  = patch.transferDiscountType  ?? null;
+    if (patch.transferDiscountValue !== undefined) p.transferDiscountValue = patch.transferDiscountValue ?? null;
+    if (patch.cardDiscountType      !== undefined) p.cardDiscountType      = patch.cardDiscountType      ?? null;
+    if (patch.cardDiscountValue     !== undefined) p.cardDiscountValue     = patch.cardDiscountValue     ?? null;
+    p.updatedAt = now();
+    return HttpResponse.json({ data: p });
+  }),
+
+  // DELETE /promo-codes/:id — admin
+  http.delete(`${BASE}/promo-codes/:id`, ({ params }) => {
+    const { id } = params as { id: string };
+    const idx = promoCodes.findIndex((p) => p.id === id);
+    if (idx === -1) return notFound("Código promocional no encontrado");
+    promoCodes.splice(idx, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // GET /shipping/zones — public
+  http.get(`${BASE}/shipping/zones`, () => {
+    return HttpResponse.json({ data: mockShippingZones });
+  }),
+
+  // POST /shipping/zones — admin
+  http.post(`${BASE}/shipping/zones`, async ({ request }) => {
+    const body = await request.json();
+    const result = ShippingZoneCreateInputSchema.safeParse(body);
+    if (!result.success) return validationError(result.error.issues);
+    const { displayName, cost } = result.data;
+    const city = normalizeCity(displayName);
+    if (mockShippingZones.some((z) => z.city === city)) {
+      return HttpResponse.json({ error: `Ya existe una zona para "${displayName}"` }, { status: 409 });
+    }
+    const zone: ShippingZone = { id: uuid(), city, displayName: displayName.trim(), cost, updatedAt: now() };
+    mockShippingZones.push(zone);
+    return HttpResponse.json({ data: zone }, { status: 201 });
+  }),
+
+  // PATCH /shipping/zones/:id — admin
+  http.patch(`${BASE}/shipping/zones/:id`, async ({ params, request }) => {
+    const { id } = params as { id: string };
+    const idx = mockShippingZones.findIndex((z) => z.id === id);
+    if (idx === -1) return notFound("Zona no encontrada");
+    const body = await request.json();
+    const result = ShippingZoneUpdateInputSchema.safeParse(body);
+    if (!result.success) return validationError(result.error.issues);
+    const { displayName, cost } = result.data;
+    if (displayName !== undefined) {
+      mockShippingZones[idx].city = normalizeCity(displayName);
+      mockShippingZones[idx].displayName = displayName.trim();
+    }
+    if (cost !== undefined) mockShippingZones[idx].cost = cost;
+    mockShippingZones[idx].updatedAt = now();
+    return HttpResponse.json({ data: mockShippingZones[idx] });
+  }),
+
+  // DELETE /shipping/zones/:id — admin
+  http.delete(`${BASE}/shipping/zones/:id`, ({ params }) => {
+    const { id } = params as { id: string };
+    const idx = mockShippingZones.findIndex((z) => z.id === id);
+    if (idx === -1) return notFound("Zona no encontrada");
+    mockShippingZones.splice(idx, 1);
+    return new HttpResponse(null, { status: 204 });
   }),
 ];

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { Search, X, Plus, Minus, ShoppingCart, AlertTriangle, CheckCircle2, Printer, RefreshCw, UserRound, UserPlus, ChevronDown, Banknote, FileText, Gift } from "lucide-react";
+import { Search, X, Plus, Minus, ShoppingCart, AlertTriangle, CheckCircle2, Printer, RefreshCw, UserRound, UserPlus, ChevronDown, Banknote, FileText, Gift, Tag } from "lucide-react";
 import type { Product, Stock, PriceTier, CustomerSearchResult } from "@kwinna/contracts";
-import type { CartItem } from "../store/use-pos-store";
+import type { CartItem, CustomCartItem } from "../store/use-pos-store";
 import { usePosStore } from "../store/use-pos-store";
 import { useProducts } from "../hooks/use-products";
 import { useStock, useInvalidateStock } from "../hooks/use-stock";
@@ -222,6 +222,155 @@ function SkuBar({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Free item panel ──────────────────────────────────────────────────────────
+// Formulario inline para agregar artículos sin SKU a la venta.
+// Touch-friendly: inputs grandes, Enter confirma para flujo rápido de caja.
+
+function FreeItemPanel({
+  onAdd,
+  onClose,
+}: {
+  onAdd:   (item: { description: string; unitPrice: number }) => void;
+  onClose: () => void;
+}) {
+  const [description, setDescription] = useState("");
+  const [price,       setPrice]       = useState("");
+
+  const parsedPrice = parseFloat(price);
+  const isValid     = description.trim().length > 0 && !isNaN(parsedPrice) && parsedPrice > 0;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isValid) return;
+    onAdd({ description: description.trim(), unitPrice: parsedPrice });
+    setDescription("");
+    setPrice("");
+    // Mantiene el panel abierto para agregar otro artículo libre consecutivo
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="mt-2 flex flex-col gap-3 bg-violet-950/40 border border-violet-700/50
+                 rounded-xl p-4"
+    >
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-violet-300 flex items-center gap-1.5">
+          <Tag size={12} />
+          Artículo libre
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-zinc-500 hover:text-white transition-colors"
+        >
+          <X size={14} />
+        </button>
+      </div>
+
+      <input
+        autoFocus
+        type="text"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Descripción del artículo (ej: Buzo verde talle M)"
+        maxLength={200}
+        className="bg-zinc-800 text-white rounded-lg px-3 py-2.5 text-sm w-full outline-none
+                   border border-zinc-700 focus:border-violet-600 transition-colors
+                   placeholder:text-zinc-500"
+      />
+
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm select-none">
+            $
+          </span>
+          <input
+            type="number"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="0"
+            min={1}
+            step={100}
+            className="bg-zinc-800 text-white rounded-lg pl-7 pr-3 py-2.5 text-sm w-full
+                       outline-none border border-zinc-700 focus:border-violet-600
+                       transition-colors placeholder:text-zinc-500"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={!isValid}
+          className="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed
+                     text-white rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors
+                     flex items-center gap-1.5 whitespace-nowrap"
+        >
+          <Plus size={14} />
+          Agregar
+        </button>
+      </div>
+
+      <p className="text-[10px] text-zinc-600">
+        Este artículo no descuenta stock. Precio aplicado según la lista de precios activa.
+      </p>
+    </form>
+  );
+}
+
+// ─── Custom cart row ──────────────────────────────────────────────────────────
+// Fila de carrito para artículos libres — sin imagen, sin validación de stock.
+
+function CustomCartRow({
+  item,
+  onRemove,
+  onDelta,
+  priceTier,
+}: {
+  item:      CustomCartItem;
+  onRemove:  () => void;
+  onDelta:   (d: number) => void;
+  priceTier: PriceTier;
+}) {
+  let unitPrice = item.unitPrice;
+  if (priceTier === "efectivo")  unitPrice = Math.ceil((unitPrice * 0.8)  / 500) * 500;
+  if (priceTier === "mayorista") unitPrice = Math.ceil((unitPrice * 0.65) / 500) * 500;
+
+  return (
+    <div className="flex items-center gap-3 py-3 border-b border-zinc-800 last:border-0">
+      <div className="w-10 h-10 rounded-lg bg-violet-900/40 border border-violet-700/40
+                      flex items-center justify-center flex-shrink-0">
+        <Tag size={14} className="text-violet-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-white leading-tight truncate">{item.description}</p>
+        <p className="text-[10px] text-violet-400 font-medium tracking-wide mt-0.5">
+          Artículo libre
+        </p>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => onDelta(-1)}
+          className="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
+        >
+          <Minus size={11} />
+        </button>
+        <span className="text-sm text-white tabular-nums w-7 text-center">{item.quantity}</span>
+        <button
+          onClick={() => onDelta(1)}
+          className="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
+        >
+          <Plus size={11} />
+        </button>
+      </div>
+      <span className="text-sm font-medium text-white w-20 text-right">
+        {formatRoundedPrice(unitPrice * item.quantity)}
+      </span>
+      <button onClick={onRemove} className="text-zinc-600 hover:text-red-400 transition-colors">
+        <X size={15} />
+      </button>
     </div>
   );
 }
@@ -714,6 +863,7 @@ export default function SellView() {
   const [cartOpen,       setCartOpen]       = useState(false);
   const [receiptData,    setReceiptData]    = useState<ReceiptData | null>(null);
   const [creditNoteData, setCreditNoteData] = useState<CreditNoteData | null>(null);
+  const [showFreePanel,  setShowFreePanel]  = useState(false);
   const receiptRef    = useRef<HTMLDivElement>(null);
   const giftRef       = useRef<HTMLDivElement>(null);
   const creditNoteRef = useRef<HTMLDivElement>(null);
@@ -723,16 +873,28 @@ export default function SellView() {
   const invalidateStock = useInvalidateStock();
   const loading = productsLoading || stockLoading;
 
-  const { cart, addToCart, removeFromCart, updateQty, clearCart, priceTier, setPriceTier, returnCredit, setReturnCredit } = usePosStore();
+  const {
+    cart, addToCart, removeFromCart, updateQty, clearCart,
+    priceTier, setPriceTier,
+    returnCredit, setReturnCredit,
+    customItems, addCustomItem, removeCustomItem, updateCustomQty,
+  } = usePosStore();
   const vendorId = useAuthStore((s) => s.user?.id);
   const vendorName = useAuthStore((s) => s.user?.name);
 
-  const subtotal = cart.reduce((sum, i) => {
+  const catalogSubtotal = cart.reduce((sum, i) => {
     let p = i.product.price;
     if (priceTier === "efectivo") p = Math.ceil((p * 0.8) / 500) * 500;
     else if (priceTier === "mayorista") p = Math.ceil((p * 0.65) / 500) * 500;
     return sum + p * i.quantity;
   }, 0);
+  const customSubtotal = customItems.reduce((sum, ci) => {
+    let p = ci.unitPrice;
+    if (priceTier === "efectivo") p = Math.ceil((p * 0.8) / 500) * 500;
+    else if (priceTier === "mayorista") p = Math.ceil((p * 0.65) / 500) * 500;
+    return sum + p * ci.quantity;
+  }, 0);
+  const subtotal = catalogSubtotal + customSubtotal;
 
   // ── Cálculos de crédito ──────────────────────────────────────────────────
   const creditAmount  = returnCredit?.amount ?? 0;
@@ -782,6 +944,13 @@ export default function SellView() {
           quantity:  i.quantity,
           size:      i.size,
         })),
+        customItems: customItems.length > 0
+          ? customItems.map((ci) => ({
+              description: ci.description,
+              unitPrice:   ci.unitPrice,
+              quantity:    ci.quantity,
+            }))
+          : undefined,
         customerName:     data.customerName,
         customerEmail:    data.customerEmail,
         customerPhone:    data.customerPhone || undefined,
@@ -800,12 +969,20 @@ export default function SellView() {
       });
 
       // Snapshot receipt ANTES de limpiar el carrito
-      const receiptItems = cart.map((i) => {
-        let p = i.product.price;
-        if (priceTier === "efectivo") p = Math.ceil((p * 0.8) / 500) * 500;
-        else if (priceTier === "mayorista") p = Math.ceil((p * 0.65) / 500) * 500;
-        return { name: i.product.name, sku: i.product.sku, size: i.size, quantity: i.quantity, unitPrice: p };
-      });
+      const receiptItems = [
+        ...cart.map((i) => {
+          let p = i.product.price;
+          if (priceTier === "efectivo") p = Math.ceil((p * 0.8) / 500) * 500;
+          else if (priceTier === "mayorista") p = Math.ceil((p * 0.65) / 500) * 500;
+          return { name: i.product.name, sku: i.product.sku, size: i.size, quantity: i.quantity, unitPrice: p };
+        }),
+        ...customItems.map((ci) => {
+          let p = ci.unitPrice;
+          if (priceTier === "efectivo") p = Math.ceil((p * 0.8) / 500) * 500;
+          else if (priceTier === "mayorista") p = Math.ceil((p * 0.65) / 500) * 500;
+          return { name: ci.description, sku: "", size: undefined as string | undefined, quantity: ci.quantity, unitPrice: p };
+        }),
+      ];
 
       setReceiptData({
         items:          receiptItems,
@@ -820,6 +997,7 @@ export default function SellView() {
         creditNoteCode: creditSnapshot?.creditNoteCode,
         transactionId:  sale.id,
         vendorName:     vendorName,
+        hasLibreItems:  customItems.length > 0,
       });
 
       // Si hay saldo a favor, usar la nota de crédito residual devuelta por la API
@@ -837,7 +1015,8 @@ export default function SellView() {
       }
 
       invalidateStock();
-      clearCart();       // también limpia returnCredit en el store
+      clearCart();       // también limpia returnCredit y customItems en el store
+      setShowFreePanel(false);
       setModal(false);
     } catch (err) {
       setSaleError(
@@ -879,7 +1058,33 @@ export default function SellView() {
             <div className="h-4 bg-zinc-800 animate-pulse rounded w-1/3" />
           </div>
         ) : (
-          <SkuBar products={products} stock={stock} cart={cart} onAdd={addToCart} />
+          <>
+            <SkuBar products={products} stock={stock} cart={cart} onAdd={addToCart} />
+
+            {/* Botón de artículo libre */}
+            <button
+              onClick={() => setShowFreePanel((v) => !v)}
+              className={`mt-3 flex items-center gap-2 text-xs font-medium px-3 py-2.5
+                          rounded-lg border transition-colors w-full ${
+                showFreePanel
+                  ? "bg-violet-900/40 border-violet-700/60 text-violet-300"
+                  : "bg-zinc-900 border-zinc-700 text-zinc-500 hover:border-violet-700/50 hover:text-violet-400"
+              }`}
+            >
+              <Tag size={13} />
+              Artículo libre — precio a mano
+            </button>
+
+            {showFreePanel && (
+              <FreeItemPanel
+                onAdd={(item) => {
+                  addCustomItem(item);
+                  setCartOpen(true);
+                }}
+                onClose={() => setShowFreePanel(false)}
+              />
+            )}
+          </>
         )}
       </div>
 
@@ -926,31 +1131,42 @@ export default function SellView() {
         )}
 
         <div className="flex-1 overflow-auto px-5">
-          {cart.length === 0 ? (
+          {cart.length === 0 && customItems.length === 0 ? (
             <p className="text-zinc-600 text-sm text-center py-12">
               La orden está vacía.<br />Buscá artículos por SKU.
             </p>
           ) : (
-            cart.map((item) => {
-              const sRows = stock.filter((s) => s.productId === item.product.id);
-              const avail = item.size
-                ? (sRows.find((s) => s.size === item.size)?.quantity ?? 0)
-                : sRows.reduce((n, s) => n + s.quantity, 0);
-              return (
-                <CartRow
-                  key={`${item.product.id}:${item.size ?? ""}`}
-                  item={item}
+            <>
+              {cart.map((item) => {
+                const sRows = stock.filter((s) => s.productId === item.product.id);
+                const avail = item.size
+                  ? (sRows.find((s) => s.size === item.size)?.quantity ?? 0)
+                  : sRows.reduce((n, s) => n + s.quantity, 0);
+                return (
+                  <CartRow
+                    key={`${item.product.id}:${item.size ?? ""}`}
+                    item={item}
+                    priceTier={priceTier}
+                    availableStock={avail}
+                    onRemove={() => removeFromCart(item.product.id, item.size)}
+                    onDelta={(d) => updateQty(item.product.id, item.size, d)}
+                  />
+                );
+              })}
+              {customItems.map((ci) => (
+                <CustomCartRow
+                  key={ci.id}
+                  item={ci}
                   priceTier={priceTier}
-                  availableStock={avail}
-                  onRemove={() => removeFromCart(item.product.id, item.size)}
-                  onDelta={(d) => updateQty(item.product.id, item.size, d)}
+                  onRemove={() => removeCustomItem(ci.id)}
+                  onDelta={(d) => updateCustomQty(ci.id, d)}
                 />
-              );
-            })
+              ))}
+            </>
           )}
         </div>
 
-        {cart.length > 0 && (
+        {(cart.length > 0 || customItems.length > 0) && (
           <div className="px-5 py-4 border-t border-zinc-800 flex flex-col gap-3">
             {saleError && (
               <p className="text-red-400 text-xs bg-red-950/30 border border-red-900/30

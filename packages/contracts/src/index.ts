@@ -2,6 +2,8 @@ export * from "./schemas/auth";
 export * from "./schemas/credit-note";
 export * from "./schemas/pos-customer";
 export * from "./schemas/product";
+export * from "./schemas/promo-code";
+export * from "./schemas/shipping-zone";
 export * from "./schemas/report";
 export * from "./schemas/return";
 export * from "./schemas/sale";

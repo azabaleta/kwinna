@@ -1,9 +1,8 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Package2, Search, ShoppingCart, SlidersHorizontal, TrendingDown, X } from "lucide-react";
-import type { Product, SaleOrderInput, Stock } from "@kwinna/contracts";
+import { ChevronDown, ChevronRight, Package2, Search, SlidersHorizontal, TrendingDown, X } from "lucide-react";
+import type { Product, Stock } from "@kwinna/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useCreateSale } from "@/hooks/use-sale";
 import { useProducts } from "@/hooks/use-products";
 import { useStock } from "@/hooks/use-stock";
 import { RestockDialog } from "@/components/inventory/restock-dialog";
@@ -179,46 +177,6 @@ function SkeletonRow() {
         </TableCell>
       ))}
     </TableRow>
-  );
-}
-
-// ─── Sell Button ──────────────────────────────────────────────────────────────
-
-function SellButton({ product, stockQty }: { product: Product; stockQty: number }) {
-  const { mutateAsync, isPending } = useCreateSale();
-
-  async function handleSell() {
-    try {
-      const payload: SaleOrderInput = {
-        items: [{ productId: product.id, quantity: 1 }],
-        customerName:     "Venta en tienda",
-        customerEmail:    "pos@kwinna.com",
-        shippingAddress:  "Local",
-        shippingCity:     "Neuquén",
-        shippingProvince: "Neuquén",
-      };
-      await mutateAsync(payload);
-
-      toast.success("Venta registrada", {
-        description: `1 × ${product.name} — $${product.price.toLocaleString("es-AR")}`,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Error al registrar la venta";
-      toast.error("Venta fallida", { description: message });
-    }
-  }
-
-  return (
-    <Button
-      size="sm"
-      variant={stockQty === 0 ? "outline" : "default"}
-      disabled={stockQty === 0 || isPending}
-      onClick={handleSell}
-      className="gap-1.5"
-    >
-      <ShoppingCart className="h-3.5 w-3.5" />
-      {stockQty === 0 ? "Sin stock" : "Vender 1"}
-    </Button>
   );
 }
 
@@ -534,10 +492,9 @@ export default function InventoryPage() {
                             </div>
                           </TableCell>
 
-                          {/* Sell + Edit + Delete */}
+                          {/* Edit + Delete */}
                           <TableCell className="pr-6 text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <SellButton product={product} stockQty={qty} />
                               <EditProductDialog product={product} />
                               <DeleteProductDialog product={product} />
                             </div>

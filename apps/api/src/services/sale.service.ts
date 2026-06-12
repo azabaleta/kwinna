@@ -1,11 +1,14 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { CreditNote, Sale, SaleItem, SaleOrderInput } from "@kwinna/contracts";
+import { LIBRE_PRODUCT_ID } from "@kwinna/contracts";
 import { db } from "../db";
 import { mapSaleRow } from "../db/repositories";
 import { generateCreditNoteCode, mapCreditNoteRow } from "../db/repositories/credit-note.repository";
+import { incrementPromoCodeUsage } from "../db/repositories/promo-code.repository";
 import { findSaleById } from "../db/repositories/sale.repository";
-import { creditNotesTable, productsTable, salesTable, stockMovementsTable, stockTable, usersTable } from "../db/schema";
+import { creditNotesTable, productsTable, promotionalCodesTable, salesTable, stockMovementsTable, stockTable, usersTable } from "../db/schema";
 import { computeShippingCost } from "./shipping.service";
+import { resolvePromoForSale } from "./promo-code.service";
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -71,6 +74,7 @@ async function deductStockItem(
 
   await tx.insert(stockMovementsTable).values({
     productId: item.productId,
+    size:      item.size ?? "",
     type:      "out",
     quantity:  item.quantity,
     reason:    "sale",
@@ -97,6 +101,14 @@ export async function createSale(
   input: SaleOrderInput
 ): Promise<{ sale: Sale; residualCreditNote?: CreditNote }> {
   let residualCreditNote: CreditNote | undefined;
+
+  // Resolve shipping cost and promo code before opening the transaction (read-only).
+  const isPickup    = input.shippingMethod === "pickup";
+  const shippingCost = isPickup ? 0 : await computeShippingCost(input.shippingCity ?? "");
+
+  const promoResolved = input.promoCode
+    ? await resolvePromoForSale(input.promoCode, input.paymentMethod ?? "")
+    : null;
 
   const row = await db.transaction(async (tx) => {
 
@@ -161,15 +173,43 @@ export async function createSale(
       });
     }
 
-    // 4 — Calcular totales en el servidor ─────────────────────────────────
-    // Pickup siempre tiene envío gratis, independientemente de la ciudad.
-    const isPickup    = input.shippingMethod === "pickup";
-    const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity ?? "");
+    // 3b — Artículos libres (sin catálogo, sin descuento de stock) ─────────
+    // Solo cuando el operador POS está identificado (vendorId) para evitar
+    // que un cliente web inyecte precios arbitrarios.
+    if (input.customItems?.length && input.channel === "pos" && input.vendorId) {
+      for (const custom of input.customItems) {
+        let unitPrice = custom.unitPrice;
+        if (effectiveTier === "efectivo")  unitPrice = Math.round((unitPrice * 0.8)  / 100) * 100;
+        if (effectiveTier === "mayorista") unitPrice = Math.round((unitPrice * 0.65) / 100) * 100;
+        saleItems.push({
+          productId: LIBRE_PRODUCT_ID,
+          quantity:  custom.quantity,
+          unitPrice,
+          subtotal:  unitPrice * custom.quantity,
+          name:      custom.description,
+        });
+      }
+    }
 
-    const itemsTotal = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
-    // Descuento por transferencia solo para ventas web sin priceTier de POS.
-    const discount   = (!effectiveTier && input.paymentMethod === "transfer") ? itemsTotal * 0.25 : 0;
-    const total      = itemsTotal - discount + shippingCost;
+    // 4 — Calcular totales en el servidor ─────────────────────────────────
+    // shippingCost resuelto antes de la transacción (ver arriba).
+
+    const itemsTotal      = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
+    const transferDiscount = (!effectiveTier && input.paymentMethod === "transfer") ? itemsTotal * 0.20 : 0;
+
+    let promoDiscount = 0;
+    if (promoResolved) {
+      if (promoResolved.discountType === "percentage") {
+        // Porcentaje: se suma al 20% de transferencia (aplica sobre itemsTotal)
+        promoDiscount = itemsTotal * (promoResolved.discountValue / 100);
+      } else {
+        // Monto fijo: aplica sobre el remanente post-transferencia
+        const base = itemsTotal - transferDiscount;
+        promoDiscount = Math.min(promoResolved.discountValue, base);
+      }
+    }
+
+    const total = itemsTotal - transferDiscount - promoDiscount + shippingCost;
 
     // 5 — Insertar venta ───────────────────────────────────────────────────
     const [inserted] = await tx
@@ -194,10 +234,17 @@ export async function createSale(
         channel:          input.channel ?? "pos",
         paymentMethod:    input.paymentMethod,
         saleNotes:        input.saleNotes,
+        promoCodeId:      promoResolved?.id   ?? null,
+        promoDiscount:    promoDiscount.toString(),
         createdAt:        new Date(),
         updatedAt:        new Date(),
       })
       .returning();
+
+    // ── Incrementar uso del código promocional ──────────────────────────────
+    if (promoResolved) {
+      await incrementPromoCodeUsage(promoResolved.id, tx);
+    }
 
     // ── Canje de nota de crédito ─────────────────────────────────────────────
     // Solo para pagos "por_devolucion" con creditNoteId provisto.
@@ -264,6 +311,12 @@ export async function createSale(
  *   4. Si el pago no se confirma, `PUT /sales/:id/cancel` revierte el stock.
  */
 export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
+  const isPickup     = input.shippingMethod === "pickup";
+  const shippingCost = isPickup ? 0 : await computeShippingCost(input.shippingCity ?? "");
+
+  const promoResolved = input.promoCode
+    ? await resolvePromoForSale(input.promoCode, input.paymentMethod ?? "")
+    : null;
   const row = await db.transaction(async (tx) => {
 
     // 1 — Check customer ban (solo web) ──────────────────────────────────
@@ -326,13 +379,22 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
     }
 
     // 4 — Calcular totales en el servidor ────────────────────────────────
-    // Pickup siempre tiene envío gratis, independientemente de la ciudad.
-    const isPickup     = input.shippingMethod === "pickup";
-    const shippingCost = isPickup ? 0 : computeShippingCost(input.shippingCity ?? "");
+    // shippingCost resuelto antes de la transacción (ver arriba).
 
-    const itemsTotal = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
-    const discount   = (!effectiveTier && input.paymentMethod === "transfer") ? itemsTotal * 0.25 : 0;
-    const total      = itemsTotal - discount + shippingCost;
+    const itemsTotal       = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
+    const transferDiscount = (!effectiveTier && input.paymentMethod === "transfer") ? itemsTotal * 0.20 : 0;
+
+    let promoDiscount = 0;
+    if (promoResolved) {
+      if (promoResolved.discountType === "percentage") {
+        promoDiscount = itemsTotal * (promoResolved.discountValue / 100);
+      } else {
+        const base = itemsTotal - transferDiscount;
+        promoDiscount = Math.min(promoResolved.discountValue, base);
+      }
+    }
+
+    const total = itemsTotal - transferDiscount - promoDiscount + shippingCost;
 
     // 5 — Insertar venta pending ───────────────────────────────────────────
     const [inserted] = await tx
@@ -356,10 +418,16 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
         channel:          input.channel ?? "web",
         paymentMethod:    input.paymentMethod,
         saleNotes:        input.saleNotes,
+        promoCodeId:      promoResolved?.id   ?? null,
+        promoDiscount:    promoDiscount.toString(),
         createdAt:        new Date(),
         updatedAt:        new Date(),
       })
       .returning();
+
+    if (promoResolved) {
+      await incrementPromoCodeUsage(promoResolved.id, tx);
+    }
 
     return inserted!;
   });
@@ -399,49 +467,38 @@ export async function cancelSaleAndRestoreStock(id: string): Promise<Sale> {
   const row = await db.transaction(async (tx) => {
 
     for (const item of sale.items) {
+      if (item.productId === LIBRE_PRODUCT_ID) continue;
 
-      if (item.size) {
-        const [stockRow] = await tx
-          .select()
-          .from(stockTable)
-          .where(and(
-            eq(stockTable.productId, item.productId),
-            eq(stockTable.size, item.size),
-          ))
-          .for("update");
+      const dbSize = item.size ?? "";
 
-        if (stockRow) {
-          await tx
-            .update(stockTable)
-            .set({ quantity: sql`${stockTable.quantity} + ${item.quantity}`, updatedAt: new Date() })
-            .where(eq(stockTable.id, stockRow.id));
-        }
-
-      } else {
-        const [stockRow] = await tx
-          .select()
-          .from(stockTable)
-          .where(and(
-            eq(stockTable.productId, item.productId),
-            eq(stockTable.size, ""),
-          ))
-          .for("update");
-
-        if (stockRow) {
-          await tx
-            .update(stockTable)
-            .set({ quantity: sql`${stockTable.quantity} + ${item.quantity}`, updatedAt: new Date() })
-            .where(eq(stockTable.id, stockRow.id));
-        }
-      }
+      await tx
+        .insert(stockTable)
+        .values({ productId: item.productId, size: dbSize, quantity: item.quantity })
+        .onConflictDoUpdate({
+          target: [stockTable.productId, stockTable.size],
+          set: { quantity: sql`${stockTable.quantity} + ${item.quantity}`, updatedAt: new Date() },
+        });
 
       await tx.insert(stockMovementsTable).values({
         productId: item.productId,
+        size:      dbSize,
         type:      "in",
         quantity:  item.quantity,
         reason:    `cancelacion-venta-${id}`,
         createdAt: new Date(),
       });
+    }
+
+    // Devolver el uso del código promocional — evita que órdenes abandonadas
+    // agoten códigos de uso limitado (ej. maxUses=1 + pago MP nunca completado).
+    if (sale.promoCodeId) {
+      await tx
+        .update(promotionalCodesTable)
+        .set({
+          usedCount: sql`GREATEST(${promotionalCodesTable.usedCount} - 1, 0)`,
+          updatedAt: new Date(),
+        })
+        .where(eq(promotionalCodesTable.id, sale.promoCodeId));
     }
 
     const [updated] = await tx
@@ -476,42 +533,24 @@ export async function dismissSale(id: string, reason: string, restoreStock: bool
   const row = await db.transaction(async (tx) => {
     if (restoreStock) {
       for (const item of sale.items) {
-        if (item.size) {
-          const [stockRow] = await tx
-            .select()
-            .from(stockTable)
-            .where(and(
-              eq(stockTable.productId, item.productId),
-              eq(stockTable.size, item.size),
-            ))
-            .for("update");
+        // Artículos libres (LIBRE_PRODUCT_ID) no tienen fila en productsTable
+        // ni en stockTable — saltarlos evita FK violation en stockMovementsTable
+        // que de otro modo hace rollback de toda la transacción.
+        if (item.productId === LIBRE_PRODUCT_ID) continue;
 
-          if (stockRow) {
-            await tx
-              .update(stockTable)
-              .set({ quantity: sql`${stockTable.quantity} + ${item.quantity}`, updatedAt: new Date() })
-              .where(eq(stockTable.id, stockRow.id));
-          }
-        } else {
-          const [stockRow] = await tx
-            .select()
-            .from(stockTable)
-            .where(and(
-              eq(stockTable.productId, item.productId),
-              eq(stockTable.size, ""),
-            ))
-            .for("update");
+        const dbSize = item.size ?? "";
 
-          if (stockRow) {
-            await tx
-              .update(stockTable)
-              .set({ quantity: sql`${stockTable.quantity} + ${item.quantity}`, updatedAt: new Date() })
-              .where(eq(stockTable.id, stockRow.id));
-          }
-        }
+        await tx
+          .insert(stockTable)
+          .values({ productId: item.productId, size: dbSize, quantity: item.quantity })
+          .onConflictDoUpdate({
+            target: [stockTable.productId, stockTable.size],
+            set: { quantity: sql`${stockTable.quantity} + ${item.quantity}`, updatedAt: new Date() },
+          });
 
         await tx.insert(stockMovementsTable).values({
           productId: item.productId,
+          size:      dbSize,
           type:      "in",
           quantity:  item.quantity,
           reason:    `desestimacion-venta-${id}`,

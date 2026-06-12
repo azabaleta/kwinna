@@ -38,6 +38,9 @@ export function mapSaleRow(row: typeof salesTable.$inferSelect): Sale {
     isDismissed:   row.isDismissed,
     dismissReason: row.dismissReason ?? undefined,
 
+    promoCodeId:   row.promoCodeId   ?? undefined,
+    promoDiscount: Number(row.promoDiscount ?? 0),
+
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

@@ -2,22 +2,23 @@ import { api } from "../lib/api";
 import type { Sale, CreditNote, SaleListResponse, SaleResponse, PriceTier } from "@kwinna/contracts";
 
 export interface PosSalePayload {
-  items:            Array<{ productId: string; quantity: number; size?: string }>;
-  customerName:     string;
-  customerEmail:    string;
-  customerPhone?:   string;
-  customerDni?:     string;
+  items:             Array<{ productId: string; quantity: number; size?: string }>;
+  customItems?:      Array<{ description: string; unitPrice: number; quantity: number }>;
+  customerName:      string;
+  customerEmail:     string;
+  customerPhone?:    string;
+  customerDni?:      string;
   shippingAddress?:  string;
   shippingCity?:     string;
   shippingProvince?: string;
-  channel:          "pos";
-  paymentMethod?:   string;
-  priceTier?:       PriceTier;
-  saleNotes?:       string;
-  vendorId?:        string;
-  userId?:          string;
-  posCustomerId?:   string;
-  creditNoteId?:    string;
+  channel:           "pos";
+  paymentMethod?:    string;
+  priceTier?:        PriceTier;
+  saleNotes?:        string;
+  vendorId?:         string;
+  userId?:           string;
+  posCustomerId?:    string;
+  creditNoteId?:     string;
 }
 
 export async function createPosSale(payload: PosSalePayload): Promise<{ sale: Sale; residualCreditNote?: CreditNote }> {

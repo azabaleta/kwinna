@@ -229,9 +229,9 @@ export function ProductCard({ product, stockQty, cartQty, onAdd }: ProductCardPr
           </p>
           <p className={cn(
             "text-[8.5px] font-medium tabular-nums",
-            Math.round(product.price * 0.25) >= 2000 ? "text-emerald-500/85" : "invisible",
+            Math.round(product.price * 0.20) >= 2000 ? "text-emerald-500/85" : "invisible",
           )}>
-            Ahorrás ${Math.round(product.price * 0.25).toLocaleString("es-AR")}
+            Ahorrás ${Math.round(product.price * 0.20).toLocaleString("es-AR")}
           </p>
         </div>
       </Link>

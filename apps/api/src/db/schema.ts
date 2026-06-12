@@ -75,6 +75,39 @@ export const snapshotPeriodEnum = pgEnum("snapshot_period", [
   "semestral",
 ]);
 
+export const discountTypeEnum = pgEnum("discount_type", [
+  "percentage",
+  "fixed",
+]);
+
+// ─── promotional_codes ────────────────────────────────────────────────────────
+// Códigos canjeables en el checkout web. Cada código puede tener un descuento
+// distinto para transferencia (stacks sobre el 25% base) y tarjeta (MP).
+// No exponer is_active=false ni vencidos en la respuesta pública de validación.
+
+export const promotionalCodesTable = pgTable("promotional_codes", {
+  id:          uuid("id").primaryKey().defaultRandom(),
+  code:        varchar("code", { length: 50 }).notNull().unique(),
+  description: text("description"),
+
+  // Transferencia
+  transferDiscountType:  discountTypeEnum("transfer_discount_type"),
+  transferDiscountValue: numeric("transfer_discount_value", { precision: 10, scale: 2 }),
+
+  // Tarjeta (MercadoPago)
+  cardDiscountType:  discountTypeEnum("card_discount_type"),
+  cardDiscountValue: numeric("card_discount_value", { precision: 10, scale: 2 }),
+
+  isActive:   boolean("is_active").notNull().default(true),
+  validFrom:  timestamp("valid_from",  { withTimezone: true }),
+  validUntil: timestamp("valid_until", { withTimezone: true }),
+  maxUses:    integer("max_uses"),
+  usedCount:  integer("used_count").notNull().default(0),
+
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── credit_notes ─────────────────────────────────────────────────────────────
 // Notas de crédito emitidas al registrar una devolución.
 // Tienen un código único legible (NC-XXXXXX) que se imprime en el ticket 58mm.
@@ -331,6 +364,10 @@ export const salesTable = pgTable("sales", {
   isDismissed:   boolean("is_dismissed").notNull().default(false),
   dismissReason: text("dismiss_reason"),
 
+  // ── Código promocional ────────────────────────────────────────────────────
+  promoCodeId:   uuid("promo_code_id"),
+  promoDiscount: numeric("promo_discount", { precision: 12, scale: 2 }).notNull().default("0"),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -495,3 +532,17 @@ export const planificacionComentariosTable = pgTable(
     creadoEn: timestamp("creado_en", { withTimezone: true }).notNull().defaultNow(),
   }
 );
+
+// ─── shipping_zones ────────────────────────────────────────────────────────────
+// Lista de ciudades con envío a precio fijo.
+// `city` es la clave normalizada (lowercase, sin tildes) usada internamente.
+// `display_name` es el nombre legible mostrado en la UI y los tickets.
+// Ciudades que no estén en esta tabla → costo 0 (coordinación manual).
+
+export const shippingZonesTable = pgTable("shipping_zones", {
+  id:          uuid("id").primaryKey().defaultRandom(),
+  city:        text("city").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  cost:        numeric("cost", { precision: 12, scale: 2 }).notNull(),
+  updatedAt:   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

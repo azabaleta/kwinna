@@ -177,6 +177,17 @@ export function CartPanel() {
               </span>
             </div>
 
+            {/* Ahorro con transferencia */}
+            <div className="rounded-none border border-emerald-500/20 bg-emerald-50/60 dark:bg-emerald-950/30 px-3 py-2.5 text-center">
+              <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                Pagando con transferencia:{" "}
+                <span className="tabular-nums">${(total * 0.80).toLocaleString("es-AR")}</span>
+              </p>
+              <p className="mt-0.5 text-[10px] text-emerald-600/70">
+                Ahorrás ${(total * 0.20).toLocaleString("es-AR")} · 20% OFF
+              </p>
+            </div>
+
             {/* Promo Cuotas */}
             {total >= 10000 && (
               <p className="text-center text-[11px] text-emerald-600 font-medium tracking-wide">

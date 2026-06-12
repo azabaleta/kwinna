@@ -327,9 +327,9 @@ export function ProductDetailClient({ id }: { id: string }) {
                   pagando con transferencia
                 </span>
               </p>
-              {Math.round(product.price * 0.25) >= 2000 && (
+              {Math.round(product.price * 0.20) >= 2000 && (
                 <p className="text-[11px] font-medium tabular-nums text-emerald-500/85 mt-0.5">
-                  Ahorrás ${Math.round(product.price * 0.25).toLocaleString("es-AR")}
+                  Ahorrás ${Math.round(product.price * 0.20).toLocaleString("es-AR")}
                 </p>
               )}
             </div>

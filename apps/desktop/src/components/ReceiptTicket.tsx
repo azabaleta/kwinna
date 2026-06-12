@@ -22,6 +22,7 @@ export interface ReceiptData {
   creditNoteCode?: string;
   transactionId?:  string;
   vendorName?:     string;
+  hasLibreItems?:  boolean;
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -67,8 +68,9 @@ function fmtDate(d: Date): string {
  */
 const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?: boolean }>(
   ({ data, hidePrice = false }, ref) => {
-    const separator = "─".repeat(32);
-    const txCode    = data.transactionId
+    const separator    = "─".repeat(32);
+    const hasLibre     = data.hasLibreItems ?? data.items.some((i) => i.sku === "");
+    const txCode       = data.transactionId
       ? data.transactionId.replace(/-/g, "").slice(0, 10).toUpperCase()
       : null;
 
@@ -97,6 +99,7 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?
               <p className="receipt-item-name">
                 {item.name}
                 {item.size ? ` (${item.size})` : ""}
+                {item.sku === "" ? " *" : ""}
               </p>
               {hidePrice ? (
                 <div className="receipt-item-line">
@@ -178,6 +181,9 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?
         {/* Policies */}
         <div className="receipt-policies" style={{ fontSize: "11px", fontWeight: 600, textAlign: "center", marginBottom: "8px", lineHeight: "1.3" }}>
           <p>Devoluciones en el local hasta 30 días corridos post-compra. Requiere ticket, bolsa y prenda sin uso en perfecto estado.</p>
+          {hasLibre && (
+            <p style={{ marginTop: "4px" }}>(*) Los artículos de oferta no tienen devolución ni cambio.</p>
+          )}
         </div>
 
         {/* Tagline */}

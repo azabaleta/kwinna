@@ -7,6 +7,14 @@ export interface CartItem {
   size?:     string;
 }
 
+// Artículo fuera de catálogo ingresado a mano en el POS
+export interface CustomCartItem {
+  id:          string;   // clave de carrito generada en cliente (no va a la API)
+  description: string;
+  unitPrice:   number;
+  quantity:    number;
+}
+
 export interface CustomerForm {
   name:     string;
   lastName: string;
@@ -19,12 +27,18 @@ export interface CustomerForm {
 }
 
 interface PosState {
-  // Cart
-  cart:        CartItem[];
-  addToCart:   (product: Product, size?: string) => void;
+  // Cart — productos del catálogo
+  cart:           CartItem[];
+  addToCart:      (product: Product, size?: string) => void;
   removeFromCart: (productId: string, size?: string) => void;
-  updateQty:   (productId: string, size: string | undefined, delta: number) => void;
-  clearCart:   () => void;
+  updateQty:      (productId: string, size: string | undefined, delta: number) => void;
+  clearCart:      () => void;
+
+  // Custom items — artículos libres sin catálogo
+  customItems:       CustomCartItem[];
+  addCustomItem:     (item: { description: string; unitPrice: number }) => void;
+  removeCustomItem:  (id: string) => void;
+  updateCustomQty:   (id: string, delta: number) => void;
 
   // Customer
   customer:       CustomerForm;
@@ -67,7 +81,8 @@ function cartKey(productId: string, size?: string): string {
 }
 
 export const usePosStore = create<PosState>((set) => ({
-  cart: [],
+  cart:        [],
+  customItems: [],
 
   addToCart: (product, size) =>
     set((s) => {
@@ -107,7 +122,35 @@ export const usePosStore = create<PosState>((set) => ({
       return { cart: updated };
     }),
 
-  clearCart: () => set({ cart: [], returnCredit: null }),
+  clearCart: () => set({ cart: [], customItems: [], returnCredit: null }),
+
+  addCustomItem: ({ description, unitPrice }) =>
+    set((s) => ({
+      customItems: [
+        ...s.customItems,
+        {
+          // ID solo para clave de carrito; nunca se envía a la API
+          id:          `libre-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`,
+          description,
+          unitPrice,
+          quantity: 1,
+        },
+      ],
+    })),
+
+  removeCustomItem: (id) =>
+    set((s) => ({
+      customItems: s.customItems.filter((ci) => ci.id !== id),
+    })),
+
+  updateCustomQty: (id, delta) =>
+    set((s) => ({
+      customItems: s.customItems
+        .map((ci) =>
+          ci.id === id ? { ...ci, quantity: Math.max(0, ci.quantity + delta) } : ci
+        )
+        .filter((ci) => ci.quantity > 0),
+    })),
 
   customer:      emptyCustomer,
   setCustomer:   (data) => set((s) => ({ customer: { ...s.customer, ...data } })),

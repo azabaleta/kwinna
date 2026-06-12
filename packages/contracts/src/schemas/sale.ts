@@ -9,6 +9,8 @@ export const SaleItemSchema = z.object({
   unitPrice: z.number().positive(),
   subtotal:  z.number().positive(),
   size:      z.string().optional(),
+  // Artículo libre: descripción ingresada a mano en el POS (sin entrada en catálogo)
+  name:      z.string().max(200).optional(),
 });
 
 export type SaleItem = z.infer<typeof SaleItemSchema>;
@@ -80,6 +82,10 @@ export const SaleSchema = z.object({
   isDismissed:   z.boolean().default(false),
   dismissReason: z.string().nullable().optional(),
 
+  // ── Código promocional ────────────────────────────────────────────────────
+  promoCodeId:   z.string().uuid().nullable().optional(),
+  promoDiscount: z.number().nonnegative().default(0),
+
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -102,8 +108,25 @@ export const SaleOrderItemSchema = z.object({
 
 export type SaleOrderItem = z.infer<typeof SaleOrderItemSchema>;
 
+// ─── Artículo libre (POS-only) ────────────────────────────────────────────────
+// UUID centinela para artículos fuera de catálogo vendidos a mano desde el POS.
+// No existe como fila en productsTable — solo aparece en el JSONB de salesTable.items.
+// Usar esta constante en API y cliente para evitar "magic strings" desincronizados.
+export const LIBRE_PRODUCT_ID = "00000000-0000-0000-0000-000000000001" as const;
+
+// Ítem sin entrada en catálogo: precio ingresado a mano por el operador.
+// El backend confía el precio solo cuando channel=pos y vendorId están presentes.
+
+export const CustomSaleItemInputSchema = z.object({
+  description: z.string().min(1, "Descripción requerida").max(200),
+  unitPrice:   z.number({ invalid_type_error: "Precio inválido" }).positive("El precio debe ser mayor a 0"),
+  quantity:    z.number().int().positive().max(99),
+});
+
+export type CustomSaleItemInput = z.infer<typeof CustomSaleItemInputSchema>;
+
 export const SaleOrderInputSchema = z.object({
-  items:            z.array(SaleOrderItemSchema).min(1).max(30, "El carrito no puede superar 30 ítems distintos"),
+  items: z.array(SaleOrderItemSchema).max(30, "El carrito no puede superar 30 ítems distintos").default([]),
   customerName:     z.string().min(1).max(100),
   customerEmail:    z.string().email().max(255),
   customerPhone:    z.string().max(30).optional(),    // opcional: POS puede omitirlo
@@ -126,6 +149,17 @@ export const SaleOrderInputSchema = z.object({
   saleNotes:     z.string().max(500).optional(),
   customerDni:   z.string().max(20).optional(),       // opcional: POS puede omitirlo
   creditNoteId:  z.string().uuid().optional(),         // nota de crédito a canjear (por_devolucion)
+  customItems:   z.array(CustomSaleItemInputSchema).max(20).optional(), // artículos libres POS
+  promoCode:     z.string().max(50).optional(),        // código promocional (web checkout)
+}).superRefine((data, ctx) => {
+  const hasItems = (data.items?.length ?? 0) > 0 || (data.customItems?.length ?? 0) > 0;
+  if (!hasItems) {
+    ctx.addIssue({
+      code:    z.ZodIssueCode.custom,
+      message: "La venta debe tener al menos un artículo",
+      path:    ["items"],
+    });
+  }
 });
 
 export type SaleOrderInput = z.infer<typeof SaleOrderInputSchema>;

@@ -4,6 +4,8 @@ export { default as glossaryRoutes }     from "./glossary.routes";
 export { default as creditNotesRoutes }  from "./credit-notes.routes";
 export { default as posCustomersRoutes } from "./pos-customers.routes";
 export { default as productRoutes }      from "./product.routes";
+export { default as promoCodesRoutes }   from "./promo-codes.routes";
+export { default as shippingRoutes }     from "./shipping.routes";
 export { default as reportsRoutes }      from "./reports.routes";
 export { default as returnsRoutes }      from "./returns.routes";
 export { default as saleRoutes }         from "./sale.routes";
