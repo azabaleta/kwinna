@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { LAUNCH_PROMO_CODE } from "@/lib/constants";
@@ -10,10 +10,19 @@ import { LAUNCH_PROMO_CODE } from "@/lib/constants";
 // desktop no entra sin engrosar la franja, así que alterna dos frases cortas
 // con un fade automático cada 3 s. Toda la barra copia el código al click.
 
-const MOBILE_MESSAGES = [
-  "HASTA 30% OFF EN TU COMPRA",
-  `CÓDIGO: ${LAUNCH_PROMO_CODE} (Tocá para copiar)`,
-] as const;
+// Promesas clave en Tertiary (beige) + bold; glow al hover de toda la barra.
+function Highlight({ children }: { children: ReactNode }) {
+  return (
+    <span className="font-bold text-tertiary transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(229,218,206,0.6)]">
+      {children}
+    </span>
+  );
+}
+
+const MOBILE_MESSAGES: readonly ReactNode[] = [
+  <><Highlight>HASTA 30% OFF</Highlight> EN TU COMPRA</>,
+  <>CÓDIGO: <Highlight>{LAUNCH_PROMO_CODE}</Highlight> (Tocá para copiar)</>,
+];
 
 const ROTATE_MS = 3000;
 
@@ -44,11 +53,25 @@ export function PromoStrip() {
       type="button"
       onClick={handleCopyCode}
       aria-label={`Copiar código ${LAUNCH_PROMO_CODE}`}
-      className="flex h-10 w-full cursor-pointer items-center justify-center bg-primary px-4 text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+      className="group relative flex h-10 w-full cursor-pointer items-center justify-center overflow-hidden bg-primary px-4 text-primary-foreground/90 shadow-[inset_0_1px_3px_rgba(0,0,0,0.3),0_1px_2px_rgba(0,0,0,0.25)] transition-all duration-300 hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
     >
+      {/* Shimmer: luz sesgada que recorre la barra cíclicamente */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/20 to-transparent"
+      />
+
       {/* Desktop: mensaje completo en una línea */}
-      <span className="hidden md:block text-sm font-medium tracking-wide">
-        CELEBRAMOS NUESTRO LANZAMIENTO: HASTA 30% OFF EN TODA LA TIENDA | CÓDIGO: {LAUNCH_PROMO_CODE}
+      <span className="hidden md:flex items-center text-sm font-medium tracking-wide">
+        CELEBRAMOS NUESTRO LANZAMIENTO
+        <span className="mx-3 opacity-40">/</span>
+        <span>
+          <Highlight>HASTA 30% OFF</Highlight> EN TODA LA TIENDA
+        </span>
+        <span className="mx-3 opacity-40">/</span>
+        <span>
+          CÓDIGO: <Highlight>{LAUNCH_PROMO_CODE}</Highlight>
+        </span>
       </span>
 
       {/* Mobile: carrusel automático fade-in/out para mantener la franja fina */}

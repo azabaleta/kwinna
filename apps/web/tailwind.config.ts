@@ -66,6 +66,18 @@ const config: Config = {
       boxShadow: {
         soft: tokens.shadows.soft,
       },
+      // Luz sesgada que recorre la PromoStrip: pasa en ~1.8s y descansa
+      // hasta completar el ciclo de 6s.
+      keyframes: {
+        shimmer: {
+          "0%":   { transform: "translateX(-100%) skewX(-12deg)" },
+          "30%":  { transform: "translateX(300%) skewX(-12deg)" },
+          "100%": { transform: "translateX(300%) skewX(-12deg)" },
+        },
+      },
+      animation: {
+        shimmer: "shimmer 6s ease-in-out infinite",
+      },
     },
   },
   plugins: [animate],
