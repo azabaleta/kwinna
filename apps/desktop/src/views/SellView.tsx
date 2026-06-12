@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Search, X, Plus, Minus, ShoppingCart, AlertTriangle, CheckCircle2, Printer, RefreshCw, UserRound, UserPlus, ChevronDown, Banknote, FileText, Gift, Tag } from "lucide-react";
 import type { Product, Stock, PriceTier, CustomerSearchResult } from "@kwinna/contracts";
+import { applyPriceTier } from "@kwinna/contracts";
 import type { CartItem, CustomCartItem } from "../store/use-pos-store";
 import { usePosStore } from "../store/use-pos-store";
 import { useProducts } from "../hooks/use-products";
@@ -163,8 +164,8 @@ function SkuBar({
                   <p className="text-[11px] text-zinc-500">{result.sku}</p>
                   <div className="flex gap-3 text-[11px] mt-1 bg-zinc-950/50 rounded p-1.5 border border-zinc-800">
                     <span className="text-zinc-400">Lista: <span className="text-zinc-200">{formatRoundedPrice(result.price)}</span></span>
-                    <span className="text-emerald-400 font-medium">Efvo: {formatRoundedPrice(result.price * 0.8)}</span>
-                    <span className="text-amber-400 font-medium">May: {formatRoundedPrice(result.price * 0.65)}</span>
+                    <span className="text-emerald-400 font-medium">Efvo: {formatPrice(applyPriceTier(result.price, "efectivo"))}</span>
+                    <span className="text-amber-400 font-medium">May: {formatPrice(applyPriceTier(result.price, "mayorista"))}</span>
                   </div>
                   {/* Sizes */}
                   {(() => {
@@ -295,7 +296,9 @@ function FreeItemPanel({
             onChange={(e) => setPrice(e.target.value)}
             placeholder="0"
             min={1}
-            step={100}
+            // "any" — un step numérico ancla la validación nativa en min={1}
+            // (solo acepta 1, 101, 201…) y rechaza precios válidos como 10000.
+            step="any"
             className="bg-zinc-800 text-white rounded-lg pl-7 pr-3 py-2.5 text-sm w-full
                        outline-none border border-zinc-700 focus:border-violet-600
                        transition-colors placeholder:text-zinc-500"
@@ -334,9 +337,7 @@ function CustomCartRow({
   onDelta:   (d: number) => void;
   priceTier: PriceTier;
 }) {
-  let unitPrice = item.unitPrice;
-  if (priceTier === "efectivo")  unitPrice = Math.ceil((unitPrice * 0.8)  / 500) * 500;
-  if (priceTier === "mayorista") unitPrice = Math.ceil((unitPrice * 0.65) / 500) * 500;
+  const unitPrice = applyPriceTier(item.unitPrice, priceTier);
 
   return (
     <div className="flex items-center gap-3 py-3 border-b border-zinc-800 last:border-0">
@@ -366,7 +367,7 @@ function CustomCartRow({
         </button>
       </div>
       <span className="text-sm font-medium text-white w-20 text-right">
-        {formatRoundedPrice(unitPrice * item.quantity)}
+        {formatPrice(unitPrice * item.quantity)}
       </span>
       <button onClick={onRemove} className="text-zinc-600 hover:text-red-400 transition-colors">
         <X size={15} />
@@ -390,9 +391,7 @@ function CartRow({
   priceTier:      PriceTier;
   availableStock: number;
 }) {
-  let unitPrice = item.product.price;
-  if (priceTier === "efectivo") unitPrice = Math.ceil((unitPrice * 0.8) / 500) * 500;
-  if (priceTier === "mayorista") unitPrice = Math.ceil((unitPrice * 0.65) / 500) * 500;
+  const unitPrice = applyPriceTier(item.product.price, priceTier);
 
   const atMax = item.quantity >= availableStock;
 
@@ -428,7 +427,7 @@ function CartRow({
         </button>
       </div>
       <span className="text-sm font-medium text-white w-20 text-right">
-        {formatRoundedPrice(unitPrice * item.quantity)}
+        {formatPrice(unitPrice * item.quantity)}
       </span>
       <button onClick={onRemove} className="text-zinc-600 hover:text-red-400 transition-colors">
         <X size={15} />
@@ -882,18 +881,14 @@ export default function SellView() {
   const vendorId = useAuthStore((s) => s.user?.id);
   const vendorName = useAuthStore((s) => s.user?.name);
 
-  const catalogSubtotal = cart.reduce((sum, i) => {
-    let p = i.product.price;
-    if (priceTier === "efectivo") p = Math.ceil((p * 0.8) / 500) * 500;
-    else if (priceTier === "mayorista") p = Math.ceil((p * 0.65) / 500) * 500;
-    return sum + p * i.quantity;
-  }, 0);
-  const customSubtotal = customItems.reduce((sum, ci) => {
-    let p = ci.unitPrice;
-    if (priceTier === "efectivo") p = Math.ceil((p * 0.8) / 500) * 500;
-    else if (priceTier === "mayorista") p = Math.ceil((p * 0.65) / 500) * 500;
-    return sum + p * ci.quantity;
-  }, 0);
+  const catalogSubtotal = cart.reduce(
+    (sum, i) => sum + applyPriceTier(i.product.price, priceTier) * i.quantity,
+    0
+  );
+  const customSubtotal = customItems.reduce(
+    (sum, ci) => sum + applyPriceTier(ci.unitPrice, priceTier) * ci.quantity,
+    0
+  );
   const subtotal = catalogSubtotal + customSubtotal;
 
   // ── Cálculos de crédito ──────────────────────────────────────────────────
@@ -970,18 +965,14 @@ export default function SellView() {
 
       // Snapshot receipt ANTES de limpiar el carrito
       const receiptItems = [
-        ...cart.map((i) => {
-          let p = i.product.price;
-          if (priceTier === "efectivo") p = Math.ceil((p * 0.8) / 500) * 500;
-          else if (priceTier === "mayorista") p = Math.ceil((p * 0.65) / 500) * 500;
-          return { name: i.product.name, sku: i.product.sku, size: i.size, quantity: i.quantity, unitPrice: p };
-        }),
-        ...customItems.map((ci) => {
-          let p = ci.unitPrice;
-          if (priceTier === "efectivo") p = Math.ceil((p * 0.8) / 500) * 500;
-          else if (priceTier === "mayorista") p = Math.ceil((p * 0.65) / 500) * 500;
-          return { name: ci.description, sku: "", size: undefined as string | undefined, quantity: ci.quantity, unitPrice: p };
-        }),
+        ...cart.map((i) => ({
+          name: i.product.name, sku: i.product.sku, size: i.size, quantity: i.quantity,
+          unitPrice: applyPriceTier(i.product.price, priceTier),
+        })),
+        ...customItems.map((ci) => ({
+          name: ci.description, sku: "", size: undefined as string | undefined, quantity: ci.quantity,
+          unitPrice: applyPriceTier(ci.unitPrice, priceTier),
+        })),
       ];
 
       setReceiptData({

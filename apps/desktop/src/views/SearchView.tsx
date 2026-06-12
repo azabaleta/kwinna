@@ -2,11 +2,11 @@ import { useState } from "react";
 import { Search, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { Product, Stock } from "@kwinna/contracts";
-import { SEASON_LABELS } from "@kwinna/contracts";
+import { SEASON_LABELS, applyPriceTier } from "@kwinna/contracts";
 import { useProducts } from "../hooks/use-products";
 import { useStock } from "../hooks/use-stock";
 import { useDebounce } from "../lib/use-debounce";
-import { formatRoundedPrice, matchProduct } from "../lib/utils";
+import { formatPrice, formatRoundedPrice, matchProduct } from "../lib/utils";
 import { usePosStore } from "../store/use-pos-store";
 import BarcodeScannerButton from "../components/BarcodeScannerButton";
 
@@ -196,11 +196,11 @@ function ProductCard({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-zinc-400">Efectivo</span>
-            <span className="text-sm font-semibold text-emerald-400">{formatRoundedPrice(product.price * 0.8)}</span>
+            <span className="text-sm font-semibold text-emerald-400">{formatPrice(applyPriceTier(product.price, "efectivo"))}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-zinc-400">Mayorista</span>
-            <span className="text-xs font-semibold text-amber-400">{formatRoundedPrice(product.price * 0.65)}</span>
+            <span className="text-xs font-semibold text-amber-400">{formatPrice(applyPriceTier(product.price, "mayorista"))}</span>
           </div>
         </div>
 

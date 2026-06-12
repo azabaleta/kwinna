@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShoppingCart, Trash2, X } from "lucide-react";
+import { TRANSFER_DISCOUNT_RATE, applyTransferDiscount } from "@kwinna/contracts";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
@@ -181,10 +182,10 @@ export function CartPanel() {
             <div className="rounded-none border border-emerald-500/20 bg-emerald-50/60 dark:bg-emerald-950/30 px-3 py-2.5 text-center">
               <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
                 Pagando con transferencia:{" "}
-                <span className="tabular-nums">${(total * 0.80).toLocaleString("es-AR")}</span>
+                <span className="tabular-nums">${applyTransferDiscount(total).toLocaleString("es-AR")}</span>
               </p>
               <p className="mt-0.5 text-[10px] text-emerald-600/70">
-                Ahorrás ${(total * 0.20).toLocaleString("es-AR")} · 20% OFF
+                Ahorrás ${(total * TRANSFER_DISCOUNT_RATE).toLocaleString("es-AR")} · {TRANSFER_DISCOUNT_RATE * 100}% OFF
               </p>
             </div>
 

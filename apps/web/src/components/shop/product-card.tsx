@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ShoppingCart, Heart, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Product } from "@kwinna/contracts";
+import { TRANSFER_DISCOUNT_RATE, applyTransferDiscount } from "@kwinna/contracts";
 import { useAuthStore } from "@/store/use-auth-store";
 import { useWishlistStore } from "@/store/use-wishlist-store";
 import { cn } from "@/lib/utils";
@@ -221,7 +222,7 @@ export function ProductCard({ product, stockQty, cartQty, onAdd }: ProductCardPr
           </p>
           <p className="tabular-nums text-emerald-600">
             <span className="text-[12px] font-semibold">
-              ${Math.round(product.price * 0.75).toLocaleString("es-AR")}
+              ${Math.round(applyTransferDiscount(product.price)).toLocaleString("es-AR")}
             </span>
             <span className="ml-1 text-[8.5px] font-medium tracking-widest uppercase text-emerald-600/70">
               transferencia
@@ -229,9 +230,9 @@ export function ProductCard({ product, stockQty, cartQty, onAdd }: ProductCardPr
           </p>
           <p className={cn(
             "text-[8.5px] font-medium tabular-nums",
-            Math.round(product.price * 0.20) >= 2000 ? "text-emerald-500/85" : "invisible",
+            Math.round(product.price * TRANSFER_DISCOUNT_RATE) >= 2000 ? "text-emerald-500/85" : "invisible",
           )}>
-            Ahorrás ${Math.round(product.price * 0.20).toLocaleString("es-AR")}
+            Ahorrás ${Math.round(product.price * TRANSFER_DISCOUNT_RATE).toLocaleString("es-AR")}
           </p>
         </div>
       </Link>

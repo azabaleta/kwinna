@@ -1,6 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { CreditNote, Sale, SaleItem, SaleOrderInput } from "@kwinna/contracts";
-import { LIBRE_PRODUCT_ID } from "@kwinna/contracts";
+import { LIBRE_PRODUCT_ID, TRANSFER_DISCOUNT_RATE, applyPriceTier } from "@kwinna/contracts";
 import { db } from "../db";
 import { mapSaleRow } from "../db/repositories";
 import { generateCreditNoteCode, mapCreditNoteRow } from "../db/repositories/credit-note.repository";
@@ -156,13 +156,7 @@ export async function createSale(
     for (const item of input.items) {
       await deductStockItem(tx, item);
 
-      let unitPrice = priceMap.get(item.productId)!;
-
-      if (effectiveTier === "efectivo") {
-        unitPrice = Math.round((unitPrice * 0.8) / 100) * 100;
-      } else if (effectiveTier === "mayorista") {
-        unitPrice = Math.round((unitPrice * 0.65) / 100) * 100;
-      }
+      const unitPrice = applyPriceTier(priceMap.get(item.productId)!, effectiveTier);
 
       saleItems.push({
         productId: item.productId,
@@ -178,9 +172,7 @@ export async function createSale(
     // que un cliente web inyecte precios arbitrarios.
     if (input.customItems?.length && input.channel === "pos" && input.vendorId) {
       for (const custom of input.customItems) {
-        let unitPrice = custom.unitPrice;
-        if (effectiveTier === "efectivo")  unitPrice = Math.round((unitPrice * 0.8)  / 100) * 100;
-        if (effectiveTier === "mayorista") unitPrice = Math.round((unitPrice * 0.65) / 100) * 100;
+        const unitPrice = applyPriceTier(custom.unitPrice, effectiveTier);
         saleItems.push({
           productId: LIBRE_PRODUCT_ID,
           quantity:  custom.quantity,
@@ -195,7 +187,7 @@ export async function createSale(
     // shippingCost resuelto antes de la transacción (ver arriba).
 
     const itemsTotal      = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
-    const transferDiscount = (!effectiveTier && input.paymentMethod === "transfer") ? itemsTotal * 0.20 : 0;
+    const transferDiscount = (!effectiveTier && input.paymentMethod === "transfer") ? itemsTotal * TRANSFER_DISCOUNT_RATE : 0;
 
     let promoDiscount = 0;
     if (promoResolved) {
@@ -361,13 +353,7 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
     for (const item of input.items) {
       await deductStockItem(tx, item);
 
-      let unitPrice = priceMap.get(item.productId)!;
-
-      if (effectiveTier === "efectivo") {
-        unitPrice = Math.round((unitPrice * 0.8) / 100) * 100;
-      } else if (effectiveTier === "mayorista") {
-        unitPrice = Math.round((unitPrice * 0.65) / 100) * 100;
-      }
+      const unitPrice = applyPriceTier(priceMap.get(item.productId)!, effectiveTier);
 
       saleItems.push({
         productId: item.productId,
@@ -382,7 +368,7 @@ export async function createPendingSale(input: SaleOrderInput): Promise<Sale> {
     // shippingCost resuelto antes de la transacción (ver arriba).
 
     const itemsTotal       = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
-    const transferDiscount = (!effectiveTier && input.paymentMethod === "transfer") ? itemsTotal * 0.20 : 0;
+    const transferDiscount = (!effectiveTier && input.paymentMethod === "transfer") ? itemsTotal * TRANSFER_DISCOUNT_RATE : 0;
 
     let promoDiscount = 0;
     if (promoResolved) {

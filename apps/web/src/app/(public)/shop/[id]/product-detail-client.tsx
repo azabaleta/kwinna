@@ -8,6 +8,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import type { Stock } from "@kwinna/contracts";
+import { TRANSFER_DISCOUNT_RATE, applyTransferDiscount } from "@kwinna/contracts";
 import { Button } from "@/components/ui/button";
 import { useProduct } from "@/hooks/use-products";
 import { useProductStock } from "@/hooks/use-stock";
@@ -321,15 +322,15 @@ export function ProductDetailClient({ id }: { id: string }) {
               </p>
               <p className="tabular-nums text-emerald-600 mt-0.5">
                 <span className="text-sm font-semibold">
-                  ${Math.round(product.price * 0.75).toLocaleString("es-AR")}
+                  ${Math.round(applyTransferDiscount(product.price)).toLocaleString("es-AR")}
                 </span>
                 <span className="ml-1.5 text-[10px] font-medium tracking-widest uppercase text-emerald-600/70">
                   pagando con transferencia
                 </span>
               </p>
-              {Math.round(product.price * 0.20) >= 2000 && (
+              {Math.round(product.price * TRANSFER_DISCOUNT_RATE) >= 2000 && (
                 <p className="text-[11px] font-medium tabular-nums text-emerald-500/85 mt-0.5">
-                  Ahorrás ${Math.round(product.price * 0.20).toLocaleString("es-AR")}
+                  Ahorrás ${Math.round(product.price * TRANSFER_DISCOUNT_RATE).toLocaleString("es-AR")}
                 </p>
               )}
             </div>

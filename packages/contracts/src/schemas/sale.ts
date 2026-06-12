@@ -42,6 +42,31 @@ export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
 export const PriceTierSchema = z.enum(["lista", "efectivo", "mayorista"]);
 export type PriceTier = z.infer<typeof PriceTierSchema>;
 
+// ─── Precios canal POS (tienda física) ────────────────────────────────────────
+// Fórmula canónica de lista de precios: descuento sobre el precio base,
+// redondeado hacia ARRIBA al múltiplo de $500 siguiente. POS, web admin y
+// backend deben usar esta única función — si divergen, el ticket impreso
+// no coincide con la venta registrada en la BD.
+// SOLO para el canal POS (vendorId presente): el canal web nunca redondea.
+export function applyPriceTier(basePrice: number, tier?: PriceTier): number {
+  if (!tier || tier === "lista") return basePrice;
+  const factor = tier === "efectivo" ? 0.8 : 0.65;
+  // Redondear a pesos enteros antes del ceil: un epsilon de coma flotante
+  // (p. ej. 6500.0000000001) saltaría un múltiplo completo de $500.
+  return Math.ceil(Math.round(basePrice * factor) / 500) * 500;
+}
+
+// ─── Precios canal WEB (e-commerce) ───────────────────────────────────────────
+// La web aplica 20% de descuento pagando por transferencia bancaria, SIN
+// redondeo, sobre el mismo precio de lista que consume el POS. Los cupones
+// promocionales se suman aparte (promo-code.service). Cards, detalle de
+// producto, carrito, checkout y backend deben derivar de estas constantes.
+export const TRANSFER_DISCOUNT_RATE = 0.20;
+
+export function applyTransferDiscount(basePrice: number): number {
+  return basePrice * (1 - TRANSFER_DISCOUNT_RATE);
+}
+
 export const SaleSchema = z.object({
   id:     z.string().uuid(),
   items:  z.array(SaleItemSchema),

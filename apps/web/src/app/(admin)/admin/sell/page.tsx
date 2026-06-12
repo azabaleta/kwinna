@@ -7,6 +7,7 @@ import {
   CheckCircle, Tag, ChevronUp, X, Receipt,
 } from "lucide-react";
 import type { CreditNote, PriceTier, Product, Sale, Stock } from "@kwinna/contracts";
+import { applyPriceTier } from "@kwinna/contracts";
 import { Button }    from "@/components/ui/button";
 import { Input }     from "@/components/ui/input";
 import { Label }     from "@/components/ui/label";
@@ -30,9 +31,9 @@ const PAYMENT_OPTIONS = [
 ] as const;
 
 const TIER_CONFIG = {
-  lista:     { label: "Lista",     mult: 1,    color: "bg-primary text-primary-foreground",    inactive: "bg-muted text-muted-foreground hover:bg-muted/80" },
-  efectivo:  { label: "Efectivo",  mult: 0.8,  color: "bg-emerald-600 text-white",             inactive: "bg-muted text-emerald-600 hover:bg-muted/80" },
-  mayorista: { label: "Mayorista", mult: 0.65, color: "bg-amber-500 text-white",               inactive: "bg-muted text-amber-600 hover:bg-muted/80" },
+  lista:     { label: "Lista",     color: "bg-primary text-primary-foreground",    inactive: "bg-muted text-muted-foreground hover:bg-muted/80" },
+  efectivo:  { label: "Efectivo",  color: "bg-emerald-600 text-white",             inactive: "bg-muted text-emerald-600 hover:bg-muted/80" },
+  mayorista: { label: "Mayorista", color: "bg-amber-500 text-white",               inactive: "bg-muted text-amber-600 hover:bg-muted/80" },
 } as const;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -56,12 +57,6 @@ type NewCustomerForm = {
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function calcPrice(base: number, tier: PriceTier): number {
-  if (tier === "efectivo")  return Math.ceil((base * 0.8)  / 500) * 500;
-  if (tier === "mayorista") return Math.ceil((base * 0.65) / 500) * 500;
-  return base;
-}
 
 function fmt(n: number): string {
   return new Intl.NumberFormat("es-AR", {
@@ -142,7 +137,7 @@ function ProductRow({
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">{product.name}</p>
-          <p className="text-xs text-muted-foreground">{fmt(calcPrice(product.price, tier))}</p>
+          <p className="text-xs text-muted-foreground">{fmt(applyPriceTier(product.price, tier))}</p>
         </div>
         <button
           type="button"
@@ -485,7 +480,7 @@ export default function SellPage() {
       )
     : products;
 
-  const cartTotal = cart.reduce((sum, item) => sum + calcPrice(item.basePrice, tier) * item.quantity, 0);
+  const cartTotal = cart.reduce((sum, item) => sum + applyPriceTier(item.basePrice, tier) * item.quantity, 0);
   const creditApplied = creditNote ? Math.min(creditNote.amount, cartTotal) : 0;
   const finalTotal = Math.max(0, cartTotal - creditApplied);
 
@@ -641,7 +636,7 @@ export default function SellPage() {
             <div className="divide-y divide-border">
               {cart.map((item) => {
                 const key       = item.productId + (item.size ?? "");
-                const unitPrice = calcPrice(item.basePrice, tier);
+                const unitPrice = applyPriceTier(item.basePrice, tier);
                 return (
                   <div key={key} className="flex items-center gap-3 px-4 py-2.5">
                     <div className="flex-1 min-w-0">

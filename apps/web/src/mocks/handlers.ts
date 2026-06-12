@@ -14,6 +14,7 @@ import {
   SaleListResponseSchema,
   SaleOrderInputSchema,
   SaleResponseSchema,
+  TRANSFER_DISCOUNT_RATE,
   normalizeCity,
   ShippingZoneCreateInputSchema,
   ShippingZoneUpdateInputSchema,
@@ -81,7 +82,7 @@ function calcMockTotals(
   paymentMethod: string | undefined,
   promoCode:     string | undefined
 ): { transferDiscount: number; promoDiscount: number; promoCodeId: string | undefined; total: number } {
-  const transferDiscount = paymentMethod === "transfer" ? itemsTotal * 0.20 : 0;
+  const transferDiscount = paymentMethod === "transfer" ? itemsTotal * TRANSFER_DISCOUNT_RATE : 0;
 
   let promoDiscount = 0;
   let promoCodeId: string | undefined;

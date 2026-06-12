@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { PromoCodeValidateResponse, SaleOrderInput } from "@kwinna/contracts";
-import { normalizeCity } from "@kwinna/contracts";
+import { TRANSFER_DISCOUNT_RATE, normalizeCity } from "@kwinna/contracts";
 import { validatePromoCode } from "@/services/promo-codes";
 import { useShippingZones } from "@/hooks/use-shipping-zones";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,9 @@ import {
   type Provincia,
   type Municipio,
 } from "@/services/georef";
+
+// Porcentaje legible del descuento por transferencia (fuente: contracts).
+const TRANSFER_PCT = TRANSFER_DISCOUNT_RATE * 100;
 
 // ─── MercadoPago domain allowlist ────────────────────────────────────────────
 // Solo redirigimos a dominios oficiales de MercadoPago/MercadoLibre.
@@ -247,7 +250,7 @@ export default function CheckoutPage() {
         setPromoInput("");
         const toastDesc =
           result.discountType === "percentage" && result.discountValue && pm === "transfer"
-            ? `¡${20 + result.discountValue}% de descuento total! (transferencia 20% + código ${result.discountValue}%)`
+            ? `¡${TRANSFER_PCT + result.discountValue}% de descuento total! (transferencia ${TRANSFER_PCT}% + código ${result.discountValue}%)`
             : result.discountLabel;
         toast.success("¡Código aplicado!", { description: toastDesc });
       } else {
@@ -267,7 +270,7 @@ export default function CheckoutPage() {
   }
 
   // ── Totales ───────────────────────────────────────────────────────────────
-  const transferDiscount = paymentMethod === "transfer" ? cartTotal * 0.20 : 0;
+  const transferDiscount = paymentMethod === "transfer" ? cartTotal * TRANSFER_DISCOUNT_RATE : 0;
   const promoDiscount = (() => {
     if (!appliedPromo?.result.valid) return 0;
     const { discountType, discountValue } = appliedPromo.result;
@@ -287,7 +290,7 @@ export default function CheckoutPage() {
   const combinedPct =
     paymentMethod === "transfer" && transferDiscount > 0 &&
     promoDiscount > 0 && appliedPromo?.result.discountType === "percentage"
-      ? 20 + (appliedPromo.result.discountValue ?? 0)
+      ? TRANSFER_PCT + (appliedPromo.result.discountValue ?? 0)
       : null;
 
   // Label contextual del código aplicado
@@ -295,7 +298,7 @@ export default function CheckoutPage() {
     if (!appliedPromo) return "";
     const { discountType, discountValue, discountLabel } = appliedPromo.result;
     if (discountType === "percentage" && discountValue && paymentMethod === "transfer") {
-      return `+${discountValue}% sobre transferencia → ${20 + discountValue}% de descuento total`;
+      return `+${discountValue}% sobre transferencia → ${TRANSFER_PCT + discountValue}% de descuento total`;
     }
     return discountLabel ?? "";
   })();
@@ -511,14 +514,14 @@ export default function CheckoutPage() {
                     <span className="tabular-nums">-${totalSavings.toLocaleString("es-AR")}</span>
                   </div>
                   <p className="mt-0.5 text-[10px] text-emerald-600/70">
-                    Transferencia 20% + código {appliedPromo!.code} {appliedPromo!.result.discountValue}%
+                    Transferencia {TRANSFER_PCT}% + código {appliedPromo!.code} {appliedPromo!.result.discountValue}%
                   </p>
                 </div>
               ) : (
                 <>
                   {paymentMethod === "transfer" && transferDiscount > 0 && (
                     <div className="flex items-center justify-between text-sm text-emerald-600 font-medium">
-                      <span className="text-[11px] tracking-wide uppercase">Descuento transferencia (20%)</span>
+                      <span className="text-[11px] tracking-wide uppercase">Descuento transferencia ({TRANSFER_PCT}%)</span>
                       <span className="tabular-nums">-${transferDiscount.toLocaleString("es-AR")}</span>
                     </div>
                   )}
@@ -642,7 +645,7 @@ export default function CheckoutPage() {
                         "text-[10px]",
                         paymentMethod === "transfer" ? "text-background/70" : "text-emerald-600",
                       )}>
-                        20% OFF
+                        {TRANSFER_PCT}% OFF
                       </span>
                     </button>
                   </div>
