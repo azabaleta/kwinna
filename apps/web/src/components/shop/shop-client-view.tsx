@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, ChevronDown, SearchX, SlidersHorizontal, X } from "lucide-react";
 import { toast } from "sonner";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { Product } from "@kwinna/contracts";
@@ -29,7 +30,6 @@ import { useAuthStore } from "@/store/use-auth-store";
 import { trackEvent } from "@/services/analytics";
 import { ProductCard } from "@/components/shop/product-card";
 import { CartPanel } from "@/components/shop/cart-panel";
-import { LaunchHero } from "@/components/shop/launch-hero";
 import { cn } from "@/lib/utils";
 import { PRODUCT_TAGS } from "@/schemas/product";
 
@@ -224,8 +224,26 @@ export function ShopClientView({ initialProducts }: ShopClientViewProps) {
   return (
     <main className="min-h-screen bg-background pb-32">
 
-      {/* ── Hero — campaña de lanzamiento ────────────────────────────── */}
-      <LaunchHero />
+      {/* ── Hero ─────────────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden border-b border-border/50 h-[600px] md:h-[70vh] min-h-[500px]">
+        <Image priority src="/images/hero-desktop.png" alt="Hero Desktop" fill className="hidden md:block object-cover object-center" />
+        <Image priority src="/images/hero-mobile.jpeg" alt="Hero Mobile" fill className="block md:hidden object-cover object-top" />
+        <div className="absolute inset-0 bg-black/30 md:bg-gradient-to-r md:from-black/60 md:to-transparent" />
+        <div className="absolute inset-0 flex items-center">
+          <div className="mx-auto w-full max-w-5xl px-4 md:px-8">
+            <p className="mb-2 text-xs font-semibold tracking-[0.25em] text-white/80 uppercase drop-shadow-sm">
+              Nueva Temporada
+            </p>
+            <h1 className="text-4xl font-bold leading-tight tracking-tight text-white md:text-6xl drop-shadow-sm">
+              Tu movimiento, TU CUERPO, TU CALZA IDEAL, tu outfit.
+            </h1>
+            <p className="mt-3 max-w-md text-sm font-light leading-relaxed text-white/90 drop-shadow-sm">
+              Indumentaria sin etiquetas para mujeres reales. Del entrenamiento a tu rutina diaria, encontrá la comodidad que tu cuerpo merece, en kwinna.
+            </p>
+          </div>
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background to-transparent" />
+      </section>
 
       <div className="mx-auto max-w-5xl px-4 md:px-8">
 
