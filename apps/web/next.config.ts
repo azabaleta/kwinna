@@ -46,6 +46,24 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  async redirects() {
+    return [
+      {
+        // Redirige todo el tráfico del subdominio 'www' al dominio principal (non-www)
+        // Esto previene errores de CORS con la API y mejora el SEO (evita contenido duplicado)
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'www.somoskwinna.com',
+          },
+        ],
+        destination: 'https://somoskwinna.com/:path*',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
