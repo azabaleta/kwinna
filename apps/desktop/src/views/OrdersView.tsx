@@ -1,24 +1,51 @@
 import { useState } from "react";
-import { RefreshCw, ChevronDown, ChevronUp, CheckCircle2, Package, ChevronLeft, ChevronRight } from "lucide-react";
+import { flushSync } from "react-dom";
+import { RefreshCw, ChevronDown, ChevronUp, CheckCircle2, Package, Printer, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Sale, Product } from "@kwinna/contracts";
-import { useWebOrders, useMarkAssembled } from "../hooks/use-orders";
+import { useWebOrders, useUpdateOrderStatus } from "../hooks/use-orders";
 import { useProducts } from "../hooks/use-products";
 import { formatDate, formatPrice } from "../lib/utils";
 import { ApiError } from "../lib/api";
+import ReceiptTicket, { type ReceiptData } from "../components/ReceiptTicket";
 
-type StatusFilter = "all" | "completed" | "assembled";
+// Mapea un pedido web al formato del ticket térmico 58mm.
+function buildReceiptData(order: Sale, productMap: Map<string, Product>): ReceiptData {
+  return {
+    items: order.items.map((it) => {
+      const p = productMap.get(it.productId);
+      return {
+        name:      p?.name ?? it.name ?? "Producto",
+        sku:       p?.sku ?? "",
+        size:      it.size,
+        quantity:  it.quantity,
+        unitPrice: it.unitPrice,
+      };
+    }),
+    total:         order.total,
+    customerName:  order.customerName,
+    customerDni:   order.customerDni,
+    paymentMethod: order.paymentMethod ?? "",
+    priceTier:     "lista",   // los pedidos web siempre usan precio de lista
+    saleNotes:     order.saleNotes,
+    date:          new Date(order.createdAt),
+    transactionId: order.id,
+  };
+}
+
+type StatusFilter = "all" | "completed" | "assembled" | "delivered";
 
 const PAGE_SIZE = 20;
 
 export default function OrdersView() {
-  const [filter,   setFilter]   = useState<StatusFilter>("all");
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [toastMsg, setToastMsg] = useState("");
-  const [page,     setPage]     = useState(0);
+  const [filter,    setFilter]    = useState<StatusFilter>("all");
+  const [expanded,  setExpanded]  = useState<string | null>(null);
+  const [toastMsg,  setToastMsg]  = useState("");
+  const [page,      setPage]      = useState(0);
+  const [printOrder, setPrintOrder] = useState<Sale | null>(null);
 
   const { orders, isLoading, isError, isRefetching, refetch } = useWebOrders();
   const { products } = useProducts();
-  const { mutateAsync: markAssembled, isPending: marking } = useMarkAssembled();
+  const { mutateAsync: updateStatus, isPending: marking } = useUpdateOrderStatus();
 
   // Build product map for O(1) lookup in order items
   const productMap = new Map<string, Product>(products.map((p) => [p.id, p]));
@@ -26,6 +53,7 @@ export default function OrdersView() {
   const displayed = orders.filter((o) => {
     if (filter === "completed") return o.status === "completed";
     if (filter === "assembled") return o.status === "assembled";
+    if (filter === "delivered") return o.status === "delivered";
     return true;
   });
 
@@ -37,12 +65,29 @@ export default function OrdersView() {
     setPage(0);
   }
 
-  const pendingCount   = orders.filter((o) => o.status === "completed").length;
-  const assembledCount = orders.filter((o) => o.status === "assembled").length;
+  const toAssembleCount = orders.filter((o) => o.status === "completed").length;
+  const assembledCount  = orders.filter((o) => o.status === "assembled").length;
+
+  // Monta el ticket en el área oculta e imprime. flushSync garantiza que el
+  // barcode (pintado en componentDidMount) esté en el DOM antes de print().
+  function printTicket(order: Sale) {
+    flushSync(() => setPrintOrder(order));
+    window.print();
+  }
 
   async function handleMarkAssembled(sale: Sale) {
     try {
-      await markAssembled(sale.id);
+      await updateStatus({ id: sale.id, status: "assembled" });
+      showToast("Pedido marcado como armado");
+      printTicket(sale);   // auto-impresión al armar
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : "Error al actualizar el pedido.");
+    }
+  }
+
+  async function handleMarkDelivered(sale: Sale) {
+    try {
+      await updateStatus({ id: sale.id, status: "delivered" });
       showToast("Pedido marcado como entregado");
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : "Error al actualizar el pedido.");
@@ -61,7 +106,7 @@ export default function OrdersView() {
         <div>
           <h1 className="text-lg font-semibold text-white">Pedidos web</h1>
           <p className="text-xs text-zinc-500 mt-0.5">
-            {pendingCount} para armar · {assembledCount} armados
+            {toAssembleCount} para armar · {assembledCount} armados
             {isRefetching && (
               <span className="ml-2 inline-flex items-center gap-1 text-zinc-600">
                 <RefreshCw size={10} className="animate-spin" /> actualizando
@@ -82,7 +127,7 @@ export default function OrdersView() {
 
       {/* Filter pills */}
       <div className="flex gap-2">
-        {(["all", "completed", "assembled"] as StatusFilter[]).map((f) => (
+        {(["all", "completed", "assembled", "delivered"] as StatusFilter[]).map((f) => (
           <button
             key={f}
             onClick={() => handleFilterChange(f)}
@@ -92,7 +137,7 @@ export default function OrdersView() {
                 : "bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800"
             }`}
           >
-            {f === "all" ? "Todos" : f === "completed" ? "Para armar" : "Armados"}
+            {f === "all" ? "Todos" : f === "completed" ? "Para armar" : f === "assembled" ? "Armados" : "Entregados"}
           </button>
         ))}
       </div>
@@ -128,6 +173,8 @@ export default function OrdersView() {
                 expanded={expanded === order.id}
                 onToggle={() => setExpanded(expanded === order.id ? null : order.id)}
                 onMarkAssembled={() => void handleMarkAssembled(order)}
+                onMarkDelivered={() => void handleMarkDelivered(order)}
+                onReprint={() => printTicket(order)}
                 marking={marking}
               />
             ))
@@ -169,6 +216,13 @@ export default function OrdersView() {
           <CheckCircle2 size={16} /> {toastMsg}
         </div>
       )}
+
+      {/* Área oculta para impresión del ticket (auto al armar + reimpresión) */}
+      {printOrder && (
+        <div id="receipt-print-area" style={{ display: "none" }}>
+          <ReceiptTicket data={buildReceiptData(printOrder, productMap)} />
+        </div>
+      )}
     </div>
   );
 }
@@ -179,6 +233,8 @@ function OrderCard({
   expanded,
   onToggle,
   onMarkAssembled,
+  onMarkDelivered,
+  onReprint,
   marking,
 }: {
   order:           Sale;
@@ -186,22 +242,36 @@ function OrderCard({
   expanded:        boolean;
   onToggle:        () => void;
   onMarkAssembled: () => void;
+  onMarkDelivered: () => void;
+  onReprint:       () => void;
   marking:         boolean;
 }) {
+  const isDelivered = order.status === "delivered";
   const isAssembled = order.status === "assembled";
+  const isPickup    = order.shippingMethod === "pickup";
+
+  // Color del punto + píldora según etapa.
+  const dotColor   = isDelivered ? "bg-emerald-500" : isAssembled ? "bg-blue-400" : "bg-amber-400";
+  const pillClass  = isDelivered
+    ? "bg-emerald-900/60 text-emerald-400"
+    : isAssembled
+      ? "bg-blue-900/60 text-blue-300"
+      : "bg-amber-900/60 text-amber-300";
+  const pillLabel  = isDelivered ? "Entregado" : isAssembled ? "Armado" : "Para armar";
 
   return (
     <div className={`bg-zinc-900 rounded-xl border transition-colors ${
-      isAssembled ? "border-zinc-800 opacity-70" : "border-zinc-700"
+      isDelivered ? "border-zinc-800 opacity-60" : isAssembled ? "border-zinc-700" : "border-zinc-700"
     }`}>
       {/* Summary row */}
       <div className="flex items-center gap-4 px-5 py-4">
-        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isAssembled ? "bg-emerald-500" : "bg-amber-400"}`} />
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`} />
 
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-white truncate">{order.customerName}</p>
           <p className="text-xs text-zinc-500 truncate">
             {order.shippingCity}, {order.shippingProvince} · {formatDate(order.createdAt)}
+            {isPickup && <span className="ml-1.5 text-blue-400">· Retiro en local</span>}
           </p>
         </div>
 
@@ -209,21 +279,42 @@ function OrderCard({
           {formatPrice(order.total)}
         </span>
 
-        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
-          isAssembled ? "bg-emerald-900/60 text-emerald-400" : "bg-amber-900/60 text-amber-300"
-        }`}>
-          {isAssembled ? "Armado" : "Para armar"}
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${pillClass}`}>
+          {pillLabel}
         </span>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          {!isAssembled && order.shippingMethod === "pickup" && (
+          {/* Pagado (para armar) → armar en el local */}
+          {order.status === "completed" && (
             <button
               onClick={onMarkAssembled}
+              disabled={marking}
+              className="text-xs bg-blue-800 hover:bg-blue-700 text-blue-100
+                         rounded-lg px-3 py-1.5 font-medium transition-colors disabled:opacity-50"
+            >
+              {marking ? "..." : "Marcar como armado"}
+            </button>
+          )}
+          {/* Armado + retiro en local → entregar desde el POS */}
+          {isAssembled && isPickup && (
+            <button
+              onClick={onMarkDelivered}
               disabled={marking}
               className="text-xs bg-emerald-800 hover:bg-emerald-700 text-emerald-200
                          rounded-lg px-3 py-1.5 font-medium transition-colors disabled:opacity-50"
             >
               {marking ? "..." : "Marcar como entregado"}
+            </button>
+          )}
+          {/* Reimpresión del ticket — armados y entregados */}
+          {(isAssembled || isDelivered) && (
+            <button
+              onClick={onReprint}
+              title="Reimprimir ticket"
+              className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300
+                         flex items-center justify-center transition-colors flex-shrink-0"
+            >
+              <Printer size={14} />
             </button>
           )}
           <button onClick={onToggle} className="text-zinc-500 hover:text-white transition-colors">

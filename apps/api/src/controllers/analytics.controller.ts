@@ -1,16 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
+import { AnalyticsEventTypeSchema } from "@kwinna/contracts";
 import {
   getAnalyticsSummary,
   insertAnalyticsEvent,
-  type AnalyticsEventType,
 } from "../db/repositories";
-
-const VALID_TYPES: AnalyticsEventType[] = [
-  "shop_view",
-  "cart_add",
-  "checkout_start",
-  "sale_complete",
-];
 
 /** POST /analytics/event — registra un evento de analítica (público, fire-and-forget). */
 export async function postEvent(
@@ -25,14 +18,15 @@ export async function postEvent(
       userId?:   string;
     };
 
-    if (!VALID_TYPES.includes(eventType as AnalyticsEventType) || !sessionId) {
+    const parsedType = AnalyticsEventTypeSchema.safeParse(eventType);
+    if (!parsedType.success || !sessionId) {
       res.status(400).json({ error: "eventType y sessionId son requeridos" });
       return;
     }
 
     // Fire-and-forget: no bloqueamos la respuesta esperando el insert
     insertAnalyticsEvent(
-      eventType as AnalyticsEventType,
+      parsedType.data,
       sessionId,
       userId ?? req.user?.sub,
     ).catch(() => { /* silencioso — analytics no debe romper el flujo */ });

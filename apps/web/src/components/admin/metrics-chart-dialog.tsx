@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { Sale } from "@kwinna/contracts";
+import { isPaidSale } from "@kwinna/contracts";
 import { BadgeDollarSign, ShoppingBag, TrendingUp, BarChart3, X } from "lucide-react";
 
 export type ChartMetric = "revenue" | "orders" | "units" | "aov";
@@ -70,7 +71,7 @@ export function MetricsChartDialog({ isOpen, onClose, metric, sales, from, to }:
     }
 
     // 3. Aggregate sales
-    const validSales = sales.filter(s => s.status === "completed" && !s.isDismissed);
+    const validSales = sales.filter(s => isPaidSale(s.status) && !s.isDismissed);
     
     validSales.forEach(sale => {
       const d = new Date(sale.createdAt);

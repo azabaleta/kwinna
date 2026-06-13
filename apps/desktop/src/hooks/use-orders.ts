@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchWebOrders, markAsAssembled } from "../services/sales";
+import type { SaleStatus } from "@kwinna/contracts";
+import { fetchWebOrders, updateOrderStatus } from "../services/sales";
 import { orderKeys } from "./query-keys";
 
 export function useWebOrders() {
@@ -18,11 +19,11 @@ export function useWebOrders() {
   };
 }
 
-export function useMarkAssembled() {
+export function useUpdateOrderStatus() {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: (id: string) => markAsAssembled(id),
+    mutationFn: ({ id, status }: { id: string; status: SaleStatus }) => updateOrderStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: orderKeys.webOrders });
     },

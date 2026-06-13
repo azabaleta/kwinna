@@ -1,21 +1,7 @@
 import { and, gte, lt } from "drizzle-orm";
+import type { AnalyticsEventType, AnalyticsSummary } from "@kwinna/contracts";
 import { db } from "../index";
 import { analyticsEventsTable } from "../schema";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export type AnalyticsEventType =
-  | "shop_view"
-  | "cart_add"
-  | "checkout_start"
-  | "sale_complete";
-
-export interface AnalyticsSummary {
-  shopViews:      number;
-  cartAdds:       number;
-  checkoutStarts: number;
-  saleCompletes:  number;
-}
 
 // ─── Insert ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +38,5 @@ export async function getAnalyticsSummary(
     shopViews:      unique("shop_view"),
     cartAdds:       unique("cart_add"),
     checkoutStarts: unique("checkout_start"),
-    saleCompletes:  unique("sale_complete"),
   };
 }

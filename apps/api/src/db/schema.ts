@@ -38,9 +38,10 @@ export const stockBalanceStatusEnum = pgEnum("stock_balance_status", [
 
 export const saleStatusEnum = pgEnum("sale_status", [
   "pending",
-  "completed",
+  "completed",       // pagado — en canal web se muestra también como "Para armar"
   "cancelled",
-  "assembled",       // completado en la web, listo para despachar (marcado desde POS)
+  "assembled",       // armado en el local (marcado desde POS o web)
+  "delivered",       // entregado al cliente (envío → web · retiro → POS)
 ]);
 
 export const saleChannelEnum = pgEnum("sale_channel", [
@@ -52,6 +53,10 @@ export const analyticsEventTypeEnum = pgEnum("analytics_event_type", [
   "shop_view",
   "cart_add",
   "checkout_start",
+  // DEPRECADO: la app ya no emite ni cuenta 'sale_complete' (las compras del
+  // embudo se cuentan desde la tabla de ventas). Se mantiene el valor en el enum
+  // por filas históricas — Postgres no permite quitar valores de un enum sin
+  // recrear el tipo. No usar en código nuevo.
   "sale_complete",
 ]);
 

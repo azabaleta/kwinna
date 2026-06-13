@@ -176,6 +176,13 @@
       "when": 1781246535744,
       "tag": "0024_curly_inhumans",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1781362162704,
+      "tag": "0025_odd_leo",
+      "breakpoints": true
     }
   ]
 }

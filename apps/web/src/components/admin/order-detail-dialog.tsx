@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   AlertTriangle,
   ClipboardList,
   Mail,
   MapPin,
+  Package,
   PackageCheck,
   Phone,
   Printer,
@@ -16,8 +17,6 @@ import {
   EyeOff,
   RotateCcw,
 } from "lucide-react";
-import { useOperators } from "@/hooks/use-operators";
-import WebReceiptTicket from "./web-receipt-ticket";
 import type { Product, Sale } from "@kwinna/contracts";
 import { selectUser, useAuthStore } from "@/store/use-auth-store";
 import { Badge } from "@/components/ui/badge";
@@ -35,13 +34,27 @@ import { Textarea } from "@/components/ui/textarea";
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
-export function StatusBadge({ status }: { status: Sale["status"] }) {
+export function StatusBadge({ status, channel }: { status: Sale["status"]; channel?: Sale["channel"] }) {
+  if (status === "delivered") {
+    return (
+      <Badge className="bg-emerald-600 text-white hover:bg-emerald-700">Entregado</Badge>
+    );
+  }
   if (status === "assembled") {
     return (
-      <Badge className="bg-blue-500 text-white hover:bg-blue-600">Entregado</Badge>
+      <Badge className="bg-blue-500 text-white hover:bg-blue-600">Armado</Badge>
     );
   }
   if (status === "completed") {
+    // En canal web, un pedido pagado todavía debe armarse: dos píldoras.
+    if (channel === "web") {
+      return (
+        <span className="inline-flex items-center gap-1.5">
+          <Badge className="bg-green-500 text-white hover:bg-green-600">Pagado</Badge>
+          <Badge variant="outline" className="border-amber-400 text-amber-600">Para armar</Badge>
+        </span>
+      );
+    }
     return (
       <Badge className="bg-green-500 text-white hover:bg-green-600">Pagado</Badge>
     );
@@ -75,10 +88,13 @@ export interface OrderDetailDialogProps {
   onCancel:          (id: string) => Promise<void>;
   onDismiss:         (id: string, reason: string, restoreStock: boolean) => Promise<void>;
   onMarkAssembled?:  (id: string) => Promise<void>;
+  onMarkDelivered?:  (id: string) => Promise<void>;
+  onPrintTicket?:    (sale: Sale, opts?: { reprint?: boolean }) => void;
   onReconcile?:      (id: string) => Promise<void>;
   isCancelling:      boolean;
   isDismissing:      boolean;
   isMarkingAssembled?: boolean;
+  isMarkingDelivered?: boolean;
   isReconciling?:    boolean;
   onApproveTransfer?: (id: string) => Promise<void>;
   isApprovingTransfer?: boolean;
@@ -91,10 +107,13 @@ export function OrderDetailDialog({
   onCancel,
   onDismiss,
   onMarkAssembled,
+  onMarkDelivered,
+  onPrintTicket,
   onReconcile,
   isCancelling,
   isDismissing,
   isMarkingAssembled,
+  isMarkingDelivered,
   isReconciling,
   onApproveTransfer,
   isApprovingTransfer,
@@ -103,16 +122,6 @@ export function OrderDetailDialog({
   const [showDismiss, setShowDismiss] = useState(false);
   const [dismissReason, setDismissReason] = useState("");
   const [restoreStock, setRestoreStock] = useState(false);
-  const printRef = useRef<HTMLDivElement>(null);
-
-  const { operators } = useOperators();
-  const vendorName = sale?.vendorId
-    ? operators?.find((op) => op.id === sale.vendorId)?.name
-    : undefined;
-
-  function handleReprint() {
-    window.print();
-  }
 
   function handleOpenChange(open: boolean) {
     if (!open) {
@@ -126,7 +135,11 @@ export function OrderDetailDialog({
 
   const user = useAuthStore(selectUser);
   const isAdmin = user?.role === "admin";
-  const canMarkDelivered = isAdmin || sale?.shippingMethod === "pickup";
+  // Armar: solo pedidos web pagados (respaldo del POS — cualquier operador).
+  const canMarkAssembled = sale?.channel === "web";
+  // Entregar: el admin puede marcar cualquiera; los envíos se entregan desde la
+  // web (el retiro en local se entrega desde el POS).
+  const canMarkDelivered = isAdmin || sale?.shippingMethod === "delivery";
 
   return (
     <>
@@ -140,7 +153,7 @@ export function OrderDetailDialog({
                 Ticket #{sale.id.slice(0, 8).toUpperCase()}
               </DialogTitle>
               <DialogDescription className="flex items-center pt-1">
-                <StatusBadge status={sale.status} />
+                <StatusBadge status={sale.status} channel={sale.channel} />
                 <DismissBadge isDismissed={sale.isDismissed} />
                 <span className="ml-auto text-xs text-muted-foreground">
                   {new Date(sale.createdAt).toLocaleString("es-AR", {
@@ -271,8 +284,8 @@ export function OrderDetailDialog({
                 </div>
               </section>
 
-              {/* ── Marcar como entregado: solo para completed ── */}
-              {sale.status === "completed" && !sale.isDismissed && onMarkAssembled && canMarkDelivered && (
+              {/* ── Marcar como armado: pedido web pagado ── */}
+              {sale.status === "completed" && !sale.isDismissed && onMarkAssembled && canMarkAssembled && (
                 <section>
                   <Button
                     size="sm"
@@ -283,6 +296,26 @@ export function OrderDetailDialog({
                     }}
                   >
                     {isMarkingAssembled ? (
+                      <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Actualizando…</>
+                    ) : (
+                      <><Package className="h-4 w-4" /> Marcar como armado</>
+                    )}
+                  </Button>
+                </section>
+              )}
+
+              {/* ── Marcar como entregado: pedido web armado ── */}
+              {sale.status === "assembled" && !sale.isDismissed && onMarkDelivered && canMarkDelivered && (
+                <section>
+                  <Button
+                    size="sm"
+                    className="w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+                    disabled={isMarkingDelivered}
+                    onClick={async () => {
+                      await onMarkDelivered(sale.id);
+                    }}
+                  >
+                    {isMarkingDelivered ? (
                       <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Actualizando…</>
                     ) : (
                       <><PackageCheck className="h-4 w-4" /> Marcar como entregado</>
@@ -486,7 +519,7 @@ export function OrderDetailDialog({
                 variant="outline"
                 size="sm"
                 className="gap-1.5 text-muted-foreground hover:text-foreground"
-                onClick={handleReprint}
+                onClick={() => onPrintTicket?.(sale, { reprint: true })}
               >
                 <Printer className="h-3.5 w-3.5" />
                 Reimprimir ticket
@@ -499,13 +532,6 @@ export function OrderDetailDialog({
         )}
       </DialogContent>
     </Dialog>
-
-    {/* Hidden print area — visible only during window.print() */}
-    {sale && productMap && (
-      <div id="web-receipt-print-area" style={{ display: "none" }}>
-        <WebReceiptTicket ref={printRef} sale={sale} productMap={productMap} reprint vendorName={vendorName} />
-      </div>
-    )}
     </>
   );
 }

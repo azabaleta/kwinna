@@ -18,8 +18,24 @@ export type SaleItem = z.infer<typeof SaleItemSchema>;
 // ─── Sale Entity ──────────────────────────────────────────────────────────────
 // Contiene PII del cliente — sólo exponer a roles admin/operator.
 
-export const SaleStatusSchema = z.enum(["pending", "completed", "cancelled", "assembled"]);
+// Ciclo de vida de una orden:
+//   pending → completed → assembled → delivered   (cancelled corta desde pending)
+// "completed" = pagado.  En canal web se muestra además como "Para armar".
+// "assembled" = armado en el local.  "delivered" = entregado al cliente.
+export const SaleStatusSchema = z.enum(["pending", "completed", "cancelled", "assembled", "delivered"]);
 export type SaleStatus = z.infer<typeof SaleStatusSchema>;
+
+// Estados que representan una venta cobrada (ingreso real): pagada y todas las
+// posteriores del flujo (pagado → armado → entregado). Excluye `pending` (aún
+// sin cobrar) y `cancelled`.
+// FUENTE ÚNICA para TODAS las métricas de ingreso/unidades/ventas: usar
+// `isPaidSale` en lugar de comparar contra "completed" a mano, para que un pedido
+// web que avanza a armado/entregado no desaparezca de los totales.
+export const PAID_SALE_STATUSES: readonly SaleStatus[] = ["completed", "assembled", "delivered"];
+
+export function isPaidSale(status: SaleStatus): boolean {
+  return PAID_SALE_STATUSES.includes(status);
+}
 
 export const SaleChannelSchema = z.enum(["web", "pos"]);
 export type SaleChannel = z.infer<typeof SaleChannelSchema>;

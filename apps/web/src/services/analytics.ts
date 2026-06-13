@@ -1,14 +1,7 @@
+import type { AnalyticsEventType, AnalyticsSummary } from "@kwinna/contracts";
 import apiClient from "@/lib/axios";
 import { getSessionId } from "@/lib/session";
 import { useAuthStore } from "@/store/use-auth-store";
-
-// ─── Event types (espejo del enum backend) ────────────────────────────────────
-
-export type AnalyticsEventType =
-  | "shop_view"
-  | "cart_add"
-  | "checkout_start"
-  | "sale_complete";
 
 // ─── Track ────────────────────────────────────────────────────────────────────
 
@@ -28,13 +21,6 @@ export function trackEvent(eventType: AnalyticsEventType): void {
 }
 
 // ─── Summary (dashboard) ──────────────────────────────────────────────────────
-
-export interface AnalyticsSummary {
-  shopViews:      number;
-  cartAdds:       number;
-  checkoutStarts: number;
-  saleCompletes:  number;
-}
 
 export async function fetchAnalyticsSummary(
   from: Date,

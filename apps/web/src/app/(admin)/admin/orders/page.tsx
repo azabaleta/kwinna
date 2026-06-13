@@ -3,8 +3,9 @@
 import { Suspense, useMemo, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, ClipboardList, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { AlertTriangle, ClipboardList, Printer, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product, Sale } from "@kwinna/contracts";
+import { isPaidSale } from "@kwinna/contracts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,6 +14,7 @@ import { useCancelSale, useSales, useDismissSale, useUpdateSaleStatus, useReconc
 import { useProducts } from "@/hooks/use-products";
 import { useOperators } from "@/hooks/use-operators";
 import { OrderDetailDialog, StatusBadge, DismissBadge } from "@/components/admin/order-detail-dialog";
+import { useReceiptPrinter } from "@/components/admin/use-receipt-printer";
 import { selectUser, useAuthStore } from "@/store/use-auth-store";
 
 const PAGE_SIZE = 25;
@@ -93,7 +95,7 @@ function OrdersContent() {
   const { sales, isLoading, isError, refetch } = useSales();
   const { mutateAsync: cancelSaleMutation,      isPending: isCancelling        } = useCancelSale();
   const { mutateAsync: dismissSaleMutation,     isPending: isDismissing        } = useDismissSale();
-  const { mutateAsync: updateStatusMutation,    isPending: isMarkingAssembled  } = useUpdateSaleStatus();
+  const { mutateAsync: updateStatusMutation,    isPending: isUpdatingStatus     } = useUpdateSaleStatus();
   const { mutateAsync: reconcileSaleMutation,   isPending: isReconciling       } = useReconcileSale();
   const { mutateAsync: approveTransferMutation, isPending: isApprovingTransfer } = useApproveTransfer();
   const { products } = useProducts();
@@ -110,6 +112,8 @@ function OrdersContent() {
     for (const o of operators) map.set(o.id, o.name);
     return map;
   }, [operators]);
+
+  const { printReceipt, printArea } = useReceiptPrinter(productMap);
 
   // ── Filtrado + paginación ──────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -130,7 +134,7 @@ function OrdersContent() {
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const pendingCount   = sales.filter((s) => s.status === "pending" && !s.isDismissed).length;
-  const completedCount = sales.filter((s) => s.status === "completed" && !s.isDismissed).length;
+  const completedCount = sales.filter((s) => isPaidSale(s.status) && !s.isDismissed).length;
   const filtersActive  = channelFilter !== "all" || (isAdmin && vendorFilter !== "all");
 
   // ── Dialog state (no va en URL) ────────────────────────────────────────────
@@ -159,6 +163,19 @@ function OrdersContent() {
   async function handleMarkAssembled(id: string) {
     try {
       await updateStatusMutation({ id, status: "assembled" });
+      toast.success("Pedido marcado como armado");
+      // Auto-impresión del ticket al armar el pedido.
+      const sale = sales.find((s) => s.id === id);
+      if (sale) printReceipt(sale, { reprint: false });
+    } catch {
+      toast.error("Error al actualizar pedido");
+      throw new Error("Failed to update status");
+    }
+  }
+
+  async function handleMarkDelivered(id: string) {
+    try {
+      await updateStatusMutation({ id, status: "delivered" });
       toast.success("Pedido marcado como entregado");
     } catch {
       toast.error("Error al actualizar pedido");
@@ -333,8 +350,19 @@ function OrdersContent() {
                         ${sale.total.toLocaleString("es-AR")}
                       </TableCell>
                       <TableCell className="pr-6 text-right">
-                        <div className="flex items-center justify-end">
-                          <StatusBadge status={sale.status} />
+                        <div className="flex items-center justify-end gap-1.5">
+                          {sale.status === "assembled" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                              title="Reimprimir ticket"
+                              onClick={(e) => { e.stopPropagation(); printReceipt(sale, { reprint: true }); }}
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          <StatusBadge status={sale.status} channel={sale.channel} />
                           <DismissBadge isDismissed={sale.isDismissed} />
                         </div>
                       </TableCell>
@@ -357,14 +385,19 @@ function OrdersContent() {
         onCancel={handleCancel}
         onDismiss={handleDismiss}
         onMarkAssembled={handleMarkAssembled}
+        onMarkDelivered={handleMarkDelivered}
+        onPrintTicket={printReceipt}
         onReconcile={handleReconcile}
         isCancelling={isCancelling}
         isDismissing={isDismissing}
-        isMarkingAssembled={isMarkingAssembled}
+        isMarkingAssembled={isUpdatingStatus}
+        isMarkingDelivered={isUpdatingStatus}
         isReconciling={isReconciling}
         onApproveTransfer={handleApproveTransfer}
         isApprovingTransfer={isApprovingTransfer}
       />
+
+      {printArea}
     </main>
   );
 }

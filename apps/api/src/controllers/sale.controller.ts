@@ -5,7 +5,6 @@ import { cancelSaleAndRestoreStock, createSale, createPendingSale, dismissSale }
 import { createMPPreference, getMPPayment, verifyMPSignature, searchApprovedPayment } from "../services/mp.service";
 import { findAllSales, findSaleById, findSaleByTxCode, findWebOrdersToProcess, updateSaleStatus, findPendingSalesByEmail } from "../db/repositories/sale.repository";
 import { sendSaleConfirmationEmail } from "../services/email.service";
-import { insertAnalyticsEvent } from "../db/repositories/analytics.repository";
 
 // ─── POST /sales ──────────────────────────────────────────────────────────────
 // Venta directa POS — crea la venta como `completed` de inmediato.
@@ -120,7 +119,6 @@ async function cleanupAbandonedPendingOrders(customerEmail: string, currentSaleI
         const completed = await updateSaleStatus(oldSale.id, "completed");
         if (completed) {
           sendSaleConfirmationEmail(completed).catch(() => {});
-          insertAnalyticsEvent("sale_complete", "mp-reconcile-auto-" + oldSale.id, completed.userId).catch(() => {});
           console.log(`[Cleanup] Orden ${oldSale.id} tenía pago aprobado. Actualizada a completed.`);
         }
       } else {
@@ -256,7 +254,6 @@ export async function postWebhook(
       sendSaleConfirmationEmail(completed).catch((err: Error) =>
         console.error("[Email] Error enviando confirmación MP:", err.message)
       );
-      insertAnalyticsEvent("sale_complete", "mp-" + saleId, completed.userId).catch(() => {});
     }
 
   } catch (err) {
@@ -371,8 +368,13 @@ export async function getSale(
 // Previene cambios imposibles como cancelled → completed que dejarían el stock inconsistente.
 const VALID_TRANSITIONS: Partial<Record<SaleStatus, SaleStatus[]>> = {
   pending:   ["completed", "cancelled"],
-  completed: ["assembled"],
+  completed: ["assembled"],   // pagado → armado
+  assembled: ["delivered"],   // armado → entregado
 };
+
+// El flujo armar → entregar solo aplica a pedidos del canal web.
+// Las ventas POS de mostrador se crean ya "completed" y no se arman ni despachan.
+const WEB_ONLY_STATUSES: SaleStatus[] = ["assembled", "delivered"];
 
 export async function patchSaleStatus(
   req:  Request,
@@ -399,6 +401,13 @@ export async function patchSaleStatus(
     if (!allowed.includes(parsed.data)) {
       res.status(422).json({
         error: `Transición de estado inválida: ${existing.status} → ${parsed.data}`,
+      });
+      return;
+    }
+
+    if (WEB_ONLY_STATUSES.includes(parsed.data) && existing.channel !== "web") {
+      res.status(422).json({
+        error: "Solo los pedidos web pueden marcarse como armado o entregado",
       });
       return;
     }
@@ -501,7 +510,6 @@ export async function postReconcile(
     sendSaleConfirmationEmail(completed).catch((err: Error) =>
       console.error("[Email] Error enviando confirmación post-reconciliación:", err.message)
     );
-    insertAnalyticsEvent("sale_complete", "mp-reconcile-" + id, completed.userId).catch(() => {});
 
     res.json({ data: completed });
   } catch (err) {
@@ -545,7 +553,6 @@ export async function postApproveTransfer(
     sendSaleConfirmationEmail(completed).catch((err: Error) =>
       console.error("[Email] Error enviando confirmación post-aprobación:", err.message)
     );
-    insertAnalyticsEvent("sale_complete", "transfer-approve-" + id, completed.userId).catch(() => {});
 
     res.json({ data: completed });
   } catch (err) {

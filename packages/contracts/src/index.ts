@@ -1,3 +1,4 @@
+export * from "./schemas/analytics";
 export * from "./schemas/auth";
 export * from "./schemas/credit-note";
 export * from "./schemas/pos-customer";

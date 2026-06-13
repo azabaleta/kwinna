@@ -1,5 +1,5 @@
 import { api } from "../lib/api";
-import type { Sale, CreditNote, SaleListResponse, SaleResponse, PriceTier } from "@kwinna/contracts";
+import type { Sale, SaleStatus, CreditNote, SaleListResponse, SaleResponse, PriceTier } from "@kwinna/contracts";
 
 export interface PosSalePayload {
   items:             Array<{ productId: string; quantity: number; size?: string }>;
@@ -31,7 +31,7 @@ export async function fetchWebOrders(): Promise<Sale[]> {
   return res.data;
 }
 
-export async function markAsAssembled(saleId: string): Promise<Sale> {
-  const res = await api.patch<SaleResponse>(`/sales/${saleId}/status`, { status: "assembled" });
+export async function updateOrderStatus(saleId: string, status: SaleStatus): Promise<Sale> {
+  const res = await api.patch<SaleResponse>(`/sales/${saleId}/status`, { status });
   return res.data;
 }

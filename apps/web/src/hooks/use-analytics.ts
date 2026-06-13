@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { fetchAnalyticsSummary, type AnalyticsSummary } from "@/services/analytics";
+import type { AnalyticsSummary } from "@kwinna/contracts";
+import { fetchAnalyticsSummary } from "@/services/analytics";
 
 export function useAnalyticsSummary(from: Date, to: Date) {
   const query = useQuery({
@@ -11,7 +12,7 @@ export function useAnalyticsSummary(from: Date, to: Date) {
   });
 
   const empty: AnalyticsSummary = {
-    shopViews: 0, cartAdds: 0, checkoutStarts: 0, saleCompletes: 0,
+    shopViews: 0, cartAdds: 0, checkoutStarts: 0,
   };
 
   return {

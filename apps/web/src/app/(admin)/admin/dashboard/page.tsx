@@ -27,7 +27,7 @@ import { useAnalyticsSummary } from "@/hooks/use-analytics";
 import { useReturnsSummary } from "@/hooks/use-returns";
 import { MetricsChartDialog, type ChartMetric } from "@/components/admin/metrics-chart-dialog";
 import { cn } from "@/lib/utils";
-import { RETURN_REASON_LABELS, type ReturnReason, type Sale, type Stock, type StockMovement } from "@kwinna/contracts";
+import { RETURN_REASON_LABELS, isPaidSale, type ReturnReason, type Sale, type Stock, type StockMovement } from "@kwinna/contracts";
 
 // ─── Period helpers ───────────────────────────────────────────────────────────
 
@@ -82,19 +82,20 @@ interface Metrics {
 
 function computeMetrics(sales: Sale[], from: Date, to: Date): Metrics {
   const inRange   = sales.filter((s) => { const d = new Date(s.createdAt); return d >= from && d < to; });
-  const completed       = inRange.filter((s) => s.status === "completed");
+  // "Cobradas" = pagado + armado + entregado (isPaidSale), no solo completed.
+  const paid            = inRange.filter((s) => isPaidSale(s.status));
   // Ventas "por_devolucion" no generan ingreso real: el cliente usó crédito previo
-  const revenueOrders   = completed.filter((s) => s.paymentMethod !== "por_devolucion");
+  const revenueOrders   = paid.filter((s) => s.paymentMethod !== "por_devolucion");
   const revenue         = revenueOrders.reduce((sum, s) => sum + s.total, 0);
-  const units           = completed.reduce((sum, s) => sum + s.items.reduce((si, i) => si + i.quantity, 0), 0);
+  const units           = paid.reduce((sum, s) => sum + s.items.reduce((si, i) => si + i.quantity, 0), 0);
   return {
     revenue,
-    orders:    completed.length,
+    orders:    paid.length,
     units,
     avgTicket: revenueOrders.length > 0 ? revenue / revenueOrders.length : 0,
     pending:   inRange.filter((s) => s.status === "pending").length,
     cancelled: inRange.filter((s) => s.status === "cancelled").length,
-    webOrders: inRange.filter((s) => s.channel === "web" && s.status === "completed").length,
+    webOrders: inRange.filter((s) => s.channel === "web" && isPaidSale(s.status)).length,
   };
 }
 
@@ -109,7 +110,7 @@ function formatDateRange(from: Date, to: Date): string {
 function topProducts(sales: Sale[], from: Date, to: Date, limit = 5) {
   const completed = sales.filter((s) => {
     const d = new Date(s.createdAt);
-    return d >= from && d < to && s.status === "completed";
+    return d >= from && d < to && isPaidSale(s.status);
   });
   const map: Record<string, { productId: string; units: number; revenue: number }> = {};
   for (const sale of completed) {
@@ -134,7 +135,7 @@ interface RetentionResult {
  * Identifica clientes por customerEmail.
  */
 function computeRetention(sales: Sale[], from: Date, to: Date): RetentionResult {
-  const completed  = sales.filter((s) => s.status === "completed");
+  const completed  = sales.filter((s) => isPaidSale(s.status));
   const inPeriod   = completed.filter((s) => { const d = new Date(s.createdAt); return d >= from && d < to; });
 
   if (inPeriod.length === 0) return { rate: null, returningCount: 0, totalCount: 0 };
@@ -188,7 +189,7 @@ function computeSellThrough(
   sales
     .filter((s) => {
       const d = new Date(s.createdAt);
-      return d >= from && d < to && s.status === "completed";
+      return d >= from && d < to && isPaidSale(s.status);
     })
     .forEach((sale) => {
       sale.items.forEach((item) => {
@@ -230,7 +231,7 @@ function computeSellThrough(
 
 function computeTurnover(sales: Sale[], stock: Stock[], from: Date, to: Date): number | null {
   const unitsSold = sales
-    .filter((s) => { const d = new Date(s.createdAt); return d >= from && d < to && s.status === "completed"; })
+    .filter((s) => { const d = new Date(s.createdAt); return d >= from && d < to && isPaidSale(s.status); })
     .reduce((sum, s) => sum + s.items.reduce((si, i) => si + i.quantity, 0), 0);
   const currentStock = stock.reduce((sum, s) => sum + s.quantity, 0);
   if (currentStock === 0) return unitsSold > 0 ? null : null;
@@ -370,10 +371,16 @@ export default function DashboardPage() {
   const productName = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.name])), [products]);
   const productSku  = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p.sku])), [products]);
 
+  // Las compras del embudo usan webOrders (pedidos web cobrados, fuente confiable),
+  // NO el evento sale_complete (fire-and-forget, puede perderse/duplicarse).
+  // Conversión = compras / visitas · Abandono = carrito que no compró / carrito.
+  // Ambas comparten la misma base de compras (webOrders).
   const conversionRate     = summary.shopViews > 0       ? (curr.webOrders / summary.shopViews) * 100 : null;
   const prevConversionRate = prevSummary.shopViews > 0   ? (prev.webOrders / prevSummary.shopViews) * 100 : null;
-  const abandonmentRate    = summary.checkoutStarts > 0  ? ((summary.checkoutStarts - curr.webOrders) / summary.checkoutStarts) * 100 : null;
-  const prevAbandonmentRate = prevSummary.checkoutStarts > 0 ? ((prevSummary.checkoutStarts - prev.webOrders) / prevSummary.checkoutStarts) * 100 : null;
+  // Clamp a ≥0: si el tracking de eventos pierde un cart_add, webOrders puede
+  // superar cartAdds y dar un abandono negativo sin sentido.
+  const abandonmentRate    = summary.cartAdds > 0  ? Math.max(0, ((summary.cartAdds - curr.webOrders) / summary.cartAdds) * 100) : null;
+  const prevAbandonmentRate = prevSummary.cartAdds > 0 ? Math.max(0, ((prevSummary.cartAdds - prev.webOrders) / prevSummary.cartAdds) * 100) : null;
 
   const retention     = useMemo(() => computeRetention(sales, from, to),         [sales, from, to]);
   const prevRetention = useMemo(() => computeRetention(sales, prevFrom, prevTo), [sales, prevFrom, prevTo]);
@@ -508,7 +515,7 @@ export default function DashboardPage() {
                   </div>
                 )}
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {summary.checkoutStarts > 0 ? `${summary.checkoutStarts - summary.saleCompletes} de ${summary.checkoutStarts} no compraron` : "Sin checkouts registrados aún"}
+                  {summary.cartAdds > 0 ? `${Math.max(0, summary.cartAdds - curr.webOrders)} de ${summary.cartAdds} con carrito no compraron` : "Sin actividad de carrito aún"}
                 </p>
               </CardContent>
             </Card>

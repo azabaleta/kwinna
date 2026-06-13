@@ -1,5 +1,6 @@
 import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import type { CustomerMetrics, Operator, User } from "@kwinna/contracts";
+import { PAID_SALE_STATUSES } from "@kwinna/contracts";
 import { db } from "../index";
 import { salesTable, usersTable } from "../schema";
 
@@ -108,12 +109,13 @@ export async function findAllCustomers(): Promise<CustomerMetrics[]> {
     .from(salesTable)
     .where(
       and(
-        eq(salesTable.status, "completed"),
+        inArray(salesTable.status, [...PAID_SALE_STATUSES]),
         inArray(salesTable.userId, customerIds),
+        eq(salesTable.isDismissed, false),   // desestimadas no cuentan en los totales del cliente
       ),
     );
 
-  // 3 — Calcular métricas en memoria (O(S) — S = total de ventas completadas)
+  // 3 — Calcular métricas en memoria (O(S) — S = total de ventas cobradas)
   return customers.map((c) => {
     const own = sales.filter((s) => s.userId === c.id);
 

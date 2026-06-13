@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import type { PaymentMethod, Sale } from "@kwinna/contracts";
 import { db } from "../index";
 import { salesTable } from "../schema";
@@ -91,17 +91,28 @@ export async function updateSaleStatus(
 
 /**
  * Devuelve pedidos web que el POS debe procesar.
- * Filtra: channel = 'web' AND status IN ('completed', 'assembled').
+ * Incluye:
+ *   - Para armar (completed) y Armados (assembled): siempre.
+ *   - Entregados (delivered): solo los de los últimos 7 días, para consulta
+ *     reciente; luego desaparecen de la cola automáticamente.
  * Ordenados por createdAt ascendente (los más antiguos primero).
  */
 export async function findWebOrdersToProcess(): Promise<Sale[]> {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
   const rows = await db
     .select()
     .from(salesTable)
     .where(
       and(
         eq(salesTable.channel, "web"),
-        inArray(salesTable.status, ["completed", "assembled"])
+        or(
+          inArray(salesTable.status, ["completed", "assembled"]),
+          and(
+            eq(salesTable.status, "delivered"),
+            gte(salesTable.updatedAt, sevenDaysAgo)
+          )
+        )
       )
     )
     .orderBy(salesTable.createdAt);

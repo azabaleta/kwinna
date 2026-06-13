@@ -8,11 +8,13 @@ import {
   Clock,
   DollarSign,
   Package,
+  Printer,
   RefreshCw,
   ShoppingBag,
   XCircle,
 } from "lucide-react";
 import type { Product, Sale } from "@kwinna/contracts";
+import { isPaidSale } from "@kwinna/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -20,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { useState } from "react";
 import { OrderDetailDialog } from "@/components/admin/order-detail-dialog";
+import { useReceiptPrinter } from "@/components/admin/use-receipt-printer";
 import { useProducts } from "@/hooks/use-products";
 import { useSales, useCancelSale, useDismissSale, useUpdateSaleStatus, useReconcileSale, useApproveTransfer } from "@/hooks/use-sale";
 
@@ -48,8 +51,35 @@ function fmtARS(n: number): string {
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: Sale["status"] }) {
+function StatusBadge({ status, channel }: { status: Sale["status"]; channel?: Sale["channel"] }) {
+  if (status === "delivered") {
+    return (
+      <Badge className="gap-1 bg-emerald-600 text-white hover:bg-emerald-700">
+        <CheckCircle2 className="h-3 w-3" />
+        Entregado
+      </Badge>
+    );
+  }
+  if (status === "assembled") {
+    return (
+      <Badge className="gap-1 bg-blue-500 text-white hover:bg-blue-600">
+        <Package className="h-3 w-3" />
+        Armado
+      </Badge>
+    );
+  }
   if (status === "completed") {
+    if (channel === "web") {
+      return (
+        <span className="inline-flex items-center gap-1.5">
+          <Badge className="gap-1 bg-green-500 text-white hover:bg-green-600">
+            <CheckCircle2 className="h-3 w-3" />
+            Pagado
+          </Badge>
+          <Badge variant="outline" className="border-amber-400 text-amber-600">Para armar</Badge>
+        </span>
+      );
+    }
     return (
       <Badge className="gap-1 bg-green-500 text-white hover:bg-green-600">
         <CheckCircle2 className="h-3 w-3" />
@@ -137,7 +167,7 @@ export default function TodayPage() {
   const { products } = useProducts();
   const { mutateAsync: cancelSaleMutation,      isPending: isCancelling        } = useCancelSale();
   const { mutateAsync: dismissSaleMutation,     isPending: isDismissing        } = useDismissSale();
-  const { mutateAsync: updateStatusMutation,    isPending: isMarkingAssembled  } = useUpdateSaleStatus();
+  const { mutateAsync: updateStatusMutation,    isPending: isUpdatingStatus     } = useUpdateSaleStatus();
   const { mutateAsync: reconcileSaleMutation,   isPending: isReconciling       } = useReconcileSale();
   const { mutateAsync: approveTransferMutation, isPending: isApprovingTransfer } = useApproveTransfer();
 
@@ -146,6 +176,8 @@ export default function TodayPage() {
     for (const p of products) map.set(p.id, { sku: p.sku, name: p.name });
     return map;
   }, [products]);
+
+  const { printReceipt, printArea } = useReceiptPrinter(productMap);
 
   async function handleCancel(id: string) {
     try {
@@ -170,6 +202,17 @@ export default function TodayPage() {
   async function handleMarkAssembled(id: string) {
     try {
       await updateStatusMutation({ id, status: "assembled" });
+      toast.success("Pedido marcado como armado");
+      const sale = sales.find((s) => s.id === id);
+      if (sale) printReceipt(sale, { reprint: false });
+    } catch {
+      toast.error("Error al actualizar pedido");
+    }
+  }
+
+  async function handleMarkDelivered(id: string) {
+    try {
+      await updateStatusMutation({ id, status: "delivered" });
       toast.success("Pedido marcado como entregado");
     } catch {
       toast.error("Error al actualizar pedido");
@@ -194,23 +237,28 @@ export default function TodayPage() {
     }
   }
 
+  // Excluimos las desestimadas de todo el día (tabla + métricas), igual que el
+  // dashboard: una venta desestimada no debe contar en ingresos ni en los conteos.
   const todaySales = useMemo(
     () => sales
-      .filter((s) => isToday(s.createdAt))
+      .filter((s) => isToday(s.createdAt) && !s.isDismissed)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [sales]
   );
 
-  const completed  = todaySales.filter((s) => s.status === "completed");
+  // "Pagadas" agrupa todo lo cobrado (isPaidSale): pagado, armado y entregado.
+  // Antes contaba solo "completed", por lo que los pedidos web que avanzaban
+  // se caían de los ingresos del día.
+  const paid       = todaySales.filter((s) => isPaidSale(s.status));
   const pending    = todaySales.filter((s) => s.status === "pending");
   const cancelled  = todaySales.filter((s) => s.status === "cancelled");
 
-  const revenue    = completed.reduce((acc, s) => acc + s.total, 0);
-  const units      = completed.reduce(
+  const revenue    = paid.reduce((acc, s) => acc + s.total, 0);
+  const units      = paid.reduce(
     (acc, s) => acc + s.items.reduce((a, i) => a + i.quantity, 0),
     0
   );
-  const aov        = completed.length > 0 ? revenue / completed.length : 0;
+  const aov        = paid.length > 0 ? revenue / paid.length : 0;
 
   const todayLabel = new Date().toLocaleDateString("es-AR", {
     weekday: "long",
@@ -257,7 +305,7 @@ export default function TodayPage() {
           />
           <MetricCard
             label="Ticket promedio"
-            value={completed.length > 0 ? fmtARS(Math.round(aov)) : "—"}
+            value={paid.length > 0 ? fmtARS(Math.round(aov)) : "—"}
             sub="Sobre órdenes completadas"
             icon={ArrowUpRight}
             accent="blue"
@@ -281,8 +329,8 @@ export default function TodayPage() {
             accent="blue"
           />
           <MetricCard
-            label="Completadas"
-            value={completed.length}
+            label="Pagadas"
+            value={paid.length}
             sub="Pagadas exitosamente"
             icon={CheckCircle2}
             accent="green"
@@ -323,7 +371,7 @@ export default function TodayPage() {
                 ? "Cargando…"
                 : todaySales.length === 0
                   ? "Aún no hay pedidos hoy."
-                  : `${todaySales.length} ${todaySales.length === 1 ? "orden" : "órdenes"} · ${completed.length} pagadas · ${pending.length} pendientes`}
+                  : `${todaySales.length} ${todaySales.length === 1 ? "orden" : "órdenes"} · ${paid.length} pagadas · ${pending.length} pendientes`}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -374,7 +422,20 @@ export default function TodayPage() {
                           {fmtARS(sale.total)}
                         </TableCell>
                         <TableCell className="pr-6 text-right">
-                          <StatusBadge status={sale.status} />
+                          <div className="flex items-center justify-end gap-1.5">
+                            {sale.status === "assembled" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                title="Reimprimir ticket"
+                                onClick={(e) => { e.stopPropagation(); printReceipt(sale, { reprint: true }); }}
+                              >
+                                <Printer className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            <StatusBadge status={sale.status} channel={sale.channel} />
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -394,14 +455,19 @@ export default function TodayPage() {
         onCancel={handleCancel}
         onDismiss={handleDismiss}
         onMarkAssembled={handleMarkAssembled}
+        onMarkDelivered={handleMarkDelivered}
+        onPrintTicket={printReceipt}
         onReconcile={handleReconcile}
         isCancelling={isCancelling}
         isDismissing={isDismissing}
-        isMarkingAssembled={isMarkingAssembled}
+        isMarkingAssembled={isUpdatingStatus}
+        isMarkingDelivered={isUpdatingStatus}
         isReconciling={isReconciling}
         onApproveTransfer={handleApproveTransfer}
         isApprovingTransfer={isApprovingTransfer}
       />
+
+      {printArea}
     </main>
   );
 }

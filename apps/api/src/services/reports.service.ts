@@ -1,5 +1,6 @@
 import { and, gte, lt } from "drizzle-orm";
 import type { MetricSnapshot, SnapshotData, SnapshotPeriod } from "@kwinna/contracts";
+import { isPaidSale } from "@kwinna/contracts";
 import { db } from "../db";
 import { salesTable } from "../db/schema";
 import { getAnalyticsSummary } from "../db/repositories/analytics.repository";
@@ -29,7 +30,10 @@ async function computeSnapshotData(from: Date, to: Date): Promise<SnapshotData> 
     findAllProducts(),
   ]);
 
-  const sales = salesRows.map(mapSaleRow).filter(s => s.status === "completed");
+  // Ingresos = órdenes pagadas y posteriores (pagado → armado → entregado),
+  // vía isPaidSale (fuente única en @kwinna/contracts). Se excluyen las
+  // desestimadas (isDismissed): órdenes de prueba/excepción no cuentan en métricas.
+  const sales = salesRows.map(mapSaleRow).filter(s => isPaidSale(s.status) && !s.isDismissed);
 
   // ── 2. Product lookup map (id → name) ─────────────────────────────────────
   const productName = new Map(products.map((p) => [p.id, p.name]));
@@ -84,15 +88,18 @@ async function computeSnapshotData(from: Date, to: Date): Promise<SnapshotData> 
   }
 
   // ── 5. Conversion metrics ─────────────────────────────────────────────────
-  // salesCompleted usa webSales (DB confirmada), no el evento de analytics,
-  // que puede duplicarse o perderse. Es la misma fuente que sales.countWeb.
+  // Las compras (salesCompleted) usan webSales (DB confirmada), no el evento de
+  // analytics, que puede duplicarse o perderse. Misma fuente que sales.countWeb.
+  // Definiciones unificadas con el dashboard:
+  //   Conversión = compras / visitas (shopViews)
+  //   Abandono   = carritos que no compraron / carritos (cartAdds)
   const { shopViews, cartAdds, checkoutStarts } = analytics;
 
-  const conversionRate      = checkoutStarts > 0
-    ? Math.round((webSales.length / checkoutStarts) * 1000) / 10
+  const conversionRate      = shopViews > 0
+    ? Math.round((webSales.length / shopViews) * 1000) / 10
     : 0;
   const cartAbandonmentRate = cartAdds > 0
-    ? Math.round(((cartAdds - checkoutStarts) / cartAdds) * 1000) / 10
+    ? Math.max(0, Math.round(((cartAdds - webSales.length) / cartAdds) * 1000) / 10)
     : 0;
 
   // ── 6. Stock crítico (snapshot del estado actual) ─────────────────────────
