@@ -235,14 +235,25 @@ export const SaleListResponseSchema = z.object({
 
 export type SaleListResponse = z.infer<typeof SaleListResponseSchema>;
 
-// ─── Checkout (MP) Response ───────────────────────────────────────────────────
+// ─── Checkout Response ────────────────────────────────────────────────────────
 // Devuelto por POST /sales/checkout.
-// initPoint es la URL de MP a la que el frontend redirige al usuario.
+//
+// initPoint es la URL de pago de MercadoPago a la que el frontend redirige al
+// usuario. Solo está presente cuando paymentMethod === "mercadopago".
+//
+// Para paymentMethod === "transfer" el backend NO genera una Preference de MP,
+// por lo que initPoint se omite: la venta queda en estado `pending` y el frontend
+// redirige a la pantalla de datos bancarios (/checkout/success). Marcarlo como
+// opcional mantiene un único contrato válido para ambos métodos de pago y evita
+// que el cliente rechace una respuesta legítima de transferencia.
+//
+// Cuando initPoint está presente debe ser una URL https válida (el frontend la
+// re-valida contra el allowlist de dominios oficiales de MP antes de redirigir).
 
 export const SaleCheckoutResponseSchema = z.object({
   data: z.object({
     sale:      SaleSchema,
-    initPoint: z.string().url(),
+    initPoint: z.string().url().optional(),
   }),
 });
 

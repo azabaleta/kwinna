@@ -90,8 +90,19 @@ function fuzzyMatch(text: string, query: string): boolean {
   });
 }
 
+// El SKU es un código identificador, no texto natural: la tolerancia a typos del
+// fuzzy match (Levenshtein) generaría falsos positivos —tipear un SKU exacto
+// devolvería muchos códigos "cercanos". Por eso el SKU se matchea de forma
+// precisa por substring normalizado: tipear el código completo deja solo ese
+// producto, y un prefijo va acotando progresivamente. El nombre sí conserva el
+// fuzzy match.
+function skuMatch(sku: string, query: string): boolean {
+  if (!query) return true;
+  return normalize(sku).includes(normalize(query));
+}
+
 function matchesQuery(product: Product, q: string, tag: string, season: string): boolean {
-  const textMatch   = !q || fuzzyMatch(product.name, q) || fuzzyMatch(product.sku, q);
+  const textMatch   = !q || fuzzyMatch(product.name, q) || skuMatch(product.sku, q);
   const tagMatch    = !tag || (product.tags ?? []).some(
     (t) => t.toLowerCase() === tag.toLowerCase()
   );
