@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { ChevronDown, ChevronRight, Package2, Search, SlidersHorizontal, TrendingDown, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Package2, Search, SlidersHorizontal, Star, TrendingDown, X } from "lucide-react";
+import { toast } from "sonner";
 import type { Product, Stock } from "@kwinna/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useProducts } from "@/hooks/use-products";
+import { useProducts, useSetProductFeatured } from "@/hooks/use-products";
 import { useStock } from "@/hooks/use-stock";
 import { RestockDialog } from "@/components/inventory/restock-dialog";
 import { RemoveStockDialog } from "@/components/inventory/remove-stock-dialog";
@@ -197,6 +198,7 @@ export default function InventoryPage() {
   const [query,        setQuery]        = useState("");
   const [activeTag,    setActiveTag]    = useState("");
   const [activeSeason, setActiveSeason] = useState<ProductSeason | "">("");
+  const [onlyFeatured, setOnlyFeatured] = useState(false);
   const [expanded,     setExpanded]     = useState<Record<string, boolean>>({});
 
   function toggleExpanded(id: string) {
@@ -205,6 +207,15 @@ export default function InventoryPage() {
 
   const { products, isLoading: loadingProducts, isError: errorProducts } = useProducts();
   const { stock, isLoading: loadingStock } = useStock();
+  const setFeatured = useSetProductFeatured();
+
+  async function handleToggleFeatured(product: Product) {
+    try {
+      await setFeatured.mutateAsync({ id: product.id, featured: !product.featured });
+    } catch {
+      toast.error("No se pudo actualizar el destacado");
+    }
+  }
 
   const isLoading = loadingProducts || loadingStock;
 
@@ -215,7 +226,11 @@ export default function InventoryPage() {
     return acc;
   }, {});
 
-  const filtered = products.filter((p) => matchesQuery(p, query, activeTag, activeSeason));
+  const filtered = products
+    .filter((p) => matchesQuery(p, query, activeTag, activeSeason))
+    .filter((p) => !onlyFeatured || p.featured);
+
+  const featuredCount = products.filter((p) => p.featured).length;
 
   const lowStockCount = products.filter((p) => {
     const qty = totalQty(stockByProduct[p.id] ?? []);
@@ -309,6 +324,22 @@ export default function InventoryPage() {
                   <X className="h-3 w-3" /> Limpiar
                 </button>
               )}
+
+              {/* Separador + filtro de destacados */}
+              <span className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={() => setOnlyFeatured((v) => !v)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-none border px-2.5 py-1 text-xs font-medium tracking-wide transition-colors",
+                  onlyFeatured
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground",
+                )}
+              >
+                <Star className={cn("h-3 w-3", onlyFeatured && "fill-current")} />
+                Solo destacados{featuredCount > 0 ? ` (${featuredCount})` : ""}
+              </button>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -402,6 +433,7 @@ export default function InventoryPage() {
                   <TableHead>SKU</TableHead>
                   <TableHead>Precio</TableHead>
                   <TableHead>Stock total</TableHead>
+                  <TableHead className="text-center">Destacado</TableHead>
                   <TableHead className="pr-6 text-right">Acción</TableHead>
                 </TableRow>
               </TableHeader>
@@ -410,7 +442,7 @@ export default function InventoryPage() {
                   Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
                       {query || activeTag
                         ? "Sin resultados para los filtros aplicados."
                         : "No hay productos cargados aún."}
@@ -503,6 +535,18 @@ export default function InventoryPage() {
                             </div>
                           </TableCell>
 
+                          {/* Destacado — toggle inmediato */}
+                          <TableCell className="text-center">
+                            <input
+                              type="checkbox"
+                              checked={!!product.featured}
+                              onChange={() => handleToggleFeatured(product)}
+                              aria-label={`Destacar ${product.name}`}
+                              title="Aparece primero en la tienda"
+                              className="h-4 w-4 cursor-pointer rounded border-border accent-primary"
+                            />
+                          </TableCell>
+
                           {/* Edit + Delete */}
                           <TableCell className="pr-6 text-right">
                             <div className="flex items-center justify-end gap-1">
@@ -518,7 +562,7 @@ export default function InventoryPage() {
                             id={`stock-detail-${product.id}`}
                             className="bg-muted/20 hover:bg-muted/20"
                           >
-                            <TableCell colSpan={6} className="pl-4 pr-6 py-3">
+                            <TableCell colSpan={7} className="pl-4 pr-6 py-3">
                               <div className="flex flex-wrap items-center gap-3 pl-[56px]">
                                 <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                                   Detalle de stock

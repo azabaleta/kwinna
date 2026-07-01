@@ -10,6 +10,7 @@ import {
   PromoCodeCreateInputSchema,
   PromoCodeUpdateInputSchema,
   PromoCodeValidateInputSchema,
+  PromoStripUpdateInputSchema,
   RegisterInputSchema,
   SaleListResponseSchema,
   SaleOrderInputSchema,
@@ -21,6 +22,7 @@ import {
   StockListResponseSchema,
   StockMovementSchema,
   type PromoCode,
+  type PromoStrip,
   type Product,
   type Sale,
   type SaleItem,
@@ -60,6 +62,25 @@ let mockShippingZones: ShippingZone[] = [
   { id: "sz-3", city: "cipolletti", displayName: "Cipolletti", cost: 3500, updatedAt: new Date().toISOString() },
   { id: "sz-4", city: "centenario", displayName: "Centenario", cost: 3500, updatedAt: new Date().toISOString() },
 ];
+
+// ─── Mock promo strip (singleton) ─────────────────────────────────────────────
+// `code` se resuelve desde promoCodeId (como el LEFT JOIN del backend real).
+
+let mockPromoStrip: Omit<PromoStrip, "code"> = {
+  enabled:     true,
+  message:     "CELEBRAMOS NUESTRO LANZAMIENTO — HASTA 30% OFF EN TODA LA TIENDA",
+  promoCodeId: "pc-0001-0000-0000-0000-000000000002", // SOYKWINNA
+  copyText:    "SOYKWINNA",
+  copyEnabled: true,
+  updatedAt:   new Date().toISOString(),
+};
+
+function resolvePromoStrip(): PromoStrip {
+  const code = mockPromoStrip.promoCodeId
+    ? promoCodes.find((c) => c.id === mockPromoStrip.promoCodeId)?.code ?? null
+    : null;
+  return { ...mockPromoStrip, code };
+}
 
 function mockShippingCost(city: string): number {
   const norm = normalizeCity(city);
@@ -198,7 +219,10 @@ export const handlers = [
         )
       : products;
 
-    const parsed = ProductListResponseSchema.parse({ data: filtered });
+    // Destacados primero (mismo criterio que el backend real: ORDER BY featured DESC)
+    const ordered = [...filtered].sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
+
+    const parsed = ProductListResponseSchema.parse({ data: ordered });
     return HttpResponse.json(parsed);
   }),
 
@@ -257,6 +281,7 @@ export const handlers = [
       categoryId:  patch.categoryId  ?? current.categoryId,
       images:      patch.images      ?? current.images,
       tags:        patch.tags        ?? current.tags,
+      featured:    patch.featured    ?? current.featured,
       updatedAt:   now(),
     };
 
@@ -807,5 +832,23 @@ export const handlers = [
     if (idx === -1) return notFound("Zona no encontrada");
     mockShippingZones.splice(idx, 1);
     return new HttpResponse(null, { status: 204 });
+  }),
+
+  // GET /promo-strip — public
+  http.get(`${BASE}/promo-strip`, () => {
+    return HttpResponse.json({ data: resolvePromoStrip() });
+  }),
+
+  // PUT /promo-strip — admin
+  http.put(`${BASE}/promo-strip`, async ({ request }) => {
+    const body = await request.json();
+    const result = PromoStripUpdateInputSchema.safeParse(body);
+    if (!result.success) return validationError(result.error.issues);
+    mockPromoStrip = {
+      ...mockPromoStrip,
+      ...result.data,
+      updatedAt: now(),
+    };
+    return HttpResponse.json({ data: resolvePromoStrip() });
   }),
 ];

@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import type { PaymentMethod, Sale } from "@kwinna/contracts";
 import { db } from "../index";
 import { salesTable } from "../schema";
@@ -133,6 +133,40 @@ export async function findPendingSalesByEmail(email: string): Promise<Sale[]> {
       )
     );
   return rows.map(mapSaleRow);
+}
+
+/**
+ * Devuelve las ventas que llevan más de `thresholdMinutes` en estado `pending`
+ * y que todavía NO fueron alertadas (`staleAlertSentAt IS NULL`).
+ * Excluye ventas desestimadas. Usado por el job de alertas de pendientes.
+ */
+export async function findStalePendingSales(thresholdMinutes: number): Promise<Sale[]> {
+  const cutoff = new Date(Date.now() - thresholdMinutes * 60 * 1000);
+
+  const rows = await db
+    .select()
+    .from(salesTable)
+    .where(
+      and(
+        eq(salesTable.status, "pending"),
+        eq(salesTable.isDismissed, false),
+        lt(salesTable.createdAt, cutoff),
+        isNull(salesTable.staleAlertSentAt)
+      )
+    )
+    .orderBy(salesTable.createdAt);
+  return rows.map(mapSaleRow);
+}
+
+/**
+ * Marca una venta como ya alertada por estar estancada en pending.
+ * Idempotencia del job: evita re-notificar en cada corrida.
+ */
+export async function markStaleAlertSent(id: string): Promise<void> {
+  await db
+    .update(salesTable)
+    .set({ staleAlertSentAt: new Date() })
+    .where(eq(salesTable.id, id));
 }
 
 /**

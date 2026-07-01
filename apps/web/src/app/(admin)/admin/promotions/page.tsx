@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Tag, Plus, Pencil, Loader2, TicketPercent, MapPin, Trash2 } from "lucide-react";
+import { Tag, Plus, Pencil, Loader2, TicketPercent, MapPin, Trash2, Megaphone } from "lucide-react";
 import { toast } from "sonner";
 import type { PromoCode, PromoCodeCreateInput, DiscountType, ShippingZone } from "@kwinna/contracts";
 import { PromoCodeCreateInputSchema } from "@kwinna/contracts";
@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePromoCodes, useCreatePromoCode, useUpdatePromoCode, useDeletePromoCode } from "@/hooks/use-promo-codes";
+import { usePromoStrip, useUpdatePromoStrip } from "@/hooks/use-promo-strip";
 import { useShippingZones, useCreateShippingZone, useUpdateShippingZone, useDeleteShippingZone } from "@/hooks/use-shipping-zones";
 import {
   fetchProvincias,
@@ -192,6 +193,181 @@ function DiscountSection({
 type PendingDelete =
   | { kind: "promo"; promo: PromoCode }
   | { kind: "zone";  zone:  ShippingZone };
+
+// ─── Promo Strip (barra promocional de la tienda) ─────────────────────────────
+
+const STRIP_NO_CODE = "__none__";
+
+function PromoStripCard() {
+  const { data: strip, isLoading } = usePromoStrip();
+  const { data: codes = [] }       = usePromoCodes();
+  const updateStrip                = useUpdatePromoStrip();
+
+  const [enabled,     setEnabled]     = useState(false);
+  const [message,     setMessage]     = useState("");
+  const [promoCodeId, setPromoCodeId] = useState<string | null>(null);
+  const [copyText,    setCopyText]    = useState("");
+  const [copyEnabled, setCopyEnabled] = useState(true);
+
+  // Hidrata el form cuando llega la config del server.
+  useEffect(() => {
+    if (!strip) return;
+    setEnabled(strip.enabled);
+    setMessage(strip.message);
+    setPromoCodeId(strip.promoCodeId);
+    setCopyText(strip.copyText);
+    setCopyEnabled(strip.copyEnabled);
+  }, [strip]);
+
+  const dirty =
+    !!strip &&
+    (enabled     !== strip.enabled ||
+     message     !== strip.message ||
+     promoCodeId !== strip.promoCodeId ||
+     copyText    !== strip.copyText ||
+     copyEnabled !== strip.copyEnabled);
+
+  // Al elegir un código, si el texto a copiar está vacío lo prellenamos con ese código.
+  function handleSelectCode(value: string) {
+    const id = value === STRIP_NO_CODE ? null : value;
+    setPromoCodeId(id);
+    if (id && !copyText.trim()) {
+      const picked = codes.find((c) => c.id === id);
+      if (picked) setCopyText(picked.code);
+    }
+  }
+
+  async function handleSave() {
+    try {
+      await updateStrip.mutateAsync({
+        enabled,
+        message:     message.trim(),
+        promoCodeId,
+        copyText:    copyText.trim().toUpperCase(),
+        copyEnabled,
+      });
+      toast.success("Barra promocional actualizada");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al guardar");
+    }
+  }
+
+  return (
+    <Card className="rounded-none">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-3">
+          <Megaphone className="h-5 w-5 text-muted-foreground" />
+          <div>
+            <CardTitle className="text-sm font-semibold tracking-wide uppercase">Barra promocional</CardTitle>
+            <CardDescription className="text-xs">
+              Franja superior de la tienda. Publicita un código de la tabla; opcionalmente lo copia al hacer click.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {/* Visible */}
+            <div className="flex items-center justify-between rounded-none border border-border/50 px-4 py-3">
+              <div>
+                <Label className="text-xs font-medium">Barra visible en la tienda</Label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {enabled ? "Se muestra a todos los visitantes" : "Oculta — nadie la ve"}
+                </p>
+              </div>
+              <Switch checked={enabled} onCheckedChange={setEnabled} />
+            </div>
+
+            {/* Mensaje */}
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-muted-foreground uppercase tracking-wider">
+                Mensaje
+              </Label>
+              <Input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Ej: Celebramos nuestro lanzamiento — hasta 30% OFF"
+                className="rounded-none text-sm"
+                maxLength={200}
+              />
+              <p className="text-[10px] text-muted-foreground">{message.length}/200 caracteres.</p>
+            </div>
+
+            {/* Código promocionado — de la tabla de promo codes */}
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-muted-foreground uppercase tracking-wider">
+                Código a promocionar
+              </Label>
+              <Select value={promoCodeId ?? STRIP_NO_CODE} onValueChange={handleSelectCode}>
+                <SelectTrigger className="rounded-none text-sm">
+                  <SelectValue placeholder="Elegí un código" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={STRIP_NO_CODE}>Ninguno (solo mensaje)</SelectItem>
+                  {codes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <span className="font-mono tracking-widest">{c.code}</span>
+                      {!c.isActive && <span className="text-muted-foreground"> · inactivo</span>}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground">
+                Se muestra en el strip como “CÓDIGO: …”. Los códigos se crean abajo — el strip no genera códigos.
+              </p>
+            </div>
+
+            {/* Copiar al click */}
+            <div className="flex items-center justify-between rounded-none border border-border/50 px-4 py-3">
+              <div>
+                <Label className="text-xs font-medium">Copiar al hacer click</Label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {copyEnabled ? "Al tocar la barra se copia el texto de abajo" : "El click no copia nada"}
+                </p>
+              </div>
+              <Switch checked={copyEnabled} onCheckedChange={setCopyEnabled} />
+            </div>
+
+            {/* Texto a copiar */}
+            {copyEnabled && (
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground uppercase tracking-wider">
+                  Texto a copiar
+                </Label>
+                <Input
+                  value={copyText}
+                  onChange={(e) => setCopyText(e.target.value.toUpperCase())}
+                  placeholder="SOYKWINNA"
+                  className="rounded-none font-mono tracking-widest uppercase text-sm"
+                  maxLength={100}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Lo que se copia al portapapeles al tocar la barra (normalmente el mismo código).
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSave}
+                disabled={!dirty || updateStrip.isPending}
+                size="sm"
+                className="rounded-none text-xs tracking-wider uppercase"
+              >
+                {updateStrip.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar cambios"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -373,6 +549,9 @@ export default function PromotionsPage() {
 
   return (
     <div className="p-4 md:p-8 space-y-6">
+
+      {/* Barra promocional de la tienda */}
+      <PromoStripCard />
 
       {/* Header */}
       <div className="flex items-center justify-between">

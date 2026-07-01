@@ -66,6 +66,30 @@ export const ReturnCreateInputSchema = z.object({
 
 export type ReturnCreateInput = z.infer<typeof ReturnCreateInputSchema>;
 
+// ─── Batch input schema (POST /returns/batch) ─────────────────────────────────
+// Permite devolver varias prendas de una misma transacción en una única operación.
+// El backend genera UNA sola nota de crédito por el total (canjeable como cualquier
+// otra). `saleId` y `notes` son compartidos; el motivo y el restock son por ítem
+// porque una prenda puede volver por talle (revendible) y otra por calidad (baja).
+
+export const ReturnBatchItemSchema = z.object({
+  productId: z.string().uuid(),
+  size:      z.string().optional(),
+  quantity:  z.number().int().min(1).max(999),
+  reason:    ReturnReasonSchema,
+  restock:   z.boolean().default(false),
+});
+
+export type ReturnBatchItem = z.infer<typeof ReturnBatchItemSchema>;
+
+export const ReturnBatchCreateInputSchema = z.object({
+  saleId: z.string().uuid().optional(),
+  notes:  z.string().max(500).optional(),
+  items:  z.array(ReturnBatchItemSchema).min(1).max(50),
+});
+
+export type ReturnBatchCreateInput = z.infer<typeof ReturnBatchCreateInputSchema>;
+
 // ─── API wrappers ─────────────────────────────────────────────────────────────
 
 export const ReturnResponseSchema = z.object({ data: ReturnSchema });
@@ -78,6 +102,13 @@ export const ReturnWithCreditNoteResponseSchema = z.object({
   creditNote: CreditNoteSchema,
 });
 export type ReturnWithCreditNoteResponse = z.infer<typeof ReturnWithCreditNoteResponseSchema>;
+
+// Respuesta del batch: array de devoluciones + la nota de crédito agregada única.
+export const ReturnBatchWithCreditNoteResponseSchema = z.object({
+  data:       z.array(ReturnSchema),
+  creditNote: CreditNoteSchema,
+});
+export type ReturnBatchWithCreditNoteResponse = z.infer<typeof ReturnBatchWithCreditNoteResponseSchema>;
 
 export const ReturnListResponseSchema = z.object({ data: z.array(ReturnSchema) });
 export type ReturnListResponse = z.infer<typeof ReturnListResponseSchema>;

@@ -47,6 +47,16 @@ export async function patchProduct(
   return ProductResponseSchema.parse(res.data);
 }
 
+// PATCH liviano solo para el toggle "destacado" del inventario — evita acoplar
+// con el form completo de edición (que exige season, etc.).
+export async function setProductFeatured(
+  id: Product["id"],
+  featured: boolean,
+): Promise<ProductResponse> {
+  const res = await apiClient.patch(`/products/${id}`, { featured });
+  return ProductResponseSchema.parse(res.data);
+}
+
 export async function deleteProduct(id: Product["id"], password: string): Promise<void> {
   // Validamos el body antes de enviar; axios DELETE requiere { data } para el body
   const body = ProductDeleteInputSchema.parse({ password });

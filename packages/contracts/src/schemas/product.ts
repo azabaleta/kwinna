@@ -29,6 +29,9 @@ export const ProductSchema = z.object({
   season:      ProductSeasonSchema.optional(),
   // Visibilidad en la web pública — false = solo visible en POS ("Exclusivo tienda")
   showInShop:  z.boolean().optional().default(true),
+  // Destacado — los productos marcados aparecen primeros en la tienda.
+  // Opcional: el backend lo devuelve siempre; ausente se interpreta como false.
+  featured:    z.boolean().optional(),
   createdAt:   z.string().datetime(),
   updatedAt:   z.string().datetime(),
 });

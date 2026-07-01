@@ -4,6 +4,7 @@ export * from "./schemas/credit-note";
 export * from "./schemas/pos-customer";
 export * from "./schemas/product";
 export * from "./schemas/promo-code";
+export * from "./schemas/promo-strip";
 export * from "./schemas/shipping-zone";
 export * from "./schemas/report";
 export * from "./schemas/return";

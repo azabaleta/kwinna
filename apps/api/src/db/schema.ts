@@ -229,6 +229,8 @@ export const productsTable = pgTable("products", {
   tags:        jsonb("tags").$type<string[]>().notNull().default([]),
   season:      productSeasonEnum("season"),
   showInShop:  boolean("show_in_shop").notNull().default(true),
+  // Destacado — aparece primero en la tienda (ORDER BY featured DESC)
+  featured:    boolean("featured").notNull().default(false),
   createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -373,6 +375,9 @@ export const salesTable = pgTable("sales", {
   promoCodeId:   uuid("promo_code_id"),
   promoDiscount: numeric("promo_discount", { precision: 12, scale: 2 }).notNull().default("0"),
 
+  // ── Alerta push de orden estancada en "pending" (>1h) — idempotencia del job ──
+  staleAlertSentAt: timestamp("stale_alert_sent_at", { withTimezone: true }),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -481,6 +486,25 @@ export const socialFormDraftsTable = pgTable(
     userIdUniq: uniqueIndex("social_form_drafts_user_id_uniq").on(table.userId),
   })
 );
+
+// ─── promo_strip ──────────────────────────────────────────────────────────────
+// Barra promocional (announcement bar) de la tienda. Fila única (singleton,
+// id=1): activable/desactivable y con mensaje + código editables desde el admin.
+// Los defaults reproducen el contenido de lanzamiento para no romper el look
+// actual tras la migración.
+
+export const promoStripTable = pgTable("promo_strip", {
+  id:          integer("id").primaryKey().default(1),
+  enabled:     boolean("enabled").notNull().default(true),
+  message:     varchar("message", { length: 200 }).notNull().default("CELEBRAMOS NUESTRO LANZAMIENTO — HASTA 30% OFF EN TODA LA TIENDA"),
+  // Código promocionado: FK a la tabla de promo codes (única fuente de códigos).
+  // onDelete set null → si se elimina el código, el strip queda sin código.
+  promoCodeId: uuid("promo_code_id").references(() => promotionalCodesTable.id, { onDelete: "set null" }),
+  // Texto que se copia al portapapeles al hacer click (si copyEnabled).
+  copyText:    varchar("copy_text", { length: 100 }).notNull().default("SOYKWINNA"),
+  copyEnabled: boolean("copy_enabled").notNull().default(true),
+  updatedAt:   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 // ─── planificacion_semanas ────────────────────────────────────────────────────
 // Una fila por semana del año. El pipeline externo hace UPSERT via POST /planificacion/upload.

@@ -1,4 +1,4 @@
-import { eq, ilike, inArray, or, and } from "drizzle-orm";
+import { eq, ilike, inArray, or, and, desc } from "drizzle-orm";
 import type { Product, ProductBulkItem, ProductCreateInput, ProductQuery, ProductSeason, ProductUpdateInput } from "@kwinna/contracts";
 import { db } from "../index";
 import { productsTable, stockMovementsTable, stockTable, returnsTable } from "../schema";
@@ -20,6 +20,7 @@ function mapRow(row: typeof productsTable.$inferSelect): Product {
     tags:        row.tags,
     season:      (row.season as ProductSeason) ?? undefined,
     showInShop:  row.showInShop,
+    featured:    row.featured,
     createdAt:   row.createdAt.toISOString(),
     updatedAt:   row.updatedAt.toISOString(),
   };
@@ -44,9 +45,11 @@ export async function findAllProducts(query?: ProductQuery, opts?: { shopOnly?: 
     conditions.push(eq(productsTable.showInShop, true));
   }
 
+  // Destacados primero (featured DESC). Sin orden secundario: el resto conserva
+  // el orden que ya devuelve Postgres, para no alterar el comportamiento actual.
   const rows = conditions.length > 0
-    ? await db.select().from(productsTable).where(and(...conditions))
-    : await db.select().from(productsTable);
+    ? await db.select().from(productsTable).where(and(...conditions)).orderBy(desc(productsTable.featured))
+    : await db.select().from(productsTable).orderBy(desc(productsTable.featured));
 
   return rows.map(mapRow);
 }
@@ -72,6 +75,7 @@ export async function insertProduct(input: ProductCreateInput): Promise<Product>
       tags:        input.tags,
       season:      input.season ?? null,
       showInShop:  input.showInShop ?? true,
+      featured:    input.featured ?? false,
       createdAt:   new Date(),
       updatedAt:   new Date(),
     })
@@ -97,6 +101,7 @@ export async function updateProduct(
   if (input.tags        !== undefined) patch["tags"]        = input.tags;
   if (input.season      !== undefined) patch["season"]      = input.season ?? null;
   if (input.showInShop  !== undefined) patch["showInShop"]  = input.showInShop;
+  if (input.featured    !== undefined) patch["featured"]    = input.featured;
 
   const rows = await db
     .update(productsTable)

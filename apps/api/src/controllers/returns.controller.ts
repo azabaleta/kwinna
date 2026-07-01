@@ -1,8 +1,8 @@
 import { z } from "zod";
 import type { NextFunction, Request, Response } from "express";
-import { ReturnCreateInputSchema } from "@kwinna/contracts";
+import { ReturnBatchCreateInputSchema, ReturnCreateInputSchema } from "@kwinna/contracts";
 import { findAllReturns, findReturnsByDateRange } from "../db/repositories";
-import { createReturn } from "../services/returns.service";
+import { createReturn, createReturnBatch } from "../services/returns.service";
 import type { ReturnReason } from "@kwinna/contracts";
 
 const RETURN_WINDOW_DAYS = 30;
@@ -40,6 +40,23 @@ export async function postReturn(
     const input = ReturnCreateInputSchema.parse(req.body);
     const { returnData, creditNote } = await createReturn(input);
     res.status(201).json({ data: returnData, creditNote });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── POST /returns/batch ──────────────────────────────────────────────────────
+// Varias prendas de una misma transacción → una única nota de crédito.
+
+export async function postReturnBatch(
+  req:  Request,
+  res:  Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const input = ReturnBatchCreateInputSchema.parse(req.body);
+    const { returns, creditNote } = await createReturnBatch(input);
+    res.status(201).json({ data: returns, creditNote });
   } catch (err) {
     next(err);
   }

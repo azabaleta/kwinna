@@ -13,6 +13,7 @@ import {
   posCustomersRoutes,
   productRoutes,
   promoCodesRoutes,
+  promoStripRoutes,
   shippingRoutes,
   reportsRoutes,
   returnsRoutes,
@@ -23,6 +24,7 @@ import {
   usersRoutes,
 } from "./routes";
 import { registerReportsJob } from "./jobs/reports.job";
+import { registerPendingOrdersJob } from "./jobs/pending-orders.job";
 
 const app = express();
 const PORT = process.env["PORT"] ?? 3001;
@@ -85,6 +87,7 @@ app.use("/reports",        reportsRoutes);
 app.use("/users",          usersRoutes);
 app.use("/pos-customers",  posCustomersRoutes);
 app.use("/glossary",       glossaryRoutes);
+app.use("/promo-strip",    promoStripRoutes);
 app.use("/social-form",    socialFormRoutes);
 app.use("/planificacion",  planificacionRoutes);
 
@@ -110,6 +113,7 @@ app.use(errorHandler);
 const server = app.listen(PORT, () => {
   process.stdout.write(`\x1b[32m[API]\x1b[0m Running on http://localhost:${PORT}\n`);
   registerReportsJob();
+  registerPendingOrdersJob();
 });
 
 // ─── Graceful shutdown ────────────────────────────────────────────────────────

@@ -183,6 +183,27 @@
       "when": 1781362162704,
       "tag": "0025_odd_leo",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1781504220971,
+      "tag": "0026_yellow_killraven",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1782880072398,
+      "tag": "0027_cooing_korvac",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1782929655981,
+      "tag": "0028_calm_kylun",
+      "breakpoints": true
     }
   ]
 }

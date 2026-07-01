@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Search, CheckCircle2, ArrowRight, RotateCcw, Printer, X, Receipt, Package } from "lucide-react";
-import type { Product, Return, ReturnReason, Sale, SaleItem } from "@kwinna/contracts";
+import { AlertTriangle, Search, CheckCircle2, ArrowRight, RotateCcw, Printer, X, Receipt, Package, Plus, Trash2 } from "lucide-react";
+import type { CreditNote as CreditNoteEntity, Product, ReturnReason, Sale, SaleItem } from "@kwinna/contracts";
 import { LIBRE_PRODUCT_ID, RETURN_REASON_LABELS, RETURN_REASON_RESALABLE } from "@kwinna/contracts";
 import { useProducts } from "../hooks/use-products";
 import { useStock } from "../hooks/use-stock";
-import { createReturn, lookupSaleByCode } from "../services/returns";
+import { createReturn, createReturnBatch, lookupSaleByCode } from "../services/returns";
 import { usePosStore } from "../store/use-pos-store";
 import { formatPrice, matchProduct, normalize } from "../lib/utils";
 import { ApiError } from "../lib/api";
@@ -29,11 +29,25 @@ const PAYMENT_LABELS: Record<string, string> = {
 
 type ReturnMode = "product" | "transaction";
 
+// Una prenda seleccionada para devolver dentro del flujo "por transacción".
+// El motivo y el restock son por línea: una prenda puede volver por talle
+// (revendible) y otra por calidad (baja).
+interface TxLine {
+  key:      string;   // productId + ":" + (size ?? "")
+  item:     SaleItem;
+  quantity: number;
+  reason:   ReturnReason | "";
+  restock:  boolean;
+}
+
+function txLineKey(item: SaleItem): string {
+  return `${item.productId}:${item.size ?? ""}`;
+}
+
 interface ReturnResult {
   creditAmount:   number;
-  reason:         ReturnReason;
-  productName:    string;
-  returnData:     Return;
+  reason?:        ReturnReason;   // solo si toda la devolución comparte motivo
+  summary:        string;         // "Vestido Lino" o "3 prendas"
   creditNoteId:   string;
   creditNoteCode: string;
 }
@@ -57,7 +71,8 @@ export default function ReturnView() {
   const [txSale,      setTxSale]      = useState<Sale | null>(null);
   const [txSearching, setTxSearching] = useState(false);
   const [txError,     setTxError]     = useState("");
-  const [txItem,      setTxItem]      = useState<SaleItem | null>(null);
+  const [txLines,     setTxLines]     = useState<TxLine[]>([]);
+  const [txNotes,     setTxNotes]     = useState("");
 
   // ── Estado compartido del formulario ─────────────────────────────────────
   const [selected, setSelected] = useState<Product | null>(null);
@@ -78,7 +93,7 @@ export default function ReturnView() {
     setMode(m);
     resetForm();
     setSkuQuery(""); setResults([]);
-    setTxCode(""); setTxSale(null); setTxError(""); setTxItem(null);
+    setTxCode(""); setTxSale(null); setTxError(""); setTxLines([]); setTxNotes("");
     setError("");
   }
 
@@ -92,7 +107,7 @@ export default function ReturnView() {
     const code = codeQuery.trim().replace(/\s/g, "");
     if (!code) return;
     setTxCode(code);
-    setTxError(""); setTxSale(null); setTxItem(null); resetForm();
+    setTxError(""); setTxSale(null); setTxLines([]); setTxNotes(""); setError(""); resetForm();
     setTxSearching(true);
     try {
       const sale = await lookupSaleByCode(code);
@@ -114,17 +129,26 @@ export default function ReturnView() {
     await performTxSearch(txCode);
   }
 
-  // ── Seleccionar un ítem de la transacción ─────────────────────────────────
-  function selectTxItem(item: SaleItem) {
+  // ── Agregar / quitar un ítem de la transacción a la devolución ────────────
+  function toggleTxLine(item: SaleItem) {
     // Los artículos libres no tienen entrada en el catálogo ni stock registrado
     if (item.productId === LIBRE_PRODUCT_ID) return;
-    setTxItem(item);
-    const prod = products.find((p) => p.id === item.productId) ?? null;
-    setSelected(prod);
-    setSize(item.size ?? "");
-    setSaleId(txSale!.id);
-    setQty(item.quantity);
+    const key = txLineKey(item);
     setError("");
+    setTxLines((lines) => {
+      if (lines.some((l) => l.key === key)) {
+        return lines.filter((l) => l.key !== key);
+      }
+      return [...lines, { key, item, quantity: item.quantity, reason: "", restock: true }];
+    });
+  }
+
+  function updateTxLine(key: string, patch: Partial<Pick<TxLine, "quantity" | "reason" | "restock">>) {
+    setTxLines((lines) => lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  }
+
+  function removeTxLine(key: string) {
+    setTxLines((lines) => lines.filter((l) => l.key !== key));
   }
 
   // ── Búsqueda por producto ─────────────────────────────────────────────────
@@ -149,7 +173,43 @@ export default function ReturnView() {
     setSelected(p); setResults([]); setSkuQuery(""); setError("");
   }
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
+  // ── Cierre común post-devolución ──────────────────────────────────────────
+  // Setea el panel de resultado + la nota de crédito imprimible y limpia el form.
+  function finishReturn(
+    creditAmount: number,
+    summary:      string,
+    creditNote:   CreditNoteEntity,
+    sharedReason: ReturnReason | undefined,
+  ) {
+    setReturnResult({
+      creditAmount,
+      ...(sharedReason && { reason: sharedReason }),
+      summary,
+      creditNoteId:   creditNote.id,
+      creditNoteCode: creditNote.code,
+    });
+    setCreditNoteData({
+      originalCredit: creditAmount,
+      usedInSale:     0,
+      remaining:      creditAmount,
+      ...(sharedReason && { reason: sharedReason }),
+      date:           new Date(),
+      code:           creditNote.code,
+    });
+
+    resetForm();
+    setSkuQuery(""); setResults([]);
+    setTxCode(""); setTxSale(null); setTxLines([]); setTxNotes("");
+  }
+
+  function friendlyError(err: unknown): string {
+    const msg = err instanceof ApiError ? err.message : "Error al registrar la devolución.";
+    return msg === "tiempo de cambio expirado"
+      ? "Tiempo de cambio expirado. La transacción tiene más de 30 días."
+      : msg;
+  }
+
+  // ── Submit modo producto (una sola prenda) ────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selected || !reason || qty < 1) return;
@@ -166,35 +226,47 @@ export default function ReturnView() {
       });
 
       const creditAmount = returnData.unitPrice * returnData.quantity;
-
-      setReturnResult({
-        creditAmount,
-        reason:         reason as ReturnReason,
-        productName:    selected.name,
-        returnData,
-        creditNoteId:   creditNote.id,
-        creditNoteCode: creditNote.code,
-      });
-      setCreditNoteData({
-        originalCredit: creditAmount,
-        usedInSale:     0,
-        remaining:      creditAmount,
-        reason:         reason as ReturnReason,
-        date:           new Date(),
-        code:           creditNote.code,
-      });
-
-      resetForm();
-      setSkuQuery(""); setResults([]);
-      setTxCode(""); setTxSale(null); setTxItem(null);
-
+      finishReturn(creditAmount, selected.name, creditNote, reason as ReturnReason);
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Error al registrar la devolución.";
-      setError(
-        msg === "tiempo de cambio expirado"
-          ? "Tiempo de cambio expirado. La transacción tiene más de 30 días."
-          : msg
-      );
+      setError(friendlyError(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // ── Submit modo transacción (varias prendas → una nota de crédito) ────────
+  async function handleTxSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!txSale || txLines.length === 0) return;
+    if (txLines.some((l) => !l.reason)) {
+      setError("Elegí un motivo para cada prenda.");
+      return;
+    }
+    setSubmitting(true); setError("");
+    try {
+      const { returns, creditNote } = await createReturnBatch({
+        saleId: txSale.id,
+        notes:  txNotes || undefined,
+        items:  txLines.map((l) => ({
+          productId: l.item.productId,
+          size:      l.item.size || undefined,
+          quantity:  l.quantity,
+          reason:    l.reason as ReturnReason,
+          restock:   l.restock,
+        })),
+      });
+
+      const creditAmount = returns.reduce((sum, r) => sum + r.unitPrice * r.quantity, 0);
+      const totalUnits   = txLines.reduce((sum, l) => sum + l.quantity, 0);
+      const summary      = txLines.length === 1
+        ? (products.find((p) => p.id === txLines[0]!.item.productId)?.name ?? "1 prenda")
+        : `${totalUnits} prendas`;
+      const reasons      = new Set(txLines.map((l) => l.reason));
+      const sharedReason = reasons.size === 1 ? (txLines[0]!.reason as ReturnReason) : undefined;
+
+      finishReturn(creditAmount, summary, creditNote, sharedReason);
+    } catch (err) {
+      setError(friendlyError(err));
     } finally {
       setSubmitting(false);
     }
@@ -232,14 +304,16 @@ export default function ReturnView() {
             </div>
             <div>
               <p className="text-base font-semibold text-white">Devolución registrada</p>
-              <p className="text-sm text-zinc-400">{returnResult.productName}</p>
+              <p className="text-sm text-zinc-400">{returnResult.summary}</p>
             </div>
           </div>
 
           <div className="bg-zinc-800 rounded-xl px-5 py-4">
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Crédito generado</p>
             <p className="text-3xl font-bold text-white">{formatPrice(returnResult.creditAmount)}</p>
-            <p className="text-xs text-zinc-500 mt-1">Motivo: {RETURN_REASON_LABELS[returnResult.reason]}</p>
+            {returnResult.reason && (
+              <p className="text-xs text-zinc-500 mt-1">Motivo: {RETURN_REASON_LABELS[returnResult.reason]}</p>
+            )}
             <div className="mt-3 pt-3 border-t border-zinc-700">
               <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Código de nota de crédito</p>
               <p className="text-lg font-mono font-bold text-emerald-400 tracking-widest">
@@ -284,7 +358,9 @@ export default function ReturnView() {
   }
 
   // ── Formulario de devolución ──────────────────────────────────────────────
-  const maxQty = txItem ? txItem.quantity : 999;
+  // maxQty aplica al form compartido, que ahora es exclusivo del modo producto.
+  const maxQty = 999;
+  const txCreditTotal = txLines.reduce((sum, l) => sum + l.item.unitPrice * l.quantity, 0);
 
   return (
     <div className="p-6 max-w-xl">
@@ -325,7 +401,7 @@ export default function ReturnView() {
               <Receipt size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
               <input
                 value={txCode}
-                onChange={(e) => { setTxCode(e.target.value.toUpperCase()); setTxSale(null); setTxItem(null); setTxError(""); resetForm(); }}
+                onChange={(e) => { setTxCode(e.target.value.toUpperCase()); setTxSale(null); setTxLines([]); setTxNotes(""); setTxError(""); setError(""); }}
                 placeholder="Ej: A3F7B2D910"
                 className="w-full bg-zinc-900 text-white rounded-lg pl-9 pr-4 py-2.5 text-sm font-mono
                            border border-zinc-800 focus:border-zinc-600 outline-none transition-colors uppercase"
@@ -357,8 +433,8 @@ export default function ReturnView() {
             </div>
           )}
 
-          {/* Tarjeta de la venta encontrada */}
-          {txSale && !txItem && (
+          {/* Tarjeta de la venta encontrada — permite elegir varias prendas */}
+          {txSale && (
             <div className="mt-4 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden">
               {/* Header de la venta */}
               <div className="px-4 py-3 border-b border-zinc-800">
@@ -378,24 +454,27 @@ export default function ReturnView() {
                 </div>
               </div>
 
-              {/* Lista de ítems */}
+              {/* Lista de ítems — clic para agregar/quitar de la devolución */}
               <div className="p-2">
                 <p className="text-[10px] text-zinc-500 uppercase tracking-wider px-2 py-1">
-                  Seleccioná la prenda a devolver
+                  Tocá las prendas a devolver
                 </p>
                 {txSale.items.map((item, i) => {
-                  const isLibre = item.productId === LIBRE_PRODUCT_ID;
-                  const prod    = isLibre ? null : products.find((p) => p.id === item.productId);
+                  const isLibre    = item.productId === LIBRE_PRODUCT_ID;
+                  const prod       = isLibre ? null : products.find((p) => p.id === item.productId);
+                  const isSelected = !isLibre && txLines.some((l) => l.key === txLineKey(item));
                   return (
                     <button
                       key={i}
                       type="button"
-                      onClick={() => selectTxItem(item)}
+                      onClick={() => toggleTxLine(item)}
                       disabled={isLibre}
-                      className={`w-full flex items-center gap-3 rounded-lg p-2.5 text-left transition-colors ${
+                      className={`w-full flex items-center gap-3 rounded-lg p-2.5 text-left transition-colors border ${
                         isLibre
-                          ? "opacity-40 cursor-not-allowed"
-                          : "hover:bg-zinc-800"
+                          ? "opacity-40 cursor-not-allowed border-transparent"
+                          : isSelected
+                            ? "bg-emerald-950/40 border-emerald-800/60"
+                            : "border-transparent hover:bg-zinc-800"
                       }`}
                     >
                       {prod?.images[0] ? (
@@ -415,9 +494,13 @@ export default function ReturnView() {
                             : `${item.size ? `Talle ${item.size} · ` : ""}${item.quantity} u. · ${formatPrice(item.unitPrice)} c/u`}
                         </p>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-sm font-semibold text-white">{formatPrice(item.subtotal)}</p>
-                      </div>
+                      {!isLibre && (
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                          isSelected ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-500"
+                        }`}>
+                          {isSelected ? <CheckCircle2 size={15} /> : <Plus size={15} />}
+                        </div>
+                      )}
                     </button>
                   );
                 })}
@@ -425,34 +508,137 @@ export default function ReturnView() {
             </div>
           )}
 
-          {/* Ítem seleccionado */}
-          {txSale && txItem && (
-            <div className="mt-4 bg-zinc-900 border border-emerald-800/50 rounded-xl p-3">
-              <div className="flex items-center gap-3">
-                {(() => {
-                  const prod = products.find((p) => p.id === txItem.productId);
-                  return prod?.images[0] ? (
-                    <img src={prod.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
-                  ) : null;
-                })()}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">
-                    {products.find((p) => p.id === txItem.productId)?.name ?? txItem.productId.slice(0, 8) + "…"}
-                  </p>
-                  <p className="text-xs text-emerald-400 mt-0.5">
-                    Precio pagado: {formatPrice(txItem.unitPrice)}
-                    {txItem.size ? ` · Talle ${txItem.size}` : ""}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setTxItem(null); resetForm(); }}
-                  className="text-zinc-600 hover:text-zinc-300 transition-colors flex-shrink-0"
-                >
-                  <X size={15} />
-                </button>
+          {/* Constructor de la devolución — una línea editable por prenda ─────── */}
+          {txSale && txLines.length > 0 && (
+            <form onSubmit={handleTxSubmit} className="mt-5 flex flex-col gap-4">
+              <h3 className="text-xs text-zinc-400 uppercase tracking-wider">
+                2. Detalle ({txLines.length} {txLines.length === 1 ? "prenda" : "prendas"})
+              </h3>
+
+              <div className="flex flex-col gap-3">
+                {txLines.map((line) => {
+                  const prod = products.find((p) => p.id === line.item.productId);
+                  return (
+                    <div key={line.key} className="bg-zinc-900 border border-emerald-800/40 rounded-xl p-3 flex flex-col gap-3">
+                      {/* Encabezado de la línea */}
+                      <div className="flex items-center gap-3">
+                        {prod?.images[0] ? (
+                          <img src={prod.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-zinc-800 flex-shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white truncate">
+                            {prod?.name ?? line.item.productId.slice(0, 8) + "…"}
+                          </p>
+                          <p className="text-xs text-emerald-400 mt-0.5">
+                            Precio pagado: {formatPrice(line.item.unitPrice)}
+                            {line.item.size ? ` · Talle ${line.item.size}` : ""}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeTxLine(line.key)}
+                          className="text-zinc-600 hover:text-red-400 transition-colors flex-shrink-0"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* Cantidad */}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs text-zinc-400">Cantidad</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={line.item.quantity}
+                            value={line.quantity}
+                            onChange={(e) =>
+                              updateTxLine(line.key, {
+                                quantity: Math.max(1, Math.min(line.item.quantity, Number(e.target.value))),
+                              })
+                            }
+                            className="bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm outline-none
+                                       border border-transparent focus:border-zinc-600"
+                          />
+                          <p className="text-[11px] text-zinc-600">Máx: {line.item.quantity} (comprado)</p>
+                        </div>
+
+                        {/* Motivo */}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs text-zinc-400">Motivo *</label>
+                          <select
+                            value={line.reason}
+                            onChange={(e) => {
+                              const r = e.target.value as ReturnReason;
+                              updateTxLine(line.key, r ? { reason: r, restock: RETURN_REASON_RESALABLE[r] } : { reason: "" });
+                            }}
+                            required
+                            className="bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm outline-none
+                                       border border-transparent focus:border-zinc-600"
+                          >
+                            <option value="">Seleccionar…</option>
+                            {REASONS.map(([key, label]) => (
+                              <option key={key} value={key}>{label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Toggle restock */}
+                        <div className="col-span-2 flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => updateTxLine(line.key, { restock: !line.restock })}
+                            className={`w-10 h-5 rounded-full transition-colors ${line.restock ? "bg-emerald-600" : "bg-zinc-700"}`}
+                          >
+                            <span className={`block w-4 h-4 bg-white rounded-full mx-0.5 transition-transform ${line.restock ? "translate-x-5" : "translate-x-0"}`} />
+                          </button>
+                          <span className="text-sm text-zinc-300">
+                            Devolver al stock {line.restock ? "(en buen estado)" : "(dañado / baja)"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+
+              {/* Notas compartidas */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-zinc-400">Notas adicionales</label>
+                <textarea
+                  value={txNotes}
+                  onChange={(e) => setTxNotes(e.target.value)}
+                  rows={2}
+                  className="bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm outline-none
+                             border border-transparent focus:border-zinc-600 resize-none"
+                />
+              </div>
+
+              {/* Total de crédito a generar */}
+              <div className="flex items-center justify-between bg-zinc-800 rounded-xl px-4 py-3">
+                <span className="text-sm text-zinc-400">Crédito total a generar</span>
+                <span className="text-lg font-bold text-white">{formatPrice(txCreditTotal)}</span>
+              </div>
+
+              {error && (
+                <p className="text-red-400 text-sm bg-red-950/30 border border-red-900/30 rounded-lg px-3 py-2">
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting || txLines.some((l) => !l.reason)}
+                className="bg-white text-zinc-900 rounded-xl py-3 text-sm font-semibold
+                           hover:bg-zinc-100 transition-colors disabled:opacity-50"
+              >
+                {submitting
+                  ? "Registrando..."
+                  : `Registrar devolución (${txLines.length} ${txLines.length === 1 ? "prenda" : "prendas"})`}
+              </button>
+            </form>
           )}
         </section>
       )}
@@ -533,13 +719,11 @@ export default function ReturnView() {
         </section>
       )}
 
-      {/* ── Formulario de detalle (compartido) ── */}
-      {selected && (
+      {/* ── Formulario de detalle (modo producto) ── */}
+      {mode === "product" && selected && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <section>
-            <h3 className="text-xs text-zinc-400 uppercase tracking-wider mb-3">
-              {mode === "transaction" ? "2. Detalle de la devolución" : "2. Detalle"}
-            </h3>
+            <h3 className="text-xs text-zinc-400 uppercase tracking-wider mb-3">2. Detalle</h3>
             <div className="grid grid-cols-2 gap-3">
               {/* Talle — solo editable en modo producto */}
               {mode === "product" && (() => {
@@ -594,9 +778,6 @@ export default function ReturnView() {
                   className="bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm outline-none
                              border border-transparent focus:border-zinc-600"
                 />
-                {mode === "transaction" && txItem && (
-                  <p className="text-[11px] text-zinc-600">Máx: {txItem.quantity} (comprado)</p>
-                )}
               </div>
 
               {/* Motivo */}

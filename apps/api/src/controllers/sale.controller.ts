@@ -5,6 +5,7 @@ import { cancelSaleAndRestoreStock, createSale, createPendingSale, dismissSale }
 import { createMPPreference, getMPPayment, verifyMPSignature, searchApprovedPayment } from "../services/mp.service";
 import { findAllSales, findSaleById, findSaleByTxCode, findWebOrdersToProcess, updateSaleStatus, findPendingSalesByEmail } from "../db/repositories/sale.repository";
 import { sendSaleConfirmationEmail } from "../services/email.service";
+import { sendPushNotification, formatSaleAlert } from "../services/notify.service";
 
 // ─── POST /sales ──────────────────────────────────────────────────────────────
 // Venta directa POS — crea la venta como `completed` de inmediato.
@@ -253,6 +254,9 @@ export async function postWebhook(
     if (completed) {
       sendSaleConfirmationEmail(completed).catch((err: Error) =>
         console.error("[Email] Error enviando confirmación MP:", err.message)
+      );
+      sendPushNotification(formatSaleAlert(completed)).catch((err: Error) =>
+        console.error("[Notify] Error push pago MP:", err.message)
       );
     }
 
@@ -510,6 +514,9 @@ export async function postReconcile(
     sendSaleConfirmationEmail(completed).catch((err: Error) =>
       console.error("[Email] Error enviando confirmación post-reconciliación:", err.message)
     );
+    sendPushNotification(formatSaleAlert(completed)).catch((err: Error) =>
+      console.error("[Notify] Error push pago post-reconciliación:", err.message)
+    );
 
     res.json({ data: completed });
   } catch (err) {
@@ -552,6 +559,9 @@ export async function postApproveTransfer(
     // Fire-and-forget
     sendSaleConfirmationEmail(completed).catch((err: Error) =>
       console.error("[Email] Error enviando confirmación post-aprobación:", err.message)
+    );
+    sendPushNotification(formatSaleAlert(completed)).catch((err: Error) =>
+      console.error("[Notify] Error push pago post-aprobación:", err.message)
     );
 
     res.json({ data: completed });

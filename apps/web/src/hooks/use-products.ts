@@ -15,6 +15,7 @@ import {
   patchProduct,
   postBulkProducts,
   postProduct,
+  setProductFeatured,
 } from "@/services/product";
 import type { ProductUpdateFormValues } from "@/schemas/product";
 import { productKeys, stockKeys } from "./query-keys";
@@ -151,6 +152,48 @@ export function useUpdateProduct(id: Product["id"]): UseUpdateProductResult {
     isPending:   mutation.isPending,
     isError:     mutation.isError,
     error:       mutation.error,
+  };
+}
+
+// ─── useSetProductFeatured ────────────────────────────────────────────────────
+// Toggle inmediato del flag "destacado" desde la tabla de inventario, con update
+// optimista para que la checkbox responda al instante.
+
+export interface UseSetProductFeaturedResult {
+  mutateAsync: (vars: { id: Product["id"]; featured: boolean }) => Promise<Product>;
+  isPending:   boolean;
+}
+
+export function useSetProductFeatured(): UseSetProductFeaturedResult {
+  const queryClient = useQueryClient();
+  const listsKey    = [...productKeys.all, "list"] as const;
+
+  const mutation = useMutation({
+    mutationFn: ({ id, featured }: { id: Product["id"]; featured: boolean }) =>
+      setProductFeatured(id, featured).then((res) => res.data),
+    onMutate: async ({ id, featured }) => {
+      await queryClient.cancelQueries({ queryKey: listsKey });
+      const snapshots = queryClient.getQueriesData<ProductListResponse>({ queryKey: listsKey });
+      for (const [key, value] of snapshots) {
+        if (!value) continue;
+        queryClient.setQueryData<ProductListResponse>(key, {
+          ...value,
+          data: value.data.map((p) => (p.id === id ? { ...p, featured } : p)),
+        });
+      }
+      return { snapshots };
+    },
+    onError: (_err, _vars, ctx) => {
+      ctx?.snapshots.forEach(([key, value]) => queryClient.setQueryData(key, value));
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: productKeys.all });
+    },
+  });
+
+  return {
+    mutateAsync: mutation.mutateAsync,
+    isPending:   mutation.isPending,
   };
 }
 
