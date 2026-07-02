@@ -55,6 +55,15 @@ export const PaymentMethodSchema = z.enum([
 ]);
 export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
 
+// ─── Desglose de pago (POS) ─────────────────────────────────────────────────────
+// Una venta POS puede saldarse con uno o dos métodos (ej. parte efectivo + parte
+// transferencia). Se guarda el detalle por método para dejar registro en el ticket.
+export const PaymentSplitSchema = z.object({
+  method: PaymentMethodSchema,
+  amount: z.number().nonnegative(),
+});
+export type PaymentSplit = z.infer<typeof PaymentSplitSchema>;
+
 export const PriceTierSchema = z.enum(["lista", "efectivo", "mayorista"]);
 export type PriceTier = z.infer<typeof PriceTierSchema>;
 
@@ -83,6 +92,17 @@ export function applyTransferDiscount(basePrice: number): number {
   return basePrice * (1 - TRANSFER_DISCOUNT_RATE);
 }
 
+// ─── Métodos de pago habilitados por columna de precios (POS) ───────────────────
+// Fuente única para POS (UI) y backend (validación): la columna de precios define
+// qué métodos "principales" puede sub-seleccionar el operador.
+//   lista               → tarjeta (crédito / débito)
+//   efectivo/mayorista  → efectivo / transferencia
+// `orden_de_compra` (siempre disponible) y `por_devolucion` (canje de nota de
+// crédito) se manejan aparte, no derivan de la columna.
+export function paymentMethodsForTier(tier?: PriceTier): PaymentMethod[] {
+  return tier === "lista" ? ["credito", "debito"] : ["efectivo", "transferencia"];
+}
+
 export const SaleSchema = z.object({
   id:     z.string().uuid(),
   items:  z.array(SaleItemSchema),
@@ -108,6 +128,8 @@ export const SaleSchema = z.object({
   // ── Canal y metadata POS ───────────────────────────────────────────────────
   channel:       SaleChannelSchema.default("web"),
   paymentMethod: PaymentMethodSchema.optional().catch(undefined),
+  // Desglose de pago POS: 1 o 2 métodos con su monto. undefined en ventas web/históricas.
+  paymentBreakdown: z.array(PaymentSplitSchema).min(1).max(2).optional(),
   saleNotes:     z.string().optional(),
 
   // ── Opcional: cliente registrado (web) ────────────────────────────────────
@@ -186,6 +208,7 @@ export const SaleOrderInputSchema = z.object({
   // ── POS metadata (opcionales — solo el cliente de mostrador los envía) ───
   channel:       SaleChannelSchema.optional(),
   paymentMethod: PaymentMethodSchema.optional(),
+  paymentBreakdown: z.array(PaymentSplitSchema).min(1).max(2).optional(), // desglose de pago POS
   priceTier:     PriceTierSchema.optional(),
   saleNotes:     z.string().max(500).optional(),
   customerDni:   z.string().max(20).optional(),       // opcional: POS puede omitirlo

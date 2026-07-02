@@ -15,6 +15,9 @@ export interface ReceiptData {
   customerName:    string;
   customerDni?:    string;
   paymentMethod:   string;
+  // Desglose de pago POS: 1-2 métodos con su monto. Si trae >1 entrada, el ticket
+  // imprime el detalle por método en lugar de la línea simple.
+  paymentBreakdown?: { method: string; amount: number }[];
   priceTier:       PriceTier;
   saleNotes?:      string;
   date:            Date;
@@ -144,7 +147,19 @@ const ReceiptTicket = forwardRef<HTMLDivElement, { data: ReceiptData; hidePrice?
           <p>Cliente: {data.customerName}</p>
           {data.customerDni && <p>DNI: {data.customerDni}</p>}
           {!hidePrice && (
-            <p>Pago: {PAYMENT_LABELS[data.paymentMethod] ?? data.paymentMethod}</p>
+            data.paymentBreakdown && data.paymentBreakdown.length > 1 ? (
+              <>
+                <p>Pago:</p>
+                {data.paymentBreakdown.map((p, i) => (
+                  <p key={i} style={{ display: "flex", justifyContent: "space-between", paddingLeft: "8px" }}>
+                    <span>{PAYMENT_LABELS[p.method] ?? p.method}</span>
+                    <span>{fmtPrice(p.amount)}</span>
+                  </p>
+                ))}
+              </>
+            ) : (
+              <p>Pago: {PAYMENT_LABELS[data.paymentMethod] ?? data.paymentMethod}</p>
+            )
           )}
           {!hidePrice && data.creditNoteCode && (
             <p>Nota de crédito: {data.creditNoteCode}</p>

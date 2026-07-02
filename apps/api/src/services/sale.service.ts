@@ -1,6 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { CreditNote, Sale, SaleItem, SaleOrderInput } from "@kwinna/contracts";
-import { LIBRE_PRODUCT_ID, TRANSFER_DISCOUNT_RATE, applyPriceTier } from "@kwinna/contracts";
+import { LIBRE_PRODUCT_ID, TRANSFER_DISCOUNT_RATE, applyPriceTier, paymentMethodsForTier } from "@kwinna/contracts";
 import { db } from "../db";
 import { mapSaleRow } from "../db/repositories";
 import { generateCreditNoteCode, mapCreditNoteRow } from "../db/repositories/credit-note.repository";
@@ -151,7 +151,39 @@ export async function createSale(
     // priceTier solo aplica en ventas POS (indicado por presencia de vendorId).
     // Ignorarlo si llega desde un cliente web sin vendorId evita que un cliente
     // anónimo obtenga descuentos de mayorista/efectivo manipulando el payload.
-    const effectiveTier = input.vendorId ? input.priceTier : undefined;
+    //
+    // Artículos libres: si la venta incluye ≥1 artículo libre, TODA la venta se
+    // fija en la columna "efectivo" (los productos de catálogo pierden lista/mayorista)
+    // y el precio manual del libre se respeta tal cual (ver loop de customItems).
+    const hasCustomItems = !!(input.customItems?.length && input.channel === "pos" && input.vendorId);
+    const effectiveTier = input.vendorId
+      ? (hasCustomItems ? "efectivo" : input.priceTier)
+      : undefined;
+
+    // Guard de método de pago (solo POS, identificado por vendorId): los métodos
+    // disponibles derivan de la columna de precios (efectiveTier). `orden_de_compra`
+    // siempre permitido; `por_devolucion` solo al canjear una nota de crédito.
+    // Con artículo libre effectiveTier="efectivo" → queda {efectivo, transferencia}.
+    const isPos = !!input.vendorId;
+    const paymentMethods = input.paymentBreakdown?.length
+      ? input.paymentBreakdown.map((p) => p.method)
+      : (input.paymentMethod ? [input.paymentMethod] : []);
+
+    if (isPos && paymentMethods.length) {
+      const allowedPayments = new Set<string>([
+        ...paymentMethodsForTier(effectiveTier),
+        "orden_de_compra",
+        ...(input.creditNoteId ? ["por_devolucion"] : []),
+      ]);
+      for (const method of paymentMethods) {
+        if (!allowedPayments.has(method)) {
+          throw Object.assign(
+            new Error(`Método de pago no permitido para esta lista de precios: ${method}`),
+            { statusCode: 422 }
+          );
+        }
+      }
+    }
 
     for (const item of input.items) {
       await deductStockItem(tx, item);
@@ -172,7 +204,8 @@ export async function createSale(
     // que un cliente web inyecte precios arbitrarios.
     if (input.customItems?.length && input.channel === "pos" && input.vendorId) {
       for (const custom of input.customItems) {
-        const unitPrice = applyPriceTier(custom.unitPrice, effectiveTier);
+        // Precio manual — nunca afectado por la lista de precios.
+        const unitPrice = custom.unitPrice;
         saleItems.push({
           productId: LIBRE_PRODUCT_ID,
           quantity:  custom.quantity,
@@ -203,6 +236,25 @@ export async function createSale(
 
     const total = itemsTotal - transferDiscount - promoDiscount + shippingCost;
 
+    // 4b — Validar y normalizar el desglose de pago POS ───────────────────────
+    // Caso normal (sin nota de crédito): los montos deben sumar el total de ítems
+    // (lo que el operador reparte en pantalla), con tolerancia de $1 por redondeo.
+    if (isPos && input.paymentBreakdown?.length && !input.creditNoteId) {
+      const paidSum = input.paymentBreakdown.reduce((sum, p) => sum + p.amount, 0);
+      if (Math.abs(paidSum - itemsTotal) > 1) {
+        throw Object.assign(
+          new Error("El desglose de pago no coincide con el total de la venta"),
+          { statusCode: 422 }
+        );
+      }
+    }
+
+    // Método primario (dominante) para reportes/compat: el de mayor monto del
+    // desglose; si no hay desglose se usa el paymentMethod recibido.
+    const primaryPaymentMethod = input.paymentBreakdown?.length
+      ? [...input.paymentBreakdown].sort((a, b) => b.amount - a.amount)[0]!.method
+      : input.paymentMethod;
+
     // 5 — Insertar venta ───────────────────────────────────────────────────
     const [inserted] = await tx
       .insert(salesTable)
@@ -224,7 +276,8 @@ export async function createSale(
         posCustomerId:    input.posCustomerId,
         vendorId:         input.vendorId,
         channel:          input.channel ?? "pos",
-        paymentMethod:    input.paymentMethod,
+        paymentMethod:    primaryPaymentMethod,
+        paymentBreakdown: input.paymentBreakdown ?? null,
         saleNotes:        input.saleNotes,
         promoCodeId:      promoResolved?.id   ?? null,
         promoDiscount:    promoDiscount.toString(),

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Search, X, Plus, Minus, ShoppingCart, AlertTriangle, CheckCircle2, Printer, RefreshCw, UserRound, UserPlus, ChevronDown, Banknote, FileText, Gift, Tag } from "lucide-react";
-import type { Product, Stock, PriceTier, CustomerSearchResult } from "@kwinna/contracts";
-import { applyPriceTier } from "@kwinna/contracts";
+import type { Product, Stock, PriceTier, PaymentMethod, PaymentSplit, CustomerSearchResult } from "@kwinna/contracts";
+import { applyPriceTier, paymentMethodsForTier } from "@kwinna/contracts";
 import type { CartItem, CustomCartItem } from "../store/use-pos-store";
 import { usePosStore } from "../store/use-pos-store";
 import { useProducts } from "../hooks/use-products";
@@ -330,14 +330,13 @@ function CustomCartRow({
   item,
   onRemove,
   onDelta,
-  priceTier,
 }: {
   item:      CustomCartItem;
   onRemove:  () => void;
   onDelta:   (d: number) => void;
-  priceTier: PriceTier;
 }) {
-  const unitPrice = applyPriceTier(item.unitPrice, priceTier);
+  // Precio manual — nunca afectado por la lista de precios.
+  const unitPrice = item.unitPrice;
 
   return (
     <div className="flex items-center gap-3 py-3 border-b border-zinc-800 last:border-0">
@@ -443,11 +442,13 @@ type CustomerMode = "search" | "new";
 function OrderModal({
   total,
   returnCreditAmount = 0,
+  priceTier,
   onClose,
   onConfirm,
 }: {
   total:               number;
   returnCreditAmount?: number;
+  priceTier:           PriceTier;
   onClose:             () => void;
   onConfirm: (data: {
     customerName:     string;
@@ -458,6 +459,7 @@ function OrderModal({
     shippingCity:     string;
     shippingProvince: string;
     paymentMethod:    string;
+    paymentBreakdown?: PaymentSplit[];
     saleNotes:        string;
     userId?:          string;
     posCustomerId?:   string;
@@ -484,9 +486,47 @@ function OrderModal({
   const [address,  setAddress]  = useState("");
   const [city,     setCity]     = useState("");
   const [province, setProvince] = useState("");
-  const [payment,  setPayment]  = useState(returnCreditAmount > 0 ? "por_devolucion" : "");
   const [notes,    setNotes]    = useState("");
   const [errors,   setErrors]   = useState<string[]>([]);
+
+  // ── Medio de pago ────────────────────────────────────────────────────────────
+  // Los métodos disponibles derivan de la columna de precios (tier). El operador
+  // puede sub-seleccionar 1 o 2 métodos; con 2 se reparte el monto por método.
+  // Con crédito de devolución activo se mantiene el flujo simple (por_devolucion).
+  const isCreditSale = returnCreditAmount > 0;
+  const payable      = Math.max(0, total - Math.min(total, returnCreditAmount));
+  const tierMethods  = paymentMethodsForTier(priceTier);
+
+  // Caso normal (sin crédito): selección múltiple de métodos + montos.
+  const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  // Caso crédito: método simple.
+  const [payment, setPayment] = useState<string>(isCreditSale ? "por_devolucion" : "");
+  const creditPayments: PaymentMethod[] = ["por_devolucion", ...tierMethods, "orden_de_compra"];
+
+  const isOrdenCompra = methods.includes("orden_de_compra");
+  const splitMethods  = methods.filter((m) => m !== "orden_de_compra");
+  const isSplit       = splitMethods.length === 2;
+  const parsedAmounts = splitMethods.map((m) => parseFloat(amounts[m] ?? "") || 0);
+  const sumAmounts    = parsedAmounts.reduce((a, b) => a + b, 0);
+  const resto         = payable - sumAmounts;
+
+  const methodLabel = (v: string) => PAYMENT_METHODS.find((m) => m.value === v)?.label ?? v;
+
+  function toggleMethod(v: PaymentMethod) {
+    setErrors([]);
+    if (v === "orden_de_compra") {
+      setMethods((prev) => (prev.includes("orden_de_compra") ? [] : ["orden_de_compra"]));
+      setAmounts({});
+      return;
+    }
+    setMethods((prev) => {
+      const base = prev.filter((m) => m !== "orden_de_compra");
+      if (base.includes(v)) return base.filter((m) => m !== v);
+      if (base.length >= 2) return base; // máximo 2 métodos
+      return [...base, v];
+    });
+  }
 
   function selectCustomer(c: CustomerSearchResult) {
     setSelectedCustomer(c);
@@ -516,13 +556,38 @@ function OrderModal({
       if (!newDni.trim())   errs.push("DNI del cliente obligatorio");
       if (!newPhone.trim()) errs.push("Teléfono del cliente obligatorio");
     }
-    if (!payment) errs.push("Medio de pago obligatorio");
+    if (isCreditSale) {
+      if (!payment) errs.push("Medio de pago obligatorio");
+    } else {
+      if (methods.length === 0) errs.push("Seleccioná el medio de pago");
+      else if (isSplit && Math.abs(resto) > 1) errs.push("Los montos por método deben sumar el total");
+    }
     return errs;
+  }
+
+  // Resuelve el método primario y el desglose según la selección.
+  function resolvePayment(): { paymentMethod: string; paymentBreakdown?: PaymentSplit[] } {
+    if (isCreditSale) {
+      return { paymentMethod: payment };
+    }
+    if (isOrdenCompra) {
+      return { paymentMethod: "orden_de_compra", paymentBreakdown: [{ method: "orden_de_compra", amount: payable }] };
+    }
+    if (splitMethods.length === 1) {
+      const m = splitMethods[0]!;
+      return { paymentMethod: m, paymentBreakdown: [{ method: m, amount: payable }] };
+    }
+    // 2 métodos: desglose con montos ingresados; primario = el de mayor monto.
+    const breakdown: PaymentSplit[] = splitMethods.map((m, i) => ({ method: m, amount: parsedAmounts[i]! }));
+    const primary = parsedAmounts[0]! >= parsedAmounts[1]! ? splitMethods[0]! : splitMethods[1]!;
+    return { paymentMethod: primary, paymentBreakdown: breakdown };
   }
 
   function handleConfirm() {
     const errs = validate();
     if (errs.length) { setErrors(errs); return; }
+
+    const { paymentMethod, paymentBreakdown } = resolvePayment();
 
     if (customerMode === "new") {
       onConfirm({
@@ -533,7 +598,8 @@ function OrderModal({
         shippingAddress:  address.trim(),
         shippingCity:     city.trim(),
         shippingProvince: province,
-        paymentMethod:    payment,
+        paymentMethod,
+        paymentBreakdown,
         saleNotes:        notes.trim(),
         newPosCustomer: {
           name:     newName.trim(),
@@ -558,7 +624,8 @@ function OrderModal({
       shippingAddress:  address.trim(),
       shippingCity:     city.trim(),
       shippingProvince: province,
-      paymentMethod:    payment,
+      paymentMethod,
+      paymentBreakdown,
       saleNotes:        notes.trim(),
       userId:          c.source === "web" ? c.id : undefined,
       posCustomerId:   c.source === "pos" ? c.id : undefined,
@@ -770,25 +837,82 @@ function OrderModal({
           {/* ── Payment ──────────────────────────────────────────────────── */}
           <section>
             <h3 className="text-xs text-zinc-400 uppercase tracking-wider mb-3">Pago</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1">
+
+            {isCreditSale ? (
+              /* Con crédito de devolución activo → selección simple */
+              <div className="flex flex-col gap-1 mb-3">
                 <label className="text-xs text-zinc-400">Medio de pago *</label>
                 <select
                   value={payment}
-                  onChange={(e) => setPayment(e.target.value)}
+                  onChange={(e) => { setPayment(e.target.value); setErrors([]); }}
                   className="bg-zinc-800 text-white rounded-lg px-3 py-2 text-sm outline-none
                              border border-transparent focus:border-zinc-600 transition-colors"
                 >
                   <option value="">Seleccionar…</option>
-                  {PAYMENT_METHODS.map((m) => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
+                  {creditPayments.map((v) => (
+                    <option key={v} value={v}>{methodLabel(v)}</option>
                   ))}
                 </select>
               </div>
-              <div className="col-span-2">
-                <Field label="Observaciones" value={notes} onChange={setNotes} multiline />
+            ) : (
+              <div className="flex flex-col gap-3 mb-3">
+                <div>
+                  <label className="text-xs text-zinc-400">Medio de pago * (podés combinar dos)</label>
+                  <div className="flex flex-wrap gap-2 mt-1.5">
+                    {[...tierMethods, "orden_de_compra" as PaymentMethod].map((v) => {
+                      const active = methods.includes(v);
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => toggleMethod(v)}
+                          className={`px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                            active
+                              ? "bg-white text-zinc-900 border-white"
+                              : "bg-zinc-800 text-zinc-300 border-zinc-700 hover:border-zinc-500"
+                          }`}
+                        >
+                          {methodLabel(v)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Montos por método cuando se combinan dos */}
+                {isSplit && (
+                  <div className="flex flex-col gap-2 bg-zinc-800/50 border border-zinc-700 rounded-xl p-3">
+                    {splitMethods.map((m) => (
+                      <div key={m} className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-400 w-28 flex-shrink-0">{methodLabel(m)}</span>
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm select-none">$</span>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            step="any"
+                            value={amounts[m] ?? ""}
+                            onChange={(e) => { setAmounts((prev) => ({ ...prev, [m]: e.target.value })); setErrors([]); }}
+                            placeholder="0"
+                            className="bg-zinc-800 text-white rounded-lg pl-7 pr-3 py-2 text-sm w-full outline-none
+                                       border border-zinc-700 focus:border-zinc-500 transition-colors"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-700">
+                      <span className="text-zinc-500">Total a cubrir: {formatPrice(payable)}</span>
+                      <span className={Math.abs(resto) < 1 ? "text-emerald-400 font-medium" : "text-amber-400 font-medium"}>
+                        {Math.abs(resto) < 1 ? "OK" : `Resto: ${formatPrice(resto)}`}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
+
+            <Field label="Observaciones" value={notes} onChange={setNotes} multiline />
           </section>
 
           {errors.length > 0 && (
@@ -881,12 +1005,18 @@ export default function SellView() {
   const vendorId = useAuthStore((s) => s.user?.id);
   const vendorName = useAuthStore((s) => s.user?.name);
 
+  // Un artículo libre fija toda la venta en la columna "efectivo": los productos de
+  // catálogo pierden lista/mayorista y el precio manual del libre se respeta tal cual.
+  // Se deriva sin mutar el store — al quitar el libre se restaura el tier elegido.
+  const hasCustomItems = customItems.length > 0;
+  const effectiveTier: PriceTier = hasCustomItems ? "efectivo" : priceTier;
+
   const catalogSubtotal = cart.reduce(
-    (sum, i) => sum + applyPriceTier(i.product.price, priceTier) * i.quantity,
+    (sum, i) => sum + applyPriceTier(i.product.price, effectiveTier) * i.quantity,
     0
   );
   const customSubtotal = customItems.reduce(
-    (sum, ci) => sum + applyPriceTier(ci.unitPrice, priceTier) * ci.quantity,
+    (sum, ci) => sum + ci.unitPrice * ci.quantity,
     0
   );
   const subtotal = catalogSubtotal + customSubtotal;
@@ -912,7 +1042,7 @@ export default function SellView() {
   interface ConfirmData {
     customerName: string; customerEmail: string; customerPhone: string;
     customerDni: string; shippingAddress: string; shippingCity: string;
-    shippingProvince: string; paymentMethod: string; saleNotes: string;
+    shippingProvince: string; paymentMethod: string; paymentBreakdown?: PaymentSplit[]; saleNotes: string;
     userId?: string; posCustomerId?: string;
     newPosCustomer?: { name: string; dni: string; phone: string; email?: string; address?: string; city?: string; province?: string };
   }
@@ -955,7 +1085,8 @@ export default function SellView() {
         shippingProvince: data.shippingProvince,
         channel:          "pos",
         paymentMethod:    data.paymentMethod || undefined,
-        priceTier:        priceTier,
+        paymentBreakdown: data.paymentBreakdown,
+        priceTier:        effectiveTier,
         saleNotes:        data.saleNotes     || undefined,
         vendorId:         vendorId,
         userId:           data.userId,
@@ -967,11 +1098,11 @@ export default function SellView() {
       const receiptItems = [
         ...cart.map((i) => ({
           name: i.product.name, sku: i.product.sku, size: i.size, quantity: i.quantity,
-          unitPrice: applyPriceTier(i.product.price, priceTier),
+          unitPrice: applyPriceTier(i.product.price, effectiveTier),
         })),
         ...customItems.map((ci) => ({
           name: ci.description, sku: "", size: undefined as string | undefined, quantity: ci.quantity,
-          unitPrice: applyPriceTier(ci.unitPrice, priceTier),
+          unitPrice: ci.unitPrice,
         })),
       ];
 
@@ -981,7 +1112,8 @@ export default function SellView() {
         customerName:   data.customerName,
         customerDni:    data.customerDni || undefined,
         paymentMethod:  data.paymentMethod,
-        priceTier:      priceTier,
+        paymentBreakdown: data.paymentBreakdown,
+        priceTier:      effectiveTier,
         saleNotes:      data.saleNotes || undefined,
         date:           new Date(),
         creditApplied:  creditApplied > 0 ? creditApplied : undefined,
@@ -1137,7 +1269,7 @@ export default function SellView() {
                   <CartRow
                     key={`${item.product.id}:${item.size ?? ""}`}
                     item={item}
-                    priceTier={priceTier}
+                    priceTier={effectiveTier}
                     availableStock={avail}
                     onRemove={() => removeFromCart(item.product.id, item.size)}
                     onDelta={(d) => updateQty(item.product.id, item.size, d)}
@@ -1148,7 +1280,6 @@ export default function SellView() {
                 <CustomCartRow
                   key={ci.id}
                   item={ci}
-                  priceTier={priceTier}
                   onRemove={() => removeCustomItem(ci.id)}
                   onDelta={(d) => updateCustomQty(ci.id, d)}
                 />
@@ -1168,20 +1299,29 @@ export default function SellView() {
 
             <div className="flex flex-col gap-1.5 mb-1">
               <label className="text-xs text-zinc-400">Lista de Precios</label>
-              <div className="flex rounded-lg overflow-hidden border border-zinc-700">
-                <button
-                  onClick={() => setPriceTier("lista")}
-                  className={`flex-1 py-1.5 text-xs font-medium transition-colors ${priceTier === "lista" ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"}`}
-                >Lista</button>
-                <button
-                  onClick={() => setPriceTier("efectivo")}
-                  className={`flex-1 py-1.5 text-xs font-medium transition-colors border-l border-zinc-700 ${priceTier === "efectivo" ? "bg-emerald-400 text-emerald-950" : "bg-zinc-800 text-emerald-400/70 hover:bg-zinc-700"}`}
-                >Efvo</button>
-                <button
-                  onClick={() => setPriceTier("mayorista")}
-                  className={`flex-1 py-1.5 text-xs font-medium transition-colors border-l border-zinc-700 ${priceTier === "mayorista" ? "bg-amber-400 text-amber-950" : "bg-zinc-800 text-amber-400/70 hover:bg-zinc-700"}`}
-                >Mayorista</button>
-              </div>
+              {hasCustomItems ? (
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-2">
+                  <Tag size={12} className="text-emerald-400 flex-shrink-0" />
+                  <span className="text-xs text-emerald-300">
+                    Efectivo · fijada por artículo libre
+                  </span>
+                </div>
+              ) : (
+                <div className="flex rounded-lg overflow-hidden border border-zinc-700">
+                  <button
+                    onClick={() => setPriceTier("lista")}
+                    className={`flex-1 py-1.5 text-xs font-medium transition-colors ${priceTier === "lista" ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"}`}
+                  >Lista</button>
+                  <button
+                    onClick={() => setPriceTier("efectivo")}
+                    className={`flex-1 py-1.5 text-xs font-medium transition-colors border-l border-zinc-700 ${priceTier === "efectivo" ? "bg-emerald-400 text-emerald-950" : "bg-zinc-800 text-emerald-400/70 hover:bg-zinc-700"}`}
+                  >Efvo</button>
+                  <button
+                    onClick={() => setPriceTier("mayorista")}
+                    className={`flex-1 py-1.5 text-xs font-medium transition-colors border-l border-zinc-700 ${priceTier === "mayorista" ? "bg-amber-400 text-amber-950" : "bg-zinc-800 text-amber-400/70 hover:bg-zinc-700"}`}
+                  >Mayorista</button>
+                </div>
+              )}
             </div>
 
             {/* Totales con crédito */}
@@ -1239,6 +1379,7 @@ export default function SellView() {
         <OrderModal
           total={subtotal}
           returnCreditAmount={creditAmount}
+          priceTier={effectiveTier}
           onClose={() => { setModal(false); setSaleError(""); }}
           onConfirm={handleConfirm}
         />

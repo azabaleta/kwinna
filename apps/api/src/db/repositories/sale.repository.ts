@@ -29,6 +29,7 @@ export function mapSaleRow(row: typeof salesTable.$inferSelect): Sale {
     // Channel + POS metadata
     channel:       row.channel,
     paymentMethod: (row.paymentMethod as PaymentMethod) ?? undefined,
+    paymentBreakdown: row.paymentBreakdown ?? undefined,
     saleNotes:     row.saleNotes     ?? undefined,
 
     userId:        row.userId        ?? undefined,

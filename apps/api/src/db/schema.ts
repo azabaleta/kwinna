@@ -14,7 +14,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import type { SaleItem } from "@kwinna/contracts";
+import type { PaymentSplit, SaleItem } from "@kwinna/contracts";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -363,7 +363,8 @@ export const salesTable = pgTable("sales", {
 
   // ── POS metadata ────────────────────────────────────────────────────────────
   channel:       saleChannelEnum("channel").notNull().default("web"),
-  paymentMethod: varchar("payment_method", { length: 50 }),   // efectivo | tarjeta | transferencia | otro
+  paymentMethod: varchar("payment_method", { length: 50 }),   // método primario (dominante) — categoría para reportes
+  paymentBreakdown: jsonb("payment_breakdown").$type<PaymentSplit[]>(),  // desglose POS: 1-2 métodos con monto
   saleNotes:     text("sale_notes"),
   customerDni:   varchar("customer_dni", { length: 20 }),
 

@@ -178,15 +178,6 @@ export function ShopClientView({ initialProducts }: ShopClientViewProps) {
           p.tags.some((t) => t.toLowerCase() === activeCategory.toLowerCase()),
         );
 
-  // ── Sort ─────────────────────────────────────────────────────────────────
-  // Copia superficial para no mutar el array original del store/query.
-
-  const visibleProducts = [...filteredProducts].sort((a, b) => {
-    if (activeSort === "price_asc")  return a.price - b.price;
-    if (activeSort === "price_desc") return b.price - a.price;
-    return 0; // "relevance" → orden original del servidor
-  });
-
   // ── O(1) lookup indices ──────────────────────────────────────────────────
 
   // Suma todas las filas del mismo productId (una por talle) para obtener
@@ -196,6 +187,26 @@ export function ShopClientView({ initialProducts }: ShopClientViewProps) {
     return acc;
   }, {});
   const cartIndex  = Object.fromEntries(cartItems.map((i) => [i.product.id, i.quantity]));
+
+  // ── Sort ─────────────────────────────────────────────────────────────────
+  // Copia superficial para no mutar el array original del store/query.
+  //
+  // En "relevance" (default) agrupamos en tiers para que los agotados caigan al
+  // fondo, salvo los destacados (que se mantienen arriba, tengan stock o no):
+  //   0 = destacado · 1 = con stock · 2 = agotado (no destacado)
+  // Dentro de cada tier se conserva el orden del server (sort estable).
+  // En orden por precio manda el precio (decisión previa: no se ancla nada).
+
+  function relevanceRank(p: Product): number {
+    if (p.featured) return 0;
+    return (stockIndex[p.id] ?? 0) > 0 ? 1 : 2;
+  }
+
+  const visibleProducts = [...filteredProducts].sort((a, b) => {
+    if (activeSort === "price_asc")  return a.price - b.price;
+    if (activeSort === "price_desc") return b.price - a.price;
+    return relevanceRank(a) - relevanceRank(b); // empate → orden del server
+  });
 
   // ── Add to cart ──────────────────────────────────────────────────────────
 
