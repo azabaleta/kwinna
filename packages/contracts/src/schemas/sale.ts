@@ -37,6 +37,20 @@ export function isPaidSale(status: SaleStatus): boolean {
   return PAID_SALE_STATUSES.includes(status);
 }
 
+/**
+ * Ingreso en dinero NUEVO de una venta: el total menos lo que se cubrió con una
+ * nota de crédito (`creditApplied`). El monto de una nota de crédito ya ingresó
+ * como ingreso en la venta original que la generó; volver a contarlo al canjearla
+ * sería doble conteo. Por eso:
+ *   - Canje TOTAL (pagado 100% con crédito) → aporta ~0.
+ *   - Canje PARCIAL (crédito + otro método) → aporta solo el saldo pagado en dinero nuevo.
+ *   - Venta sin crédito → aporta el total.
+ * FUENTE ÚNICA para métricas de ingreso: usar en lugar de sumar `total` a mano.
+ */
+export function saleNetRevenue(sale: Pick<Sale, "total" | "creditApplied">): number {
+  return Math.max(0, sale.total - (sale.creditApplied ?? 0));
+}
+
 export const SaleChannelSchema = z.enum(["web", "pos"]);
 export type SaleChannel = z.infer<typeof SaleChannelSchema>;
 
@@ -148,6 +162,12 @@ export const SaleSchema = z.object({
   // ── Código promocional ────────────────────────────────────────────────────
   promoCodeId:   z.string().uuid().nullable().optional(),
   promoDiscount: z.number().nonnegative().default(0),
+
+  // ── Nota de crédito aplicada ──────────────────────────────────────────────
+  // Monto de esta venta cubierto con una nota de crédito canjeada. Se resta del
+  // total para el ingreso NETO (ver saleNetRevenue) y evitar doble conteo del
+  // crédito, que ya ingresó en la venta original que lo generó.
+  creditApplied: z.number().nonnegative().default(0),
 
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

@@ -1,6 +1,6 @@
 import { and, gte, lt } from "drizzle-orm";
 import type { MetricSnapshot, SnapshotData, SnapshotPeriod } from "@kwinna/contracts";
-import { isPaidSale } from "@kwinna/contracts";
+import { isPaidSale, saleNetRevenue } from "@kwinna/contracts";
 import { db } from "../db";
 import { salesTable } from "../db/schema";
 import { getAnalyticsSummary } from "../db/repositories/analytics.repository";
@@ -42,14 +42,16 @@ async function computeSnapshotData(from: Date, to: Date): Promise<SnapshotData> 
   const webSales = sales.filter((s) => s.channel === "web");
   const posSales = sales.filter((s) => s.channel === "pos");
 
-  // Excluir ventas "por_devolucion" de ingresos: no generan ingreso real
-  const revSales       = sales.filter((s) => s.paymentMethod !== "por_devolucion");
-  const revWebSales    = webSales.filter((s) => s.paymentMethod !== "por_devolucion");
-  const revPosSales    = posSales.filter((s) => s.paymentMethod !== "por_devolucion");
+  // Ingreso NETO por venta = total menos el crédito de una nota canjeada
+  // (saleNetRevenue, fuente única). Se descartan las ventas sin ingreso nuevo
+  // (canje 100% con nota de crédito → neto 0) para que no arrastren el AOV.
+  const revSales       = sales.filter((s) => saleNetRevenue(s) > 0);
+  const revWebSales    = webSales.filter((s) => saleNetRevenue(s) > 0);
+  const revPosSales    = posSales.filter((s) => saleNetRevenue(s) > 0);
 
-  const revenue           = revSales.reduce((s, v) => s + v.total, 0);
-  const revenueWeb        = revWebSales.reduce((s, v) => s + v.total, 0);
-  const revenuePos        = revPosSales.reduce((s, v) => s + v.total, 0);
+  const revenue           = revSales.reduce((s, v) => s + saleNetRevenue(v), 0);
+  const revenueWeb        = revWebSales.reduce((s, v) => s + saleNetRevenue(v), 0);
+  const revenuePos        = revPosSales.reduce((s, v) => s + saleNetRevenue(v), 0);
   const shippingRev       = revSales.reduce((s, v) => s + v.shippingCost, 0);
   const avgOrderValue     = revSales.length    > 0 ? revenue    / revSales.length    : 0;
   const avgOrderValueWeb  = revWebSales.length > 0 ? revenueWeb / revWebSales.length : 0;

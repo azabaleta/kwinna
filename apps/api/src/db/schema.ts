@@ -376,6 +376,11 @@ export const salesTable = pgTable("sales", {
   promoCodeId:   uuid("promo_code_id"),
   promoDiscount: numeric("promo_discount", { precision: 12, scale: 2 }).notNull().default("0"),
 
+  // ── Nota de crédito aplicada ──────────────────────────────────────────────
+  // Monto de esta venta cubierto con una nota de crédito canjeada. Se resta del
+  // total para el ingreso NETO (evita doble conteo del crédito ya ingresado).
+  creditApplied: numeric("credit_applied", { precision: 12, scale: 2 }).notNull().default("0"),
+
   // ── Alerta push de orden estancada en "pending" (>1h) — idempotencia del job ──
   staleAlertSentAt: timestamp("stale_alert_sent_at", { withTimezone: true }),
 

@@ -28,6 +28,7 @@ import { useStock } from "@/hooks/use-stock";
 import { selectCartItems, useCartStore } from "@/store/use-cart-store";
 import { useAuthStore } from "@/store/use-auth-store";
 import { trackEvent } from "@/services/analytics";
+import { metaTrack } from "@/lib/meta-pixel";
 import { ProductCard } from "@/components/shop/product-card";
 import { CartPanel } from "@/components/shop/cart-panel";
 import { cn } from "@/lib/utils";
@@ -227,6 +228,13 @@ export function ShopClientView({ initialProducts }: ShopClientViewProps) {
 
     addItem(product);
     trackEvent("cart_add");
+    metaTrack("AddToCart", {
+      content_ids:  [product.id],
+      content_type: "product",
+      content_name: product.name,
+      value:        product.price,
+      currency:     "ARS",
+    });
     toast.success("Añadido al carrito", { description: product.name });
   }
 

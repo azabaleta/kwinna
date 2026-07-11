@@ -27,7 +27,7 @@ import { useAnalyticsSummary } from "@/hooks/use-analytics";
 import { useReturnsSummary } from "@/hooks/use-returns";
 import { MetricsChartDialog, type ChartMetric } from "@/components/admin/metrics-chart-dialog";
 import { cn } from "@/lib/utils";
-import { RETURN_REASON_LABELS, isPaidSale, type ReturnReason, type Sale, type Stock, type StockMovement } from "@kwinna/contracts";
+import { RETURN_REASON_LABELS, isPaidSale, saleNetRevenue, type ReturnReason, type Sale, type Stock, type StockMovement } from "@kwinna/contracts";
 
 // ─── Period helpers ───────────────────────────────────────────────────────────
 
@@ -84,9 +84,10 @@ function computeMetrics(sales: Sale[], from: Date, to: Date): Metrics {
   const inRange   = sales.filter((s) => { const d = new Date(s.createdAt); return d >= from && d < to; });
   // "Cobradas" = pagado + armado + entregado (isPaidSale), no solo completed.
   const paid            = inRange.filter((s) => isPaidSale(s.status));
-  // Ventas "por_devolucion" no generan ingreso real: el cliente usó crédito previo
-  const revenueOrders   = paid.filter((s) => s.paymentMethod !== "por_devolucion");
-  const revenue         = revenueOrders.reduce((sum, s) => sum + s.total, 0);
+  // Ingreso NETO: total menos el crédito de una nota canjeada (saleNetRevenue,
+  // fuente única). Las ventas 100% con crédito (neto 0) no cuentan como ingreso.
+  const revenueOrders   = paid.filter((s) => saleNetRevenue(s) > 0);
+  const revenue         = revenueOrders.reduce((sum, s) => sum + saleNetRevenue(s), 0);
   const units           = paid.reduce((sum, s) => sum + s.items.reduce((si, i) => si + i.quantity, 0), 0);
   return {
     revenue,

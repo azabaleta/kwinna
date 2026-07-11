@@ -314,8 +314,20 @@ export async function createSale(
         .set({ status: "redeemed", redeemedSaleId: inserted!.id, redeemedAt: new Date() })
         .where(eq(creditNotesTable.id, input.creditNoteId));
 
-      // Si el crédito supera el total de la venta → nota residual
       const creditAmount = Number(creditNoteRow.amount);
+
+      // Crédito efectivamente aplicado a ESTA venta (lo que excede va a la nota
+      // residual, ver abajo). Se persiste para que el ingreso neto no vuelva a
+      // contar el monto del crédito, que ya ingresó en la venta que lo originó.
+      const creditApplied = Math.min(creditAmount, itemsTotal);
+      await tx
+        .update(salesTable)
+        .set({ creditApplied: creditApplied.toString() })
+        .where(eq(salesTable.id, inserted!.id));
+      // Reflejar el valor en el row que se retorna/mapea (el INSERT trajo "0").
+      inserted!.creditApplied = creditApplied.toString();
+
+      // Si el crédito supera el total de la venta → nota residual
       if (creditAmount > itemsTotal) {
         const remaining = creditAmount - itemsTotal;
         const [residualRow] = await tx

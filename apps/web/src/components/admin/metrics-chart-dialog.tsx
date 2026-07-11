@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { Sale } from "@kwinna/contracts";
-import { isPaidSale } from "@kwinna/contracts";
+import { isPaidSale, saleNetRevenue } from "@kwinna/contracts";
 import { BadgeDollarSign, ShoppingBag, TrendingUp, BarChart3, X } from "lucide-react";
 
 export type ChartMetric = "revenue" | "orders" | "units" | "aov";
@@ -85,10 +85,12 @@ export function MetricsChartDialog({ isOpen, onClose, metric, sales, from, to }:
       if (!point) return;
 
       let val = 0;
-      if (metric === "revenue") val = sale.total;
+      // Ingreso NETO (saleNetRevenue): descuenta el crédito de una nota canjeada
+      // para no doble-contar; también excluye implícitamente los canjes 100% crédito.
+      if (metric === "revenue") val = saleNetRevenue(sale);
       if (metric === "orders") val = 1;
       if (metric === "units") val = sale.items.reduce((acc, i) => acc + i.quantity, 0);
-      if (metric === "aov") val = sale.total; // We sum revenue first, then divide by orders later
+      if (metric === "aov") val = saleNetRevenue(sale); // We sum revenue first, then divide by orders later
 
       if (sale.channel === "web") point.web += val;
       if (sale.channel === "pos") point.pos += val;

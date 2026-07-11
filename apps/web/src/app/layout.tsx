@@ -4,6 +4,7 @@ import { Manrope } from "next/font/google";
 import { MockProvider } from "@/providers/mock-provider";
 import { QueryProvider } from "@/providers/query-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { MetaPixel } from "@/components/analytics/meta-pixel";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -42,6 +43,7 @@ export default function RootLayout({
           <QueryProvider>{children}</QueryProvider>
         </MockProvider>
         <Toaster />
+        <MetaPixel />
       </body>
     </html>
   );

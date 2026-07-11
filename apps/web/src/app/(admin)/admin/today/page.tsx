@@ -14,7 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import type { Product, Sale } from "@kwinna/contracts";
-import { isPaidSale } from "@kwinna/contracts";
+import { isPaidSale, saleNetRevenue } from "@kwinna/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -253,7 +253,8 @@ export default function TodayPage() {
   const pending    = todaySales.filter((s) => s.status === "pending");
   const cancelled  = todaySales.filter((s) => s.status === "cancelled");
 
-  const revenue    = paid.reduce((acc, s) => acc + s.total, 0);
+  // Ingreso NETO: descuenta el crédito de una nota canjeada (saleNetRevenue).
+  const revenue    = paid.reduce((acc, s) => acc + saleNetRevenue(s), 0);
   const units      = paid.reduce(
     (acc, s) => acc + s.items.reduce((a, i) => a + i.quantity, 0),
     0

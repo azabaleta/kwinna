@@ -42,6 +42,8 @@ export function mapSaleRow(row: typeof salesTable.$inferSelect): Sale {
     promoCodeId:   row.promoCodeId   ?? undefined,
     promoDiscount: Number(row.promoDiscount ?? 0),
 
+    creditApplied: Number(row.creditApplied ?? 0),
+
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

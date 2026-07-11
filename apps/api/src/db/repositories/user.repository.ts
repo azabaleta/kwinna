@@ -102,9 +102,10 @@ export async function findAllCustomers(): Promise<CustomerMetrics[]> {
   const customerIds = customers.map((c) => c.id);
   const sales = await db
     .select({
-      userId:    salesTable.userId,
-      total:     salesTable.total,
-      createdAt: salesTable.createdAt,
+      userId:        salesTable.userId,
+      total:         salesTable.total,
+      creditApplied: salesTable.creditApplied,
+      createdAt:     salesTable.createdAt,
     })
     .from(salesTable)
     .where(
@@ -116,16 +117,21 @@ export async function findAllCustomers(): Promise<CustomerMetrics[]> {
     );
 
   // 3 — Calcular métricas en memoria (O(S) — S = total de ventas cobradas)
+  // Gasto NETO: se descuenta el crédito de una nota canjeada (ya ingresó en la
+  // venta original que la generó) para no doble-contar el gasto del cliente.
+  const net = (s: { total: string; creditApplied: string | null }) =>
+    Math.max(0, Number(s.total) - Number(s.creditApplied ?? 0));
+
   return customers.map((c) => {
     const own = sales.filter((s) => s.userId === c.id);
 
-    const totalLifetime = own.reduce((sum, s) => sum + Number(s.total), 0);
+    const totalLifetime = own.reduce((sum, s) => sum + net(s), 0);
     const totalSemester = own
       .filter((s) => s.createdAt >= sixMonthsAgo)
-      .reduce((sum, s) => sum + Number(s.total), 0);
+      .reduce((sum, s) => sum + net(s), 0);
     const totalMonth = own
       .filter((s) => s.createdAt >= startOfMonth)
-      .reduce((sum, s) => sum + Number(s.total), 0);
+      .reduce((sum, s) => sum + net(s), 0);
 
     return {
       id:            c.id,

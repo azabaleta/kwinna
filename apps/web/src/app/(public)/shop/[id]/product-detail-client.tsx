@@ -16,6 +16,7 @@ import { selectCartItems, useCartStore } from "@/store/use-cart-store";
 import { useAuthStore } from "@/store/use-auth-store";
 import { useWishlistStore } from "@/store/use-wishlist-store";
 import { trackEvent } from "@/services/analytics";
+import { metaTrack } from "@/lib/meta-pixel";
 import { cn } from "@/lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -202,6 +203,18 @@ export function ProductDetailClient({ id }: { id: string }) {
     setSelectedSize(undefined);
   }, [id]);
 
+  // Meta Pixel — ViewContent al cargar la ficha del producto.
+  useEffect(() => {
+    if (!product) return;
+    metaTrack("ViewContent", {
+      content_ids:  [product.id],
+      content_type: "product",
+      content_name: product.name,
+      value:        product.price,
+      currency:     "ARS",
+    });
+  }, [product]);
+
   const hasSizes    = stock.some((s) => s.size !== undefined && s.size !== "");
   const sortedStock = hasSizes ? sortSizes(stock.filter((s) => s.size)) : [];
   const noSizeEntry = !hasSizes ? stock[0] : undefined;
@@ -260,6 +273,13 @@ export function ProductDetailClient({ id }: { id: string }) {
     }
     addItem(product, 1, selectedSize);
     trackEvent("cart_add");
+    metaTrack("AddToCart", {
+      content_ids:  [product.id],
+      content_type: "product",
+      content_name: product.name,
+      value:        product.price,
+      currency:     "ARS",
+    });
     toast.success("Añadido al carrito", {
       description: selectedSize ? `Talle ${selectedSize}` : product.name,
     });

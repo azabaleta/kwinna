@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Clock, Copy, ExternalLink, Loader2, Landmark } from "lucide-react";
 import Link from "next/link";
@@ -9,6 +9,7 @@ import { isPaidSale } from "@kwinna/contracts";
 import { Button } from "@/components/ui/button";
 import { useSaleById } from "@/hooks/use-sale";
 import { waLink } from "@/lib/constants";
+import { metaTrack } from "@/lib/meta-pixel";
 
 const BANK_DETAILS = {
   bank: "Brubank",
@@ -27,6 +28,32 @@ function CheckoutSuccessContent() {
 
   const { data, isLoading, isError } = useSaleById(id);
   const sale = data?.data;
+
+  // Meta Pixel — Purchase. Solo se dispara si la venta ya está pagada (MP aprobado
+  // al instante). Las transferencias / pagos tardíos los cubre el CAPI server-side
+  // al completarse la orden. El eventID determinístico `purchase_<saleId>` deduplica
+  // ambos envíos → Meta cuenta la compra una sola vez. El ref evita re-disparos.
+  const purchaseSentRef = useRef(false);
+  useEffect(() => {
+    if (!sale || purchaseSentRef.current) return;
+    if (!isPaidSale(sale.status)) return;
+    purchaseSentRef.current = true;
+    metaTrack(
+      "Purchase",
+      {
+        content_ids:  sale.items.map((i) => i.productId),
+        content_type: "product",
+        contents:     sale.items.map((i) => ({
+          id:         i.productId,
+          quantity:   i.quantity,
+          item_price: i.unitPrice,
+        })),
+        value:        sale.total,
+        currency:     "ARS",
+      },
+      `purchase_${sale.id}`,
+    );
+  }, [sale]);
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);

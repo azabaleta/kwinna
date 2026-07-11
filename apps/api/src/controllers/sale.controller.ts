@@ -6,6 +6,7 @@ import { createMPPreference, getMPPayment, verifyMPSignature, searchApprovedPaym
 import { findAllSales, findSaleById, findSaleByTxCode, findWebOrdersToProcess, updateSaleStatus, findPendingSalesByEmail } from "../db/repositories/sale.repository";
 import { sendSaleConfirmationEmail } from "../services/email.service";
 import { sendPushNotification, formatSaleAlert } from "../services/notify.service";
+import { sendPurchaseEvent } from "../services/meta-capi.service";
 
 // ─── POST /sales ──────────────────────────────────────────────────────────────
 // Venta directa POS — crea la venta como `completed` de inmediato.
@@ -120,6 +121,7 @@ async function cleanupAbandonedPendingOrders(customerEmail: string, currentSaleI
         const completed = await updateSaleStatus(oldSale.id, "completed");
         if (completed) {
           sendSaleConfirmationEmail(completed).catch(() => {});
+          sendPurchaseEvent(completed).catch(() => {});
           console.log(`[Cleanup] Orden ${oldSale.id} tenía pago aprobado. Actualizada a completed.`);
         }
       } else {
@@ -257,6 +259,9 @@ export async function postWebhook(
       );
       sendPushNotification(formatSaleAlert(completed)).catch((err: Error) =>
         console.error("[Notify] Error push pago MP:", err.message)
+      );
+      sendPurchaseEvent(completed).catch((err: Error) =>
+        console.error("[MetaCAPI] Error Purchase pago MP:", err.message)
       );
     }
 
@@ -517,6 +522,9 @@ export async function postReconcile(
     sendPushNotification(formatSaleAlert(completed)).catch((err: Error) =>
       console.error("[Notify] Error push pago post-reconciliación:", err.message)
     );
+    sendPurchaseEvent(completed).catch((err: Error) =>
+      console.error("[MetaCAPI] Error Purchase post-reconciliación:", err.message)
+    );
 
     res.json({ data: completed });
   } catch (err) {
@@ -562,6 +570,9 @@ export async function postApproveTransfer(
     );
     sendPushNotification(formatSaleAlert(completed)).catch((err: Error) =>
       console.error("[Notify] Error push pago post-aprobación:", err.message)
+    );
+    sendPurchaseEvent(completed).catch((err: Error) =>
+      console.error("[MetaCAPI] Error Purchase post-aprobación:", err.message)
     );
 
     res.json({ data: completed });

@@ -44,6 +44,7 @@ import {
   type CheckoutFormValues,
 } from "@/schemas/checkout";
 import { trackEvent } from "@/services/analytics";
+import { metaTrack } from "@/lib/meta-pixel";
 import { cn } from "@/lib/utils";
 import {
   fetchProvincias,
@@ -118,7 +119,22 @@ export default function CheckoutPage() {
   const zonesMap = Object.fromEntries(shippingZones.map((z) => [z.city, z.cost]));
 
   // checkout_start: el usuario llegó al checkout con ítems en el carrito
-  useEffect(() => { trackEvent("checkout_start"); }, []);
+  useEffect(() => {
+    trackEvent("checkout_start");
+    metaTrack("InitiateCheckout", {
+      content_ids:  items.map((i) => i.product.id),
+      content_type: "product",
+      contents:     items.map((i) => ({
+        id:         i.product.id,
+        quantity:   i.quantity,
+        item_price: i.product.price,
+      })),
+      num_items:    count,
+      value:        cartTotal,
+      currency:     "ARS",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── React Hook Form ───────────────────────────────────────────────────────
   // Inicializamos con valores vacíos para que SSR y cliente rindan IDÉNTICO HTML.
